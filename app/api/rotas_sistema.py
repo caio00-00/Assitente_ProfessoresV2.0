@@ -39,15 +39,51 @@ def _exigir_segredo(authorization: str = Header(default="")) -> None:
         raise HTTPException(status_code=401, detail="Segredo inválido.")
 
 
-@router.get("/saude")
-def saude(db: Session = Depends(get_db)):
+def _diagnostico_banco(erro: Exception) -> dict:
+    """O que dá para dizer sobre a conexão sem mostrar a senha."""
+    from urllib.parse import urlsplit
+
     s = get_settings()
+    definida = bool(os.environ.get("DATABASE_URL"))
+    url = s.DATABASE_URL
+    try:
+        p = urlsplit(url)
+        host, porta, usuario = p.hostname, p.port, p.username
+    except Exception:  # noqa: BLE001
+        p = host = porta = usuario = None
+    msg = str(erro).splitlines()[0][:300] if str(erro) else ""
+    if p and p.password:
+        msg = msg.replace(p.password, "***")
+    dicas = []
+    if not definida:
+        dicas.append("DATABASE_URL não está definida: o sistema tentou o Postgres do Docker.")
+    if host and host.startswith("db.") and host.endswith(".supabase.co"):
+        dicas.append("Conexão direta do Supabase (db.<projeto>.supabase.co) só tem IPv6 e a Vercel não alcança: use a URL do pooler (aws-0-...pooler.supabase.com).")
+    if host and "pooler.supabase.com" in host and usuario and "." not in usuario:
+        dicas.append("No pooler o usuário é postgres.<id-do-projeto>, não só postgres.")
+    if "sslmode" not in url:
+        dicas.append("Falta ?sslmode=require no fim da URL.")
+    if "password authentication failed" in msg:
+        dicas.append("Senha errada. Se ela tem @ # / % :, escreva codificada (%40 %23 %2F %25 %3A).")
+    return {"database_url_definida": definida, "host": host, "porta": porta, "usuario": usuario,
+            "erro": f"{type(erro).__name__}: {msg}", "dicas": dicas}
+
+
+@router.get("/saude")
+def saude(db: Session = Depends(get_db), authorization: str = Header(default="")):
+    """Pública. Com Authorization: Bearer <CRON_SECRET>, mostra também o motivo
+    de o banco não conectar (sem a senha)."""
+    s = get_settings()
+    detalhe = None
     try:
         db.execute(text("SELECT 1"))
         banco = "ok"
-    except Exception:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE001
         banco = "sem conexão"
-    return {
+        segredo = s.CRON_SECRET
+        if segredo and hmac.compare_digest(authorization.removeprefix("Bearer ").strip().encode(), segredo.encode()):
+            detalhe = _diagnostico_banco(e)
+    resposta = {
         "api": "ok",
         "banco": banco,
         "versao": s.APP_VERSION,
@@ -55,6 +91,11 @@ def saude(db: Session = Depends(get_db)):
         "busca_no_drive": s.modo_tarefas,
         "tempo_real": s.tempo_real,
     }
+    if detalhe:
+        resposta["diagnostico_banco"] = detalhe
+    elif banco != "ok":
+        resposta["como_ver_o_motivo"] = "chame esta rota com o cabeçalho Authorization: Bearer <CRON_SECRET>"
+    return resposta
 
 
 def _rodar_varredura(db: Session):
