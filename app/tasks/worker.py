@@ -312,3 +312,16 @@ def reprocessar_vermelhos_drive():
         print(f"[REPROCESSAR] ❌ Erro: {e}")
     finally:
         db.close()
+
+def verificar_compliance_agora(report_id: str, nome_padronizado: str, exigir_diretor: bool = True) -> str:
+    """Verificação única e síncrona, sem fila (HML 6047d52: Reverificar quando
+    o Redis/Celery está fora). Devolve o status_compliance final."""
+    import uuid as _uuid
+
+    verificar_uma_vez(report_id, nome_padronizado, exigir_diretor)
+    db = SessionLocal()
+    try:
+        r = db.query(ClassReport).filter(ClassReport.id == _uuid.UUID(str(report_id))).first()
+        return r.status_compliance if r else "NAO_ENCONTRADO"
+    finally:
+        db.close()

@@ -698,17 +698,35 @@ def lookup_contexto_estudio(
     link_da_agenda = bool(youtube_link)
     chave_da_agenda = bool(chave_transmissao)
 
+    from app.services.agenda_estudios import (
+        OCORRENCIAS_DE_AULA, TIPOS_DE_AULA, turno_do_horario, turma_label, youtube_do_agendamento,
+    )
+
+    ag = None
     if estudio_id:
-        ag = db.query(AgendamentoEstudio).filter(
-            AgendamentoEstudio.data == data,
-            AgendamentoEstudio.estudio_id == estudio_id,
-            AgendamentoEstudio.status == "AGENDADO",
-        ).first()
+        # Agendamento deste estúdio NESTE turno (não o primeiro do dia, que pode ser de outro
+        # turno); cancelamento/remanejamento de aula da grade não é agendamento.
+        do_turno = [
+            a for a in db.query(AgendamentoEstudio).filter(
+                AgendamentoEstudio.data == data,
+                AgendamentoEstudio.estudio_id == estudio_id,
+                AgendamentoEstudio.status == "AGENDADO",
+                ~AgendamentoEstudio.tipo.in_(OCORRENCIAS_DE_AULA),
+            ).order_by(AgendamentoEstudio.horario_inicio).all()
+            if a.horario_inicio and turno_do_horario(a.horario_inicio) == turno_agenda
+        ]
+        # o que tem link/chave primeiro
+        do_turno.sort(key=lambda a: not (a.chave_transmissao or youtube_do_agendamento(a)))
+        ag = do_turno[0] if do_turno else None
         if ag:
+            # Link/chave digitados pelo diretor-chefe no agendamento valem como os da Agenda
             if ag.chave_transmissao and not chave_transmissao:
                 chave_transmissao = ag.chave_transmissao
-            if not youtube_link and ag.chamado_link and ("youtube" in ag.chamado_link.lower() or "youtu.be" in ag.chamado_link.lower()):
-                youtube_link = ag.chamado_link
+                chave_da_agenda = True
+            link_ag = youtube_do_agendamento(ag)
+            if link_ag and not youtube_link:
+                youtube_link = link_ag
+                link_da_agenda = True
             if ag.tipo == "EVENTO":
                 is_evento = True
                 nome_evento = ag.nome_evento or ag.titulo
@@ -741,13 +759,34 @@ def lookup_contexto_estudio(
     professor_nome = None
     horario_aula = None
 
-    if estudio_id and not is_evento:
+    if ag is not None and not is_evento and ag.tipo in TIPOS_DE_AULA and ag.turma_id:
+        # Gravação/aula marcada na Agenda: turma, título e professor vêm do agendamento
+        turma_id = str(ag.turma_id)
+        turma_nome = turma_label(ag.turma) if ag.turma else None
+        disciplina_nome = ag.titulo
+        professor_nome = ag.professor
+        if ag.professor:
+            from app.models.auxiliares import Professor
+            from app.services.idr_txt_parser import norm_key
+            alvo_prof = norm_key(ag.professor)
+            achado = next((p for p in db.query(Professor).all() if norm_key(p.nome) == alvo_prof), None)
+            if achado:
+                professor_id = str(achado.id)
+                professor_nome = achado.nome
+        horario_aula = f"{ag.horario_inicio:%H:%M} às {ag.horario_fim:%H:%M}"
+    elif estudio_id and not is_evento:
         dia_sem = data.weekday()
-        grade_slot = db.query(Grade).join(Turma, Grade.turma_id == Turma.id).filter(
+        # Só aulas do turno escolhido (antes pegava a primeira do dia, de qualquer turno)
+        candidatos = db.query(Grade).join(Turma, Grade.turma_id == Turma.id).filter(
             Grade.estudio_id == estudio_id,
             Grade.dia_semana == dia_sem,
             Turma.is_active == True,
-        ).first()
+        ).order_by(Grade.horario_inicio).all()
+        grade_slot = next((
+            g for g in candidatos
+            if g.horario_inicio and g.horario_inicio.strftime("%H:%M") != "00:00"
+            and turno_do_horario(g.horario_inicio) == turno_agenda
+        ), None)
         if grade_slot:
             turma_id = str(grade_slot.turma_id)
             turma_nome = grade_slot.turma.nome if grade_slot.turma else None
@@ -1541,6 +1580,7 @@ def conferencia_do_par(
 ):
     """O que não bate entre este relatório e o do assistente da mesma aula (aviso antes de validar)."""
     report = _get_report_or_404(db, report_id)
+    _assert_can_manage(db, current_user, report)
     cr = None
     if report.class_report_id:
         cr = db.query(ClassReport).filter(

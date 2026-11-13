@@ -86,7 +86,7 @@
 
                 if (!res.ok) {
                     const data = await res.json();
-                    throw new Error(data.detail || 'Erro ao autenticar.');
+                    throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao autenticar.'));
                 }
 
                 const data = await res.json();

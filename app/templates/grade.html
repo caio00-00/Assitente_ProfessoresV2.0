@@ -1233,7 +1233,7 @@
                 loadGrade();
             } else {
                 const err = await res.json();
-                alert(err.detail || 'Erro ao salvar slot');
+                alert((err.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(err.detail) : String(err.detail)) : 'Erro ao salvar slot'));
             }
         } catch (e) { console.error(e); }
     }

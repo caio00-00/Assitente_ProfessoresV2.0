@@ -109,6 +109,9 @@ class AgendamentoEstudio(Base):
     # (REMANEJADA: estudio_id é o estúdio para onde a aula foi neste dia)
     # (SET NULL: se o slot for apagado da grade, o registro fica e aparece na conferência)
     grade_id = Column(UUID(as_uuid=True), ForeignKey("grades.id", ondelete="SET NULL"), nullable=True, index=True)
+    # Para AULA_CANCELADA / AULA_REMANEJADA lançada por um agendamento (a aula saiu para dar
+    # lugar a ele): qual agendamento. Se ele for excluído, cancelado ou mudar de lugar, a aula volta.
+    origem_agendamento_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
     chamado = Column(String(50), nullable=True)
     chamado_link = Column(String(500), nullable=True)
@@ -120,6 +123,9 @@ class AgendamentoEstudio(Base):
 
     # v3.5 — demandas outubro 2026 (eventos, chave, antecipação e mês de referência)
     chave_transmissao = Column(String(255), nullable=True)
+    # Link da transmissão (YouTube). Antes ia junto com o link do chamado em chamado_link,
+    # e um sobrescrevia o outro; registros antigos ainda podem ter o YouTube em chamado_link.
+    youtube_link = Column(String(500), nullable=True)
     nome_evento = Column(String(255), nullable=True)
     responsavel_evento = Column(String(255), nullable=True)
     solicitante_antecipacao = Column(String(20), nullable=True)  # SEDUC / PROFESSOR
@@ -308,6 +314,8 @@ def garantir_colunas_agenda(engine) -> None:
             "departamento": "VARCHAR(120)",
             "grade_exibicao_id": "UUID REFERENCES grades(id) ON DELETE SET NULL",
             "reposicao": "BOOLEAN NOT NULL DEFAULT FALSE",
+            "youtube_link": "VARCHAR(500)",
+            "origem_agendamento_id": "UUID",
         },
         "agenda_bloqueios": {
             "tipo": "VARCHAR(20) NOT NULL DEFAULT 'TRANCADO'",
@@ -327,6 +335,7 @@ def garantir_colunas_agenda(engine) -> None:
         novas["agenda_escala_dia"]["diretor2_imagem_id"] = "VARCHAR(36)"
         novas["agenda_agendamentos"]["grade_exibicao_id"] = "VARCHAR(36)"
         novas["agenda_agendamentos"]["reposicao"] = "BOOLEAN NOT NULL DEFAULT 0"
+        novas["agenda_agendamentos"]["origem_agendamento_id"] = "VARCHAR(36)"
     with engine.begin() as conn:
         for tabela, colunas in novas.items():
             if tabela not in tabelas:

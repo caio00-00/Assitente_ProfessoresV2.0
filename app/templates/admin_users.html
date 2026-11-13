@@ -78,7 +78,7 @@
         </div>
         <div class="form-group">
             <label class="form-label">Nome Completo</label>
-            <input type="text" id="invite-name" class="form-input" placeholder="Nome do utilizador" required>
+            <input type="text" id="invite-name" class="form-input" placeholder="Nome do usuário" required>
         </div>
         <div class="form-group">
             <label class="form-label">Perfil</label>
@@ -234,7 +234,7 @@
     async function toggleUser(userId, action) {
         // TASK 18: Confirmation before deactivation
         const actionText = action === 'deactivate' ? 'DESATIVAR' : 'REATIVAR';
-        if (!confirm(`Tem certeza que deseja ${actionText} este utilizador?`)) return;
+        if (!confirm(`Tem certeza que deseja ${actionText} este usuário?`)) return;
 
         const token = localStorage.getItem('token') || localStorage.getItem('access_token');
         try {
@@ -244,7 +244,7 @@
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro'));
             }
             const data = await res.json();
             showToast(data.message, 'success');
@@ -262,7 +262,7 @@
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro'));
             }
             const data = await res.json();
             showToast(data.message, 'success');
@@ -281,7 +281,7 @@
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro ao enviar reset');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao enviar reset'));
             }
             const data = await res.json();
             showToast(data.message, 'success');
@@ -298,7 +298,7 @@
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro ao reenviar convite');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao reenviar convite'));
             }
             const data = await res.json();
             showToast(data.message, 'success');
@@ -411,7 +411,7 @@
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro ao enviar convite.');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao enviar convite.'));
             }
 
             const data = await res.json();
@@ -464,7 +464,7 @@
             const res = await fetch(`/api/v1/cadastros/diretores/${id}/toggle-active`, {
                 method: 'PATCH', headers: { 'Authorization': `Bearer ${getToken()}` }
             });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            if (!res.ok) { const d = await res.json(); throw new Error((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro')); }
             const data = await res.json();
             showToast(data.message, 'success');
             loadDiretores();
@@ -538,7 +538,7 @@
                 method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) { const data = await res.json(); throw new Error(data.detail || 'Erro ao salvar'); }
+            if (!res.ok) { const data = await res.json(); throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao salvar')); }
             showToast('Diretor salvo com sucesso!', 'success');
             closeDiretorModal();
             loadDiretores();

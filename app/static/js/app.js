@@ -113,8 +113,8 @@ function applyNavForRole(user) {
     }
 
     const configNav = document.getElementById('nav-configuracoes');
-    if (configNav && !['admin', 'gestor'].includes(user.role)) {
-        configNav.style.display = 'none';
+    if (configNav) {
+        configNav.style.display = ['admin', 'gestor'].includes(user.role) ? 'flex' : 'none';
     }
 
     // "Nova Aula" saiu: relatório só a partir da Grade Horária (gestão de grade pelo diretor-chefe)

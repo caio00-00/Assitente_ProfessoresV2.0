@@ -180,12 +180,12 @@ def test_agendamento_com_conflito_de_aula_e_de_agendamento(client, db_session, a
                     headers=admin_headers)
     assert r.status_code == 409
 
-    # Cancelando o agendamento o estúdio libera
+    # Cancelando o agendamento o estúdio libera e as aulas que ele tirou voltam sozinhas
     r = client.patch(f"{URL}/agendamentos/{ag_id}/status", json={"status": "CANCELADO"}, headers=admin_headers)
-    assert r.json()["status"] == "CANCELADO"
+    assert r.json()["status"] == "CANCELADO" and r.json()["aulas_devolvidas"] == 2
     r = client.post(f"{URL}/aulas/restaurar", json={"data": QUARTA.isoformat(), "grade_id": grade_id},
                     headers=admin_headers)
-    assert r.status_code == 200
+    assert r.status_code == 404  # já voltou: não há o que restaurar
     # Reativar agora bate com a aula restaurada
     r = client.patch(f"{URL}/agendamentos/{ag_id}/status", json={"status": "AGENDADO"}, headers=admin_headers)
     assert r.status_code == 409
@@ -215,7 +215,7 @@ def test_agendamento_em_horario_livre_e_listagem(client, db_session, admin_heade
     lista = client.get(f"{URL}/agendamentos", params={"data_inicio": "2026-08-01", "data_fim": "2026-08-31",
                                                       "busca": "uapi"}, headers=admin_headers).json()
     assert lista["total"] == 1
-    assert client.delete(f"{URL}/agendamentos/{ag['id']}", headers=admin_headers).status_code == 204
+    assert client.delete(f"{URL}/agendamentos/{ag['id']}", headers=admin_headers).status_code == 200
     lista = client.get(f"{URL}/agendamentos", params={"data_inicio": "2026-08-01", "data_fim": "2026-08-31"},
                        headers=admin_headers).json()
     assert lista["total"] == 0
@@ -361,14 +361,19 @@ def test_reserva_checa_o_que_ja_esta_cadastrado(client, db_session, admin_header
                     headers=admin_headers)
     assert r.status_code == 422 and "funciona" in r.json()["detail"]
 
-    # Professor e turma já têm aula da grade nesse horário em outro estúdio: pede confirmação
+    # Professor já tem aula da grade nesse horário em outro estúdio: pede confirmação.
+    # Na gravação a turma não vai ao estúdio, então a aula da turma não é aviso.
     r = client.post(f"{URL}/agendamentos", json={**base, "professor": "prof. física", "turma_id": ids["turma"]},
                     headers=admin_headers)
     assert r.status_code == 409
     avisos = r.json()["detail"]["avisos"]
     assert any("professor Prof. Física" in a for a in avisos)
-    assert any("turma EM 1 TI" in a for a in avisos)
+    assert not any("turma EM 1 TI" in a for a in avisos)
     assert r.json()["detail"]["aulas"] == []
+    # Aula extra (a turma vai ao estúdio): a aula da turma em outro estúdio continua sendo aviso
+    r = client.post(f"{URL}/agendamentos", json={**base, "tipo": "AULA_EXTRA", "turma_id": ids["turma"]},
+                    headers=admin_headers)
+    assert r.status_code == 409 and any("turma EM 1 TI" in a for a in r.json()["detail"]["avisos"])
 
     # Relatório de aula já registrado nesse estúdio/horário
     turma = db_session.query(Turma).filter(Turma.nomenclatura_padrao == "EM 1 TI").first()

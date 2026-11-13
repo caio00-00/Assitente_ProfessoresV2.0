@@ -497,7 +497,7 @@
 
         <!-- Naming Engine Preview (§5.2 Crítico) -->
         <div class="naming-preview" id="naming-preview" style="margin-bottom: 1.5rem;">
-            <span style="color: var(--text-muted); font-size: 0.7rem;">PREVIEW DO FICHEIRO GERADO</span><br>
+            <span style="color: var(--text-muted); font-size: 0.7rem;">PRÉVIA DO NOME DO ARQUIVO</span><br>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 0.25rem;">
                 <span id="naming-output" style="word-break: break-all; font-weight: 500;">Preencha os campos acima...</span>
                 <button type="button" class="btn btn-sm" style="background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); white-space: nowrap; font-size: 0.75rem; width: auto; min-height: auto;" onclick="copyFileName('naming-output', this)">
@@ -799,6 +799,23 @@
             isEditing = true;
             lastSavedId = reportId;
             await loadExistingReport(reportId);
+        }
+
+        // Horário vindo da grade como faixa ("07:30 às 08:30"): converte para o ordinal da turma
+        // (1º Horário…). Sem isso o campo fica vazio e travado, e o relatório sai sem horário.
+        if (hora && hora.includes('às')) {
+            const selHorario = document.getElementById('horario_aula');
+            if (!selHorario.value) {
+                const turmaSel = (turmasData || []).find(t => String(t.id) === document.getElementById('turma_id').value);
+                const turnoRef = turmaSel && String(turmaSel.turno || '').toUpperCase().includes('INTEGRAL')
+                    ? 'INTEGRAL' : document.getElementById('turno').value;
+                const tipo = getTipoPorTurnoHorario(turnoRef, turmaSel ? (turmaSel.nomenclatura_padrao || turmaSel.nome) : '');
+                const ord = normalizeHorarioAulaValor(hora, tipo) || hora.trim();
+                if (!Array.from(selHorario.options).some(o => o.value === ord)) {
+                    selHorario.insertAdjacentHTML('beforeend', `<option value="${ord}">${ord}</option>`);
+                }
+                selHorario.value = ord;
+            }
         }
 
         // Dados da aula vindos da grade: travados (o assistente só confirma)
@@ -1424,7 +1441,7 @@
                 const modUpper = (tOption?.dataset?.modalidade || '').toUpperCase();
 
                 if (modUpper === 'TECNICO') {
-                    const match = r.conteudo_ministrado.match(/^AULA\s+(\d{2})\s+(.+)$/i);
+                    const match = r.conteudo_ministrado.match(/^AULA\s+(\d{2,4})\s+(.+)$/i);
                     if (match) {
                         document.getElementById('numero_aula').value = match[1];
                         document.getElementById('conteudo_ministrado').value = match[2];
@@ -2020,7 +2037,7 @@
             formData.append('username', email);
             formData.append('password', password);
 
-            const res = await fetch('/api/v1/auth/token', {
+            const res = await fetch('/api/v1/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: formData

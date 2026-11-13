@@ -670,6 +670,10 @@ def listar_grade_estudio_turmas_route(
     # Assistente vê a grade só por turma (sem visão por estúdio)
     if getattr(current_user, "role", None) == "assistente":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="A grade por estúdio não está disponível para o assistente.")
+    # Diretor de imagem vê só os estúdios em que está escalado (/agenda-estudios/minha-escala);
+    # aqui veria qualquer estúdio, com a escala e os relatórios dos outros diretores.
+    if getattr(current_user, "role", None) == "diretor_imagem":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Use a sua grade (estúdios em que você está escalado).")
 
     if data_inicio and data_fim:
         dt_ini = data_inicio

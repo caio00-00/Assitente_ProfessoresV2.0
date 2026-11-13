@@ -50,7 +50,7 @@ def gerar_nome_tecnico(
     Espera-se que o front-end já envie o `conteudo` iniciando com "AULA NN ".
     """
     # Parse com regex conforme requisito da Correção 4
-    match = re.match(r"^AULA\s+(\d{2})\s+(.+)$", conteudo.strip(), flags=re.IGNORECASE)
+    match = re.match(r"^AULA\s+(\d{2,4})\s+(.+)$", conteudo.strip(), flags=re.IGNORECASE)
     
     if not match:
         raise ValueError(

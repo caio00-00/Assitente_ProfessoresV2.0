@@ -198,8 +198,8 @@ async function saveEstudio(ev, id) {
             if (typeof showToast === 'function') showToast('Estúdio salvo com sucesso!', 'success');
         } else {
             const d = await res.json();
-            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar', 'error');
-            else alert(d.detail || 'Erro ao salvar.');
+            if (typeof showToast === 'function') showToast((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao salvar'), 'error');
+            else alert((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao salvar.'));
         }
     } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
 }
@@ -286,8 +286,8 @@ async function saveCanal(ev, id) {
             if (typeof showToast === 'function') showToast('Canal salvo com sucesso!', 'success');
         } else {
             const d = await res.json();
-            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar', 'error');
-            else alert(d.detail || 'Erro ao salvar.');
+            if (typeof showToast === 'function') showToast((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao salvar'), 'error');
+            else alert((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao salvar.'));
         }
     } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
 }
@@ -410,8 +410,8 @@ async function saveSlot(ev, id) {
             if (typeof showToast === 'function') showToast('Slot salvo com sucesso!', 'success');
         } else {
             const d = await res.json();
-            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar slot', 'error');
-            else alert(d.detail || 'Erro.');
+            if (typeof showToast === 'function') showToast((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao salvar slot'), 'error');
+            else alert((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro.'));
         }
     } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
 }

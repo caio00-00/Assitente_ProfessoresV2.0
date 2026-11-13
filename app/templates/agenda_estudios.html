@@ -449,6 +449,8 @@
             <div id="ag-grupo-solicitacao" style="display:none;">
                 <label class="ag-check"><input type="checkbox" id="ag-reposicao" onchange="ajustarCamposTipo()">
                     <span><b>Reposição</b> — a aula da grade não aconteceu e está sendo reposta nesta gravação</span></label>
+                <label class="ag-check" id="ag-grupo-tem-exibicao"><input type="checkbox" id="ag-tem-exibicao" checked onchange="ajustarCamposTipo()">
+                    <span><b>Tem data de exibição</b> — a gravação vai ao ar numa aula da grade. Desmarque quando basta a data de gravação (ex.: aulas gravadas do 1º trimestre).</span></label>
                 <div class="form-group" id="ag-grupo-exibicao"><label class="form-label" id="ag-label-data-ref">Data da exibição (aula na grade)</label>
                     <input type="date" id="ag-data-exibicao" class="form-input" onchange="carregarAulasExibicao()"></div>
             </div>
@@ -1095,16 +1097,21 @@
         document.getElementById('ag-turma').value = pre.turma_id || '';
         document.getElementById('ag-turma-nome').value = ((OPCOES.turmas.find(t => t.id === pre.turma_id) || {}).nome) || '';
         document.getElementById('ag-chamado').value = pre.chamado || '';
-        document.getElementById('ag-link').value = pre.chamado_link || '';
+        // Link do chamado e link do YouTube são campos separados (antes um sobrescrevia o outro).
+        // Registro antigo com o YouTube no campo do chamado: o link aparece só no campo do YouTube.
+        const ytAg = pre.youtube_link || '';
+        document.getElementById('ag-link').value = (pre.chamado_link && pre.chamado_link !== ytAg) ? pre.chamado_link : '';
         document.getElementById('ag-descricao').value = pre.descricao || '';
         document.getElementById('ag-canal').value = pre.canal_iptv_id || '';
         document.getElementById('ag-departamento').value = pre.departamento || '';
         document.getElementById('ag-nome-evento').value = pre.nome_evento || '';
-        document.getElementById('ag-youtube-link').value = pre.chamado_link || '';
+        document.getElementById('ag-youtube-link').value = ytAg;
         document.getElementById('ag-chave-transmissao').value = pre.chave_transmissao || '';
         document.getElementById('ag-seduc').checked = pre.solicitante_antecipacao === 'SEDUC';
         document.getElementById('ag-reposicao').checked = !!pre.reposicao || pre.tipo === 'REPOSICAO';
         document.getElementById('ag-data-exibicao').value = pre.data_referencia || '';
+        // Novo agendamento: vem marcada. Edição: marcada só se a gravação já tem data de exibição.
+        document.getElementById('ag-tem-exibicao').checked = pre.id ? !!pre.data_referencia : true;
         carregarAulasExibicao(pre.grade_exibicao_id || '');
         ajustarCamposTipo();
         const edicao = !!pre.id;
@@ -1135,12 +1142,16 @@
         const repo = gravacao && document.getElementById('ag-reposicao').checked;
         document.getElementById('ag-secao-gravacao').style.display = gravacao ? '' : 'none';
         document.getElementById('ag-grupo-solicitacao').style.display = gravacao ? '' : 'none';
-        document.getElementById('ag-grupo-exibicao').style.display = gravacao ? '' : 'none';
-        document.getElementById('ag-grupo-aula-exibida').style.display = gravacao ? '' : 'none';
-        document.getElementById('ag-data-exibicao').required = repo;
+        // Reposição sempre tem a data da aula que não aconteceu; na gravação comum a data de
+        // exibição pode ser desmarcada (só a data de gravação, ex.: aulas do 1º trimestre).
+        const usaData = gravacao && (repo || document.getElementById('ag-tem-exibicao').checked);
+        document.getElementById('ag-grupo-tem-exibicao').style.display = gravacao && !repo ? '' : 'none';
+        document.getElementById('ag-grupo-exibicao').style.display = usaData ? '' : 'none';
+        document.getElementById('ag-grupo-aula-exibida').style.display = usaData ? '' : 'none';
+        document.getElementById('ag-data-exibicao').required = usaData;
         document.getElementById('ag-label-data-ref').innerHTML = repo
             ? 'Data da aula que não aconteceu <span style="color:var(--status-red);">*</span>'
-            : 'Data da exibição (aula na grade)';
+            : 'Data da exibição (aula na grade) <span style="color:var(--status-red);">*</span>';
         document.getElementById('ag-label-aula-ref').textContent = repo
             ? 'Aula da grade que está sendo reposta' : 'Aula da grade que vai ao ar com esta gravação';
         document.getElementById('ag-ajuda-aula-ref').textContent = repo
@@ -1187,7 +1198,8 @@
             professor: document.getElementById('ag-professor').value.trim() || null,
             turma_id: document.getElementById('ag-turma').value || null,
             chamado: document.getElementById('ag-chamado').value.trim() || null,
-            chamado_link: document.getElementById('ag-youtube-link').value.trim() || document.getElementById('ag-link').value.trim() || null,
+            chamado_link: document.getElementById('ag-link').value.trim() || null,
+            youtube_link: document.getElementById('ag-youtube-link').value.trim() || null,
             descricao: document.getElementById('ag-descricao').value.trim() || null,
             canal_iptv_id: document.getElementById('ag-canal').value ? Number(document.getElementById('ag-canal').value) : null,
             departamento: ['EVENTO', 'PODCAST', 'RESERVA'].includes(document.getElementById('ag-tipo').value)
@@ -1195,13 +1207,19 @@
             solicitante_antecipacao: document.getElementById('ag-seduc').checked ? 'SEDUC' : null,
             reposicao: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
                 && document.getElementById('ag-reposicao').checked,
-            data_referencia: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
+            data_referencia: usaDataExibicao()
                 ? (document.getElementById('ag-data-exibicao').value || null) : null,
-            grade_exibicao_id: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
+            grade_exibicao_id: usaDataExibicao()
                 ? (document.getElementById('ag-aula-exibida').value || null) : null,
             remanejar_aulas: cancelarAulas ? destinosEscolhidos() : [],
             confirmar_avisos: cancelarAulas,
         };
+    }
+
+    /** Gravação ligada a uma data da grade: reposição sempre; gravação comum se "Tem data de exibição". */
+    function usaDataExibicao() {
+        if (!TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)) return false;
+        return document.getElementById('ag-reposicao').checked || document.getElementById('ag-tem-exibicao').checked;
     }
 
     /** Destino de cada aula do horário (diálogo de conflito). Nenhuma aula fica sem estúdio. */
@@ -1223,6 +1241,7 @@
             const partes = [];
             if (r.aulas_remanejadas) partes.push(`${r.aulas_remanejadas} aula(s) remanejada(s)`);
             if (r.aulas_canceladas) partes.push(`${r.aulas_canceladas} aula(s) cancelada(s)`);
+            if (r.aulas_devolvidas) partes.push(`${r.aulas_devolvidas} aula(s) de volta ao estúdio da grade`);
             showToast(partes.length ? `Agendado. ${partes.join(' e ')} neste dia (a grade não muda).` : 'Agendamento salvo.', 'success');
             fecharDrawers();
             if (body.data !== dataAtual() && document.querySelector('#abas-principais .tab-btn.active').dataset.tab === 'dia') {
@@ -1270,8 +1289,9 @@
         if (!agendamentoAtual) return;
         const novo = agendamentoAtual.status === 'CANCELADO' ? 'AGENDADO' : 'CANCELADO';
         try {
-            await api('PATCH', `${API}/agendamentos/${agendamentoAtual.id}/status`, { status: novo });
-            showToast(novo === 'CANCELADO' ? 'Agendamento cancelado (continua visível em vermelho).' : 'Agendamento reativado.', 'success');
+            const r = await api('PATCH', `${API}/agendamentos/${agendamentoAtual.id}/status`, { status: novo });
+            const volta = r && r.aulas_devolvidas ? ` ${r.aulas_devolvidas} aula(s) voltaram para o estúdio da grade.` : '';
+            showToast(novo === 'CANCELADO' ? `Agendamento cancelado (continua visível em vermelho).${volta}` : 'Agendamento reativado.', 'success');
             fecharDrawers();
             recarregarVisao();
         } catch (e) { showToast(e.message, 'error'); }
@@ -1287,8 +1307,9 @@
             return;
         }
         try {
-            await api('DELETE', `${API}/agendamentos/${agendamentoAtual.id}`);
-            showToast('Agendamento excluído.', 'success');
+            const r = await api('DELETE', `${API}/agendamentos/${agendamentoAtual.id}`);
+            const volta = r && r.aulas_devolvidas ? ` ${r.aulas_devolvidas} aula(s) voltaram para o estúdio da grade.` : '';
+            showToast(`Agendamento excluído.${volta}`, 'success');
             fecharDrawers();
             recarregarVisao();
         } catch (e) { showToast(e.message, 'error'); }

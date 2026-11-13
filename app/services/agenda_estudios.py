@@ -152,6 +152,18 @@ def _ordinal_do_slot(turma: Turma, inicio: time) -> Optional[str]:
     return None
 
 
+def eh_link_youtube(url: Optional[str]) -> bool:
+    u = (url or "").lower()
+    return "youtube.com" in u or "youtu.be" in u
+
+
+def youtube_do_agendamento(a: AgendamentoEstudio) -> Optional[str]:
+    """Link do YouTube do agendamento (registros antigos guardavam no campo do chamado)."""
+    if getattr(a, "youtube_link", None):
+        return a.youtube_link
+    return a.chamado_link if eh_link_youtube(a.chamado_link) else None
+
+
 def turma_label(turma: Optional[Turma]) -> Optional[str]:
     if not turma:
         return None
@@ -568,6 +580,7 @@ def agendamento_to_dict(a: AgendamentoEstudio) -> dict:
         "canal": a.canal.nome if a.canal else None,
         "departamento": a.departamento,
         "chave_transmissao": a.chave_transmissao,
+        "youtube_link": youtube_do_agendamento(a),
         "nome_evento": a.nome_evento,
         "responsavel_evento": a.responsavel_evento,
         "solicitante_antecipacao": a.solicitante_antecipacao,
@@ -624,12 +637,16 @@ def descrever_agendamento(a: AgendamentoEstudio) -> str:
 def avisos_agendamento(
     db: Session, data: date, estudio_id: int, inicio: time, fim: time,
     professor: Optional[str], turma_id: Optional[UUID], ignorar_id: Optional[UUID] = None,
+    tipo: Optional[str] = None,
 ) -> List[str]:
     """
     O que já está cadastrado e esbarra no agendamento sem ser choque no
     próprio estúdio: horário trancado, margem de segurança antes da próxima
     aula, professor ou turma ocupados em outro estúdio e relatório de aula já
     registrado nesse estúdio/horário. Pede confirmação, não bloqueia.
+
+    Gravação: a turma não vai ao estúdio (só o professor grava), então a turma ter aula
+    da grade no mesmo horário não é conflito; o professor continua sendo checado.
     """
     from app.services.agenda_conferencia import chave_estudio, relatorios_de_aula
     from app.services.idr_txt_parser import norm_key
@@ -660,6 +677,11 @@ def avisos_agendamento(
             if fim_min <= ini_aula < fim_min + MARGEM_SEGURANCA_MIN:
                 avisos.append(f"Termina a menos de {MARGEM_SEGURANCA_MIN} min da próxima aula do estúdio "
                               f"({descrever_aula(s)}) — sem margem de segurança.")
+    # A mesma margem vale antes do próximo agendamento do estúdio (gravação, evento…)
+    for a in agendamentos_ativos_do_estudio(db, data, estudio_id, ignorar_id):
+        if fim_min <= minutos(a.horario_inicio) < fim_min + MARGEM_SEGURANCA_MIN:
+            avisos.append(f"Termina a menos de {MARGEM_SEGURANCA_MIN} min do próximo agendamento do estúdio "
+                          f"({descrever_agendamento(a)}) — sem margem de segurança.")
 
     prof_key = norm_key(professor) if professor else ""
     for s in aulas:
@@ -670,9 +692,12 @@ def avisos_agendamento(
         onde = f"{nomes.get(s['estudio_efetivo'], 'outro estúdio')} ({descrever_aula(s)})"
         if prof_key and s["professor"] and norm_key(s["professor"]) == prof_key:
             avisos.append(f"O professor {s['professor']} tem aula da grade nesse horário: {onde}.")
-        if turma_id and s["turma_id"] == str(turma_id):
+        if turma_id and tipo not in TIPOS_GRAVACAO and s["turma_id"] == str(turma_id):
             avisos.append(f"A turma {s['turma']} tem aula da grade nesse horário: {onde}.")
-    if prof_key:
+    # Turma em outro agendamento no mesmo horário (aula extra x aula extra…). Gravação não conta:
+    # a turma não vai ao estúdio na gravação.
+    turma_vai = bool(turma_id) and tipo not in TIPOS_GRAVACAO
+    if prof_key or turma_vai:
         outros = db.query(AgendamentoEstudio).filter(
             AgendamentoEstudio.data == data,
             AgendamentoEstudio.estudio_id != estudio_id,
@@ -682,9 +707,13 @@ def avisos_agendamento(
         if ignorar_id:
             outros = outros.filter(AgendamentoEstudio.id != ignorar_id)
         for a in outros.all():
-            if a.professor and norm_key(a.professor) == prof_key and sobrepoe(inicio, fim, a.horario_inicio, a.horario_fim):
-                avisos.append(f"O professor {a.professor} já está agendado nesse horário em "
-                              f"{nomes.get(a.estudio_id, 'outro estúdio')}: {descrever_agendamento(a)}.")
+            if not sobrepoe(inicio, fim, a.horario_inicio, a.horario_fim):
+                continue
+            onde = f"{nomes.get(a.estudio_id, 'outro estúdio')}: {descrever_agendamento(a)}"
+            if prof_key and a.professor and norm_key(a.professor) == prof_key:
+                avisos.append(f"O professor {a.professor} já está agendado nesse horário em {onde}.")
+            if turma_vai and a.turma_id and str(a.turma_id) == str(turma_id) and a.tipo not in TIPOS_GRAVACAO:
+                avisos.append(f"A turma {turma_label(a.turma) or ''} já está agendada nesse horário em {onde}.")
     k_est = chave_estudio(nomes.get(estudio_id))
     for r in relatorios_de_aula(db, data):
         if chave_estudio(r.estudio) != k_est or not (r.start_time and r.end_time):
@@ -1545,7 +1574,6 @@ def grade_semana_estudio(
                 "motivo_cancelamento": None,
                 "chamado": a.chamado,
                 "chamado_link": a.chamado_link,
-                "chave_transmissao": a.chave_transmissao,
                 "report_id": report_id,
                 "report_status": report_status,
                 "idr_id": None,
@@ -1608,9 +1636,18 @@ def aula_da_agenda(db: Session, turma_id: UUID, data: date, inicio: Optional[tim
                 "tipo_agenda_label": TIPOS_AGENDAMENTO.get(a.tipo, {}).get("label", a.tipo),
                 "agendamento_id": str(a.id),
                 **diretor_escalado(db, data, a.horario_inicio, a.estudio_id),
-                **transmissao_da_aula(db, data, a.horario_inicio, a.estudio_id),
+                **transmissao_com_agendamento(
+                    transmissao_da_aula(db, data, a.horario_inicio, a.estudio_id), a),
             }
     return None
+
+
+def transmissao_com_agendamento(tx: dict, a: AgendamentoEstudio) -> dict:
+    """Link e chave do estúdio/turno (diretor-chefe); o que faltar vem do próprio agendamento."""
+    return {
+        "youtube_link": tx.get("youtube_link") or youtube_do_agendamento(a),
+        "chave_transmissao": tx.get("chave_transmissao") or a.chave_transmissao,
+    }
 
 
 def agendamentos_de_aula_da_turma(db: Session, turma_id: UUID, data_inicio: date, data_fim: date):

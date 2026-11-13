@@ -302,6 +302,7 @@ a:hover {
 
 .main-content {
     flex: 1;
+    min-width: 0; /* deixa tabelas largas rolarem dentro do card, sem estourar a página */
     margin-left: 260px;
     padding: 2rem;
 }

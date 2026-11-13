@@ -59,6 +59,8 @@ def _apply_letterhead(pdf_bytes: bytes) -> bytes:
 
     writer = PdfWriter()
     for page in content_reader.pages:
+        # pypdf 7+: a página precisa estar no writer ANTES do merge_page
+        # (o merge em página "solta" foi removido e dava DeprecationError → 500).
         lh_reader = PdfReader(io.BytesIO(letterhead_pdf))
         # v4: a página do timbrado entra no writer ANTES do merge. O pypdf 7
         # removeu o merge em páginas soltas (era o que quebrava o PDF do turno).

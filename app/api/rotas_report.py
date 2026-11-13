@@ -1937,6 +1937,11 @@ def sync_individual(
     ).first()
     if not report:
         raise HTTPException(status_code=404, detail="Relatório não encontrado.")
+    if not report.nome_ficheiro_gerado:
+        raise HTTPException(
+            status_code=400,
+            detail="Relatório sem nome de arquivo gerado. Finalize o relatório antes de reverificar.",
+        )
 
     report.status_compliance = "Pendente"
     db.commit()

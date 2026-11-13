@@ -46,12 +46,17 @@ def agendar_verificacao(report_id, nome: str) -> None:
 
 def verificar_agora(report_id, nome: str, exigir_diretor: bool = True) -> dict:
     """Uma verificação imediata (botão Reverificar, diretor finalizou)."""
+    from app.tasks.worker import verificar_uma_vez
+
     if modo() == "celery":
         from app.tasks.worker import verificar_compliance_drive
 
-        verificar_compliance_drive.delay(str(report_id), nome, exigir_diretor=exigir_diretor)
-        return {"modo": "celery", "resultado": "na_fila"}
-    from app.tasks.worker import verificar_uma_vez
+        try:
+            verificar_compliance_drive.delay(str(report_id), nome, exigir_diretor=exigir_diretor)
+            return {"modo": "celery", "resultado": "na_fila"}
+        except Exception as e:  # noqa: BLE001
+            # HML 6047d52: com o Redis/Celery fora, verifica na hora em vez de dar erro 500
+            log.warning("fila indisponível (%s); verificando direto no Drive", e)
 
     return {"modo": "direto", "resultado": verificar_uma_vez(report_id, nome, exigir_diretor)}
 

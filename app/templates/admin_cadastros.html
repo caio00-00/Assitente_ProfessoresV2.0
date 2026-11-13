@@ -733,7 +733,7 @@
                 method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            if (!res.ok) { const d = await res.json(); throw new Error((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro')); }
             showToast('Estúdio salvo com sucesso!', 'success');
             closeEstudioModal();
             loadEstudiosTab();
@@ -824,7 +824,7 @@
                 method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            if (!res.ok) { const d = await res.json(); throw new Error((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro')); }
             showToast('Canal IPTV salvo!', 'success');
             closeIptvModal();
             loadIptvTab();
@@ -853,7 +853,7 @@
             : `/api/v1/cadastros/${entity}/${id}/toggle-active`;
         try {
             const res = await fetch(url, { method: 'PATCH', headers: { 'Authorization': `Bearer ${getToken()}` } });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            if (!res.ok) { const d = await res.json(); throw new Error((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro')); }
             const data = await res.json();
             showToast(data.message, 'success');
             if (entity === 'professores') loadProfessores();
@@ -956,7 +956,7 @@
                 method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
             });
-            if (!res.ok) { const data = await res.json(); throw new Error(data.detail || 'Erro ao salvar'); }
+            if (!res.ok) { const data = await res.json(); throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao salvar')); }
             showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} salvo com sucesso!`, 'success');
             closeModal();
             if (type === 'professor') { loadProfessores(); loadAllDisciplinasForSelect(); }
@@ -1228,7 +1228,7 @@
             method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' }
         });
         if (res.ok) { showToast('Nova versão criada! Adicione os slots e ative.', 'success'); loadGradeVersoes(); }
-        else { const d = await res.json(); showToast(d.detail || 'Erro ao criar versão', 'error'); }
+        else { const d = await res.json(); showToast((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao criar versão'), 'error'); }
     }
 
     // ─── Slot Modal ────────────────────────────────────────────────────
@@ -1390,7 +1390,7 @@
                 loadGradeVersoes();
             } else {
                 const d = await res.json();
-                showToast(d.detail || 'Erro ao remover', 'error');
+                showToast((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao remover'), 'error');
             }
         } catch(e) { showToast(e.message, 'error'); }
     }
@@ -1448,7 +1448,7 @@
                 headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nome, nomenclatura_padrao: nomenclatura || null })
             });
-            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro ao clonar'); }
+            if (!res.ok) { const d = await res.json(); throw new Error((d.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : String(d.detail)) : 'Erro ao clonar')); }
             const data = await res.json();
             showToast(data.message, 'success');
             closeClonarModal();

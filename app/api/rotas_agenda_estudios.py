@@ -63,6 +63,8 @@ class AgendamentoIn(BaseModel):
     departamento: Optional[str] = Field(None, max_length=120)
     # v3.5 — demandas outubro 2026 (eventos, chave, antecipação e mês de referência)
     chave_transmissao: Optional[str] = Field(None, max_length=255)
+    # Link do YouTube da transmissão (separado do link do chamado)
+    youtube_link: Optional[str] = Field(None, max_length=500)
     nome_evento: Optional[str] = Field(None, max_length=255)
     responsavel_evento: Optional[str] = Field(None, max_length=255)
     solicitante_antecipacao: Optional[str] = Field(None, max_length=20)
@@ -280,8 +282,12 @@ def _validar_solicitacao(dados: AgendamentoIn) -> None:
         raise HTTPException(422, "Informe a data da aula da grade ligada a esta gravação.")
 
 
-def _aula_exibida_valida(db: Session, dados: AgendamentoIn) -> None:
-    """A aula escolhida para a exibição precisa estar na grade da turma naquela data."""
+def _aula_exibida_valida(db: Session, dados: AgendamentoIn, ignorar_id: Optional[UUID] = None) -> None:
+    """
+    A aula escolhida para a exibição precisa estar na grade da turma naquela data, e só uma
+    gravação ativa pode ir ao ar (ou repor) a mesma aula no mesmo dia — senão o relatório do
+    dia aponta para uma delas ao acaso e a cobrança conta duas vezes.
+    """
     if not dados.grade_exibicao_id:
         return
     if not dados.turma_id:
@@ -289,18 +295,25 @@ def _aula_exibida_valida(db: Session, dados: AgendamentoIn) -> None:
     ids = {a["grade_id"] for a in svc.aulas_da_turma_no_dia(db, dados.turma_id, dados.data_referencia)}
     if str(dados.grade_exibicao_id) not in ids:
         raise HTTPException(422, "A aula escolhida não está na grade da turma na data da exibição.")
+    q = db.query(AgendamentoEstudio).filter(
+        AgendamentoEstudio.tipo.in_(svc.TIPOS_GRAVACAO),
+        AgendamentoEstudio.status == svc.STATUS_AGENDADO,
+        AgendamentoEstudio.data_referencia == dados.data_referencia,
+        AgendamentoEstudio.grade_exibicao_id == dados.grade_exibicao_id,
+        AgendamentoEstudio.reposicao == bool(dados.reposicao),
+    )
+    if ignorar_id:
+        q = q.filter(AgendamentoEstudio.id != ignorar_id)
+    outra = q.first()
+    if outra:
+        o_que = "reposta" if dados.reposicao else "ligada a uma gravação que vai ao ar"
+        raise HTTPException(409, f"Essa aula de {dados.data_referencia.strftime('%d/%m/%Y')} já está {o_que}: "
+                                 f"{svc.descrever_agendamento(outra)} em {outra.data.strftime('%d/%m/%Y')}. "
+                                 "Desligue a outra gravação antes.")
 
 
-def _validar_agendamento(db: Session, dados: AgendamentoIn, ignorar_id: Optional[UUID] = None):
-    """
-    Checa tudo o que já existe no sistema antes de gravar a reserva:
-    1. feriado, estúdio ativo e dentro do horário de funcionamento (bloqueia);
-    2. outro agendamento no mesmo estúdio/horário (bloqueia);
-    3. aula da grade no mesmo estúdio/horário: cada aula precisa de um destino
-       (outro estúdio livre) ou ser cancelada no dia — nenhuma fica sem estúdio;
-    4. professor/turma ocupados em outro estúdio, horário trancado ou sob demanda,
-       relatório de aula já registrado (pede confirmação).
-    """
+def _validar_campos(db: Session, dados: AgendamentoIn, ignorar_id: Optional[UUID] = None) -> Estudio:
+    """O que vale para qualquer agendamento, ativo ou cancelado: tipo, pedido, evento, turma, canal."""
     if dados.tipo not in svc.TIPOS_AGENDAMENTO:
         raise HTTPException(422, "Tipo de agendamento inválido.")
     _validar_solicitacao(dados)
@@ -312,12 +325,29 @@ def _validar_agendamento(db: Session, dados: AgendamentoIn, ignorar_id: Optional
                 raise HTTPException(422, "O Nome do Evento é obrigatório quando o tipo for Evento.")
         elif not (dados.titulo and dados.titulo.strip()):
             dados.titulo = dados.nome_evento.strip()
-    _sem_feriado(db, dados.data)
     est = _estudio_ativo(db, dados.estudio_id)
     if dados.turma_id and not db.query(Turma).filter(Turma.id == dados.turma_id).first():
         raise HTTPException(422, "Turma não encontrada.")
     _canal_valido(db, dados.canal_iptv_id)
-    _aula_exibida_valida(db, dados)
+    _aula_exibida_valida(db, dados, ignorar_id)
+    return est
+
+
+def _validar_agendamento(db: Session, dados: AgendamentoIn, ignorar_id: Optional[UUID] = None,
+                         avisos_ja_aceitos: bool = False):
+    """
+    Checa tudo o que já existe no sistema antes de gravar a reserva:
+    1. feriado, estúdio ativo e dentro do horário de funcionamento (bloqueia);
+    2. outro agendamento no mesmo estúdio/horário (bloqueia);
+    3. aula da grade no mesmo estúdio/horário: cada aula precisa de um destino
+       (outro estúdio livre) ou ser cancelada no dia — nenhuma fica sem estúdio;
+    4. professor/turma ocupados em outro estúdio, horário trancado ou sob demanda,
+       relatório de aula já registrado (pede confirmação). Na edição que não muda
+       data, estúdio, horário, professor nem turma, os avisos já foram aceitos quando
+       o agendamento foi salvo e não são pedidos de novo (`avisos_ja_aceitos`).
+    """
+    _sem_feriado(db, dados.data)
+    est = _validar_campos(db, dados, ignorar_id)
     h_ini, h_fim = _horarios(dados.horario_inicio, dados.horario_fim)
     if svc.fora_do_funcionamento(est, h_ini, h_fim):
         raise HTTPException(
@@ -335,10 +365,11 @@ def _validar_agendamento(db: Session, dados: AgendamentoIn, ignorar_id: Optional
         })
     avisos = svc.avisos_agendamento(
         db, dados.data, dados.estudio_id, h_ini, h_fim, dados.professor, dados.turma_id, ignorar_id,
+        tipo=dados.tipo,
     )
     decisoes = {str(r.grade_id): r for r in dados.remanejar_aulas}
     pendentes = [s for s in c["aulas"] if s["grade_id"] not in decisoes and not dados.cancelar_aulas_conflitantes]
-    precisa_ciencia = bool(avisos) and not dados.confirmar_avisos
+    precisa_ciencia = bool(avisos) and not (dados.confirmar_avisos or avisos_ja_aceitos)
     if pendentes or precisa_ciencia:
         ocupado_pelo_agendamento = {dados.estudio_id: [(h_ini, h_fim)]}
         raise HTTPException(409, {
@@ -391,8 +422,12 @@ def _definir_ocorrencia(
     db: Session, data: date, slot: dict, tipo: str, estudio_id: int, user: User, *,
     descricao: Optional[str] = None, chamado: Optional[str] = None, chamado_link: Optional[str] = None,
     canal_iptv_id: Optional[int] = None, horario: Optional[tuple] = None,
+    origem_agendamento_id: Optional[UUID] = None,
 ) -> AgendamentoEstudio:
-    """Cancelamento ou remanejamento da aula no dia — substitui o que já houver para ela."""
+    """
+    Cancelamento ou remanejamento da aula no dia — substitui o que já houver para ela.
+    `origem_agendamento_id`: o agendamento que tirou a aula do estúdio (vazio = decisão manual).
+    """
     existente = db.query(AgendamentoEstudio).filter(
         AgendamentoEstudio.data == data,
         AgendamentoEstudio.grade_id == UUID(slot["grade_id"]),
@@ -409,6 +444,7 @@ def _definir_ocorrencia(
     o.chamado = (chamado or "").strip().lstrip("#") or None
     o.chamado_link = (chamado_link or "").strip() or None
     o.canal_iptv_id = canal_iptv_id
+    o.origem_agendamento_id = origem_agendamento_id
     o.status = svc.STATUS_AGENDADO
     o.atualizado_por = user.id
     if not existente:
@@ -423,7 +459,8 @@ def _aplicar_plano(db: Session, data: date, plano: list, agendamento: Agendament
         motivo = f"Estúdio usado por: {agendamento.titulo}"
         if destino is None:
             _definir_ocorrencia(db, data, s, svc.AULA_CANCELADA, s["estudio_efetivo"], user, descricao=motivo,
-                                chamado=agendamento.chamado, chamado_link=agendamento.chamado_link)
+                                chamado=agendamento.chamado, chamado_link=agendamento.chamado_link,
+                                origem_agendamento_id=agendamento.id)
             canceladas += 1
         elif destino.id == s["estudio_id"]:
             # volta para o estúdio da grade: desfaz o remanejamento do dia
@@ -435,9 +472,45 @@ def _aplicar_plano(db: Session, data: date, plano: list, agendamento: Agendament
         else:
             _definir_ocorrencia(db, data, s, svc.AULA_REMANEJADA, destino.id, user, descricao=motivo,
                                 chamado=agendamento.chamado, chamado_link=agendamento.chamado_link,
-                                canal_iptv_id=canal_id)
+                                canal_iptv_id=canal_id, origem_agendamento_id=agendamento.id)
             remanejadas += 1
     return canceladas, remanejadas
+
+
+def _devolver_aulas(db: Session, a: AgendamentoEstudio, novo: Optional[tuple] = None) -> int:
+    """
+    Aulas que `a` tirou do estúdio (canceladas ou remanejadas para dar lugar a ele) voltam para
+    o estúdio da grade quando `a` é excluído, cancelado ou muda de lugar. `novo` = (data,
+    estudio_id, inicio, fim) da nova posição: a aula que continua no caminho dele fica como está.
+    A aula só volta se o estúdio da grade estiver livre; senão continua como está (e aparece
+    na agenda para o chefe decidir). Registros antigos (antes de existir a ligação) são achados
+    pelo motivo "Estúdio usado por: <título>" no mesmo dia. Devolve quantas voltaram.
+    """
+    legado = db.query(AgendamentoEstudio).filter(
+        AgendamentoEstudio.origem_agendamento_id.is_(None),
+        AgendamentoEstudio.data == a.data,
+        AgendamentoEstudio.descricao == f"Estúdio usado por: {a.titulo}",
+    )
+    ligadas = db.query(AgendamentoEstudio).filter(AgendamentoEstudio.origem_agendamento_id == a.id)
+    devolvidas = 0
+    for o in {x.id: x for x in ligadas.all() + legado.all()}.values():
+        if o.tipo not in svc.OCORRENCIAS_DE_AULA or not o.grade_id:
+            continue
+        g = db.query(Grade).filter(Grade.id == o.grade_id).first()
+        if not g or not g.estudio_id or not g.horario_inicio or not g.horario_fim:
+            continue
+        if novo and novo[0] == o.data and novo[1] == g.estudio_id and svc.sobrepoe(
+            novo[2], novo[3], g.horario_inicio, g.horario_fim
+        ):
+            continue  # ainda está no caminho do agendamento
+        c = svc.conflitos(db, o.data, g.estudio_id, g.horario_inicio, g.horario_fim,
+                          ignorar_agendamento_id=a.id, ignorar_grade_id=str(g.id))
+        if c["aulas"] or c["agendamentos"]:
+            continue  # o estúdio da grade foi ocupado por outra coisa: fica como está
+        db.delete(o)
+        db.flush()
+        devolvidas += 1
+    return devolvidas
 
 
 def _aula_prevista(db: Session, data: date, grade_id: UUID) -> dict:
@@ -477,6 +550,9 @@ def agenda_do_dia(
                     c["diretor"].pop("youtube_link", None)
                     c["diretor"].pop("chave_transmissao", None)
                 c.pop("transmissao", None)
+                for it in c.get("itens", []):
+                    if isinstance(it.get("registro"), dict):
+                        it["registro"].pop("chave_transmissao", None)
     return agenda
 
 
@@ -489,7 +565,7 @@ def listar_agendamentos(
     status: Optional[str] = Query(None),
     busca: Optional[str] = Query(None, description="Título, professor ou nº do chamado"),
     db: Session = Depends(get_db),
-    _: User = Depends(pode_ver),
+    user: User = Depends(pode_ver),
 ):
     inicio = data_inicio or date.today()
     fim = data_fim or (inicio + timedelta(days=30))
@@ -516,8 +592,15 @@ def listar_agendamentos(
         "data_inicio": inicio.isoformat(),
         "data_fim": fim.isoformat(),
         "total": len(itens),
-        "items": [svc.agendamento_to_dict(a) for a in itens],
+        "items": [_sem_chave(svc.agendamento_to_dict(a), user) for a in itens],
     }
+
+
+def _sem_chave(d: dict, user: User) -> dict:
+    """Chave de transmissão: só quem edita a Agenda (pedagógico e auditoria só consultam)."""
+    if user.role not in PAPEIS_AGENDA:
+        d.pop("chave_transmissao", None)
+    return d
 
 
 # ─── Agendamentos ─────────────────────────────────────────────────────
@@ -538,6 +621,7 @@ def criar_agendamento(
         canal_iptv_id=dados.canal_iptv_id,
         departamento=(dados.departamento or "").strip() or None,
         chave_transmissao=(dados.chave_transmissao or "").strip() or None,
+        youtube_link=(dados.youtube_link or "").strip() or None,
         nome_evento=(dados.nome_evento or "").strip() or None,
         responsavel_evento=(dados.responsavel_evento or "").strip() or None,
         solicitante_antecipacao=(dados.solicitante_antecipacao or "").strip() or None,
@@ -548,10 +632,28 @@ def criar_agendamento(
         status=svc.STATUS_AGENDADO, criado_por=user.id, atualizado_por=user.id,
     )
     db.add(a)
+    db.flush()  # gera o id: as aulas tiradas do estúdio ficam ligadas a ele
     canceladas, remanejadas = _aplicar_plano(db, dados.data, plano, a, user)
     db.commit()
     db.refresh(a)
     return {**svc.agendamento_to_dict(a), "aulas_canceladas": canceladas, "aulas_remanejadas": remanejadas}
+
+
+def _mesmo_horario_e_pessoas(a: AgendamentoEstudio, dados: AgendamentoIn) -> bool:
+    """A edição não mexe em nada que gera aviso (data, estúdio, horário, tipo, professor, turma)?"""
+    try:
+        h_ini, h_fim = svc.parse_hora(dados.horario_inicio), svc.parse_hora(dados.horario_fim)
+    except ValueError:
+        return False
+    norm = lambda v: (v or "").strip().lower()
+    return (
+        a.status == svc.STATUS_AGENDADO
+        and a.data == dados.data and a.estudio_id == dados.estudio_id
+        and a.horario_inicio == h_ini and a.horario_fim == h_fim
+        and (a.tipo in svc.TIPOS_GRAVACAO) == (dados.tipo in svc.TIPOS_GRAVACAO)
+        and norm(a.professor) == norm(dados.professor)
+        and str(a.turma_id or "") == str(dados.turma_id or "")
+    )
 
 
 @router.put("/agendamentos/{agendamento_id}")
@@ -564,16 +666,21 @@ def editar_agendamento(
     a = _get_agendamento(db, agendamento_id)
     if a.tipo in svc.OCORRENCIAS_DE_AULA:
         raise HTTPException(422, "Cancelamento/remanejamento de aula não se edita aqui; restaure a aula se precisar.")
+    h_novo = _horarios(dados.horario_inicio, dados.horario_fim)
+    # Mudou de dia, estúdio ou horário: as aulas que ele tirou e que não estão mais no caminho
+    # voltam. Se a validação abaixo recusar a edição, nada é gravado (a sessão não faz commit).
+    devolvidas = _devolver_aulas(
+        db, a, None if a.status == svc.STATUS_CANCELADO else (dados.data, dados.estudio_id, *h_novo),
+    )
     if a.status == svc.STATUS_CANCELADO:
-        # Cancelado não ocupa o estúdio: edita sem checar conflito de horário
-        if dados.tipo not in svc.TIPOS_AGENDAMENTO:
-            raise HTTPException(422, "Tipo de agendamento inválido.")
-        _validar_solicitacao(dados)
-        _estudio_ativo(db, dados.estudio_id)
-        h_ini, h_fim = _horarios(dados.horario_inicio, dados.horario_fim)
+        # Cancelado não ocupa o estúdio: edita sem checar conflito de horário, mas os campos valem
+        _validar_campos(db, dados, ignorar_id=a.id)
+        h_ini, h_fim = h_novo
         plano = []
     else:
-        h_ini, h_fim, plano = _validar_agendamento(db, dados, ignorar_id=a.id)
+        h_ini, h_fim, plano = _validar_agendamento(
+            db, dados, ignorar_id=a.id, avisos_ja_aceitos=_mesmo_horario_e_pessoas(a, dados),
+        )
     a.data, a.estudio_id, a.horario_inicio, a.horario_fim = dados.data, dados.estudio_id, h_ini, h_fim
     a.tipo, a.titulo, a.descricao = dados.tipo, dados.titulo.strip(), dados.descricao
     a.professor = (dados.professor or "").strip() or None
@@ -583,6 +690,7 @@ def editar_agendamento(
     a.canal_iptv_id = dados.canal_iptv_id
     a.departamento = (dados.departamento or "").strip() or None
     a.chave_transmissao = (dados.chave_transmissao or "").strip() or None
+    a.youtube_link = (dados.youtube_link or "").strip() or None
     a.nome_evento = (dados.nome_evento or "").strip() or None
     a.responsavel_evento = (dados.responsavel_evento or "").strip() or None
     a.solicitante_antecipacao = (dados.solicitante_antecipacao or "").strip() or None
@@ -594,7 +702,8 @@ def editar_agendamento(
     canceladas, remanejadas = _aplicar_plano(db, dados.data, plano, a, user)
     db.commit()
     db.refresh(a)
-    return {**svc.agendamento_to_dict(a), "aulas_canceladas": canceladas, "aulas_remanejadas": remanejadas}
+    return {**svc.agendamento_to_dict(a), "aulas_canceladas": canceladas, "aulas_remanejadas": remanejadas,
+            "aulas_devolvidas": devolvidas}
 
 
 @router.patch("/agendamentos/{agendamento_id}/status")
@@ -610,8 +719,15 @@ def mudar_status_agendamento(
         raise HTTPException(422, "Status inválido. Use AGENDADO ou CANCELADO.")
     if a.tipo in svc.OCORRENCIAS_DE_AULA:
         raise HTTPException(422, "Para desfazer o cancelamento/remanejamento de uma aula use 'Restaurar aula'.")
-    _sem_feriado(db, a.data)
+    devolvidas = 0
+    if novo == svc.STATUS_CANCELADO and a.status != novo:
+        # Cancelar vale até em dia que virou feriado; as aulas que ele tirou do estúdio voltam
+        devolvidas = _devolver_aulas(db, a)
     if novo == svc.STATUS_AGENDADO and a.status != novo:
+        _sem_feriado(db, a.data)
+        est = _estudio_ativo(db, a.estudio_id)
+        if svc.fora_do_funcionamento(est, a.horario_inicio, a.horario_fim):
+            raise HTTPException(422, f"{est.nome} não funciona mais nesse horário: edite o agendamento.")
         c = svc.conflitos(db, a.data, a.estudio_id, a.horario_inicio, a.horario_fim, a.id)
         if c["agendamentos"] or c["aulas"]:
             ocupantes = [svc.descrever_agendamento(x) for x in c["agendamentos"]] + [
@@ -622,18 +738,23 @@ def mudar_status_agendamento(
     a.atualizado_por = user.id
     db.commit()
     db.refresh(a)
-    return svc.agendamento_to_dict(a)
+    return {**svc.agendamento_to_dict(a), "aulas_devolvidas": devolvidas}
 
 
-@router.delete("/agendamentos/{agendamento_id}", status_code=204)
+@router.delete("/agendamentos/{agendamento_id}")
 def excluir_agendamento(
     agendamento_id: UUID,
     db: Session = Depends(get_db),
     _: User = Depends(pode_agenda),
 ):
     a = _get_agendamento(db, agendamento_id)
+    if a.tipo in svc.OCORRENCIAS_DE_AULA and a.grade_id:
+        # Apagar direto devolveria a aula sem checar se o estúdio da grade está livre
+        raise HTTPException(422, "Para desfazer o cancelamento/remanejamento de uma aula use 'Restaurar aula'.")
+    devolvidas = 0 if a.tipo in svc.OCORRENCIAS_DE_AULA else _devolver_aulas(db, a)
     db.delete(a)
     db.commit()
+    return {"ok": True, "aulas_devolvidas": devolvidas}
 
 
 # ─── Aulas da grade: cancelar / restaurar num dia ─────────────────────

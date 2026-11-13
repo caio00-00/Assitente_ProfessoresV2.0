@@ -643,7 +643,7 @@
             });
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.detail || 'Erro ao excluir');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao excluir'));
             }
             showToast('Relatório excluído com sucesso.', 'success');
             closeReportDetail();
@@ -677,7 +677,7 @@
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.detail || 'Erro ao validar relatório');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao validar relatório'));
             }
             showToast('Relatório validado com sucesso! ✅', 'success');
             closeReportDetail();
@@ -706,7 +706,7 @@
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.detail || 'Erro ao enviar para correção');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro ao enviar para correção'));
             }
             showToast('Relatório enviado para correção. O assistente será notificado. 🔁', 'success');
             closeReportDetail();
@@ -1062,7 +1062,7 @@
             const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || 'Erro ao carregar relatórios');
+                throw new Error((err.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(err.detail) : String(err.detail)) : 'Erro ao carregar relatórios'));
             }
             const data = await res.json();
             if (seq !== loadSeq) return; // resposta de um filtro antigo — descarta
@@ -1363,7 +1363,7 @@
             });
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.detail || 'Erro na exportação');
+                throw new Error((data.detail ? (typeof formatApiDetail === 'function' ? formatApiDetail(data.detail) : String(data.detail)) : 'Erro na exportação'));
             }
 
             const blob = await res.blob();
@@ -1937,8 +1937,14 @@
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            if (!res.ok) throw new Error('Erro ao disparar verificação');
-            showToast('Verificação iniciada. O status deve ser atualizado em breve.', 'success');
+            if (!res.ok) {
+                let msg = 'Erro ao disparar verificação';
+                try { const err = await res.json(); if (err && err.detail) msg += ': ' + err.detail; } catch (_) {}
+                throw new Error(msg);
+            }
+            let okMsg = 'Verificação iniciada. O status deve ser atualizado em breve.';
+            try { const data = await res.json(); if (data && data.modo === 'direto' && data.message) okMsg = data.message; } catch (_) {}
+            showToast(okMsg, 'success');
             const idrRes = await fetch(`/api/v1/reports/${reportId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
