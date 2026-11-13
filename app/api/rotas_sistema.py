@@ -44,7 +44,10 @@ def _diagnostico_banco(erro: Exception) -> dict:
     from urllib.parse import urlsplit
 
     s = get_settings()
-    definida = bool(os.environ.get("DATABASE_URL"))
+    origem = ("DATABASE_URL" if os.environ.get("DATABASE_URL")
+              else "POSTGRES_URL (integração Supabase da Vercel)" if os.environ.get("POSTGRES_URL")
+              else "POSTGRES_HOST/USER/PASSWORD")
+    definida = origem != "POSTGRES_HOST/USER/PASSWORD"
     url = s.DATABASE_URL
     try:
         p = urlsplit(url)
@@ -56,7 +59,7 @@ def _diagnostico_banco(erro: Exception) -> dict:
         msg = msg.replace(p.password, "***")
     dicas = []
     if not definida:
-        dicas.append("DATABASE_URL não está definida: o sistema tentou o Postgres do Docker.")
+        dicas.append("Nem DATABASE_URL nem POSTGRES_URL estão definidas: a URL foi montada com POSTGRES_HOST/USER/PASSWORD.")
     if host and host.startswith("db.") and host.endswith(".supabase.co"):
         dicas.append("Conexão direta do Supabase (db.<projeto>.supabase.co) só tem IPv6 e a Vercel não alcança: use a URL do pooler (aws-0-...pooler.supabase.com).")
     if host and "pooler.supabase.com" in host and usuario and "." not in usuario:
@@ -65,7 +68,7 @@ def _diagnostico_banco(erro: Exception) -> dict:
         dicas.append("Falta ?sslmode=require no fim da URL.")
     if "password authentication failed" in msg:
         dicas.append("Senha errada. Se ela tem @ # / % :, escreva codificada (%40 %23 %2F %25 %3A).")
-    return {"database_url_definida": definida, "host": host, "porta": porta, "usuario": usuario,
+    return {"database_url_definida": definida, "origem_da_url": origem, "host": host, "porta": porta, "usuario": usuario,
             "erro": f"{type(erro).__name__}: {msg}", "dicas": dicas}
 
 

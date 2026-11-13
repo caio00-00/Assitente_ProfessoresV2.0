@@ -73,7 +73,15 @@ class Settings(BaseSettings):
         import os
         env_url = os.environ.get("DATABASE_URL")
         if env_url:
-            return env_url
+            return _normalizar_url_postgres(env_url)
+
+        # v4.1: integração Supabase da Vercel. Ela cria POSTGRES_URL (pooler,
+        # porta 6543) e também POSTGRES_HOST apontando para a conexão direta
+        # db.<projeto>.supabase.co, que a Vercel não alcança (só IPv6). Por isso
+        # o POSTGRES_URL tem preferência sobre montar a URL com POSTGRES_HOST.
+        integracao = os.environ.get("POSTGRES_URL")
+        if integracao:
+            return _normalizar_url_postgres(integracao)
 
         # Tenta detectar se o host 'db' (docker) é o correto ou se devemos usar localhost
         host = self.POSTGRES_HOST
@@ -179,6 +187,30 @@ SECRET_KEY_PADRAO = "chave_secreta_provisoria_desenvolvimento"
 
 
 @lru_cache()
+def _normalizar_url_postgres(url: str) -> str:
+    """Deixa a URL no formato que o SQLAlchemy + psycopg2 aceitam.
+
+    - "postgres://" (padrão do Supabase/Heroku) vira "postgresql://";
+    - tira parâmetros que não são do Postgres (o Supabase põe "supa=base-pooler.x"
+      e o psycopg2 recusa a conexão com "invalid URI query parameter").
+    """
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    url = url.strip()
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://"):]
+    partes = urlsplit(url)
+    if not partes.query:
+        return url
+    aceitos = {
+        "sslmode", "sslrootcert", "sslcert", "sslkey", "connect_timeout", "application_name",
+        "options", "target_session_attrs", "keepalives", "keepalives_idle", "host", "port",
+        "gssencmode", "channel_binding", "client_encoding",
+    }
+    params = [(k, v) for k, v in parse_qsl(partes.query, keep_blank_values=True) if k in aceitos]
+    return urlunsplit(partes._replace(query=urlencode(params)))
+
+
 def get_settings() -> Settings:
     """Singleton cacheado da configuração."""
     s = Settings()
