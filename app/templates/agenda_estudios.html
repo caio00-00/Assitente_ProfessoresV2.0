@@ -1,0 +1,2304 @@
+{% extends "base.html" %}
+{% block title %}Agenda dos estúdios — Canal Educação{% endblock %}
+
+{% block head %}
+<style>
+    /* A agenda é larga: rola dentro de cada turno, sem alargar a página */
+    .main-content { min-width: 0; }
+    .ag-turno { max-width: 100%; }
+    .ag-toolbar { display: flex; flex-wrap: wrap; gap: 0.6rem; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+    .ag-toolbar .grupo { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+    .ag-toolbar .form-input { width: auto; padding: 0.45rem 0.7rem; }
+    .ag-dia-label { font-size: 1.05rem; font-weight: 600; margin-left: 0.4rem; }
+    .ag-btn-icon { width: 36px; padding: 0.45rem 0; justify-content: center; }
+    .ag-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+    .ag-chip { border: 1px solid var(--border-subtle); background: transparent; color: var(--text-secondary); border-radius: 999px; padding: 0.3rem 0.8rem; font-size: 0.78rem; cursor: pointer; font-family: inherit; }
+    .ag-chip.active { background: var(--accent-start); border-color: var(--accent-start); color: #fff; }
+
+    .ag-resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .ag-num { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.75rem 1rem; }
+    .ag-num b { display: block; font-size: 1.6rem; line-height: 1.1; }
+    .ag-num span { font-size: 0.72rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .ag-num.alerta b { color: var(--status-red); }
+    .ag-num.ok b { color: var(--status-green); }
+
+    .ag-legenda { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 1rem; }
+    .ag-legenda i { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 0.3rem; vertical-align: -1px; }
+
+    .ag-turno { margin-bottom: 1.25rem; padding: 1rem; }
+    /* Abas de turno: um turno por vez, a aba fica presa no topo ao rolar */
+    .ag-turno-tabs { position: sticky; top: 0; z-index: 5; background: var(--bg-primary); margin-bottom: 1rem; flex-wrap: wrap; }
+    .ag-turno-tabs .tab-btn { font-size: 0.9rem; }
+    .ag-turno-tabs .qtd { display: inline-block; min-width: 1.5em; margin-left: 0.4rem; padding: 0 0.45em; border-radius: 999px; font-size: 0.7rem; font-weight: 700;
+        background: var(--bg-glass); color: var(--text-secondary); text-align: center; }
+    .ag-turno-tabs .tab-btn.active .qtd { background: var(--accent-start); color: #fff; }
+    .ag-turno-titulo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; font-weight: 600; }
+    .ag-turno-titulo small { color: var(--text-muted); font-weight: 500; }
+    /* Gravações da grade sem estúdio (faixa acima do turno) */
+    .ag-grav-faixa { border: 1px dashed #c2410c; background: rgba(194, 65, 12, 0.06); border-radius: 8px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
+    .ag-grav-faixa-titulo { font-size: 0.8rem; font-weight: 600; color: #ea580c; margin-bottom: 0.45rem; }
+    .ag-grav-faixa-titulo small { color: var(--text-muted); font-weight: 500; margin-left: 0.4rem; }
+    .ag-grav-chips { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .ag-grav-chip { border-left: 4px solid #c2410c; background: var(--bg-card); border-radius: 6px; padding: 0.3rem 0.55rem; font-size: 0.72rem;
+                    line-height: 1.3; cursor: grab; max-width: 260px; display: flex; flex-direction: column; }
+    .ag-grav-chip .hr { font-size: 0.65rem; color: #ea580c; font-weight: 700; }
+    .ag-grav-chip .sub { color: var(--text-muted); font-size: 0.66rem; }
+    .ag-grav-chip.cancelada { opacity: 0.5; text-decoration: line-through; cursor: default; }
+    .ag-grav-chip.arrastando { opacity: 0.4; }
+    .ag-scroll { overflow-x: auto; }
+    .ag-grid { display: grid; min-width: max-content; }
+    .ag-head { padding: 0.5rem 0.45rem; border-bottom: 1px solid var(--border-subtle); border-left: 1px solid var(--border-subtle); font-size: 0.78rem; min-height: 92px; }
+    .ag-head .est { font-weight: 700; font-size: 0.85rem; }
+    .ag-head .turmas { color: var(--text-muted); font-size: 0.7rem; line-height: 1.3; margin: 0.15rem 0 0.35rem; min-height: 1.8em; }
+    .ag-dir { display: inline-flex; align-items: center; gap: 0.3rem; border: 1px dashed var(--border-subtle); background: transparent; color: var(--text-primary); border-radius: 6px; padding: 0.2rem 0.45rem; font-size: 0.72rem; font-weight: 600; cursor: pointer; font-family: inherit; max-width: 100%; text-align: left; }
+    .ag-dir:hover { border-color: var(--accent-start); }
+    .ag-dir.falta { color: var(--status-red); border-color: rgba(239, 68, 68, 0.5); }
+    .ag-dir.vazio { color: var(--text-muted); font-weight: 500; }
+    .ag-dir .troca { font-size: 0.6rem; font-weight: 700; color: var(--status-yellow); }
+    .ag-tx { display: inline-flex; align-items: center; gap: 0.25rem; margin-top: 0.25rem; border: 1px dashed var(--border-subtle); background: transparent; color: var(--text-muted); border-radius: 6px; padding: 0.15rem 0.4rem; font-size: 0.66rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .ag-tx.ok { color: var(--status-green, #16a34a); border-style: solid; border-color: rgba(22, 163, 74, 0.4); }
+    .ag-tx.falta { color: var(--status-yellow, #f59e0b); border-color: rgba(245, 158, 11, 0.5); }
+    .tx-tabela td { vertical-align: top; }
+    .tx-tabela input { font-size: 0.78rem; padding: 0.3rem 0.45rem; margin-bottom: 0.25rem; }
+    .tx-tabela .tx-sem { color: var(--text-muted); font-size: 0.7rem; }
+    .ag-regua { position: relative; border-right: 1px solid var(--border-subtle); }
+    .ag-regua span { position: absolute; right: 6px; font-size: 0.66rem; color: var(--text-muted); transform: translateY(-50%); }
+    .ag-col { position: relative; border-left: 1px solid var(--border-subtle); cursor: copy;
+        background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--h30) - 1px), var(--border-subtle) calc(var(--h30) - 1px), var(--border-subtle) var(--h30));
+        background-color: transparent; }
+    .ag-col:hover { background-color: var(--bg-glass); }
+    .ag-livre { position: absolute; left: 3px; right: 3px; border-radius: 6px; border: 1px dashed rgba(16, 185, 129, 0.6);
+        background: rgba(16, 185, 129, 0.12); color: var(--status-green); font-size: 0.64rem; font-weight: 600; padding: 3px 6px; cursor: pointer; z-index: 1; }
+    .ag-livre:hover { background: rgba(16, 185, 129, 0.22); }
+    .ag-trancado { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; color: #c2410c; font-size: 0.6rem; font-weight: 700; padding: 2px 5px;
+        background: repeating-linear-gradient(135deg, rgba(249, 115, 22, 0.18) 0 6px, rgba(249, 115, 22, 0.06) 6px 12px); border-top: 2px solid rgba(249, 115, 22, 0.7); }
+    .ag-intervalo { position: absolute; left: 0; right: 0; z-index: 0; pointer-events: none; color: #0369a1; font-size: 0.6rem; font-weight: 700; padding: 2px 5px;
+        background: repeating-linear-gradient(90deg, rgba(14, 165, 233, 0.16) 0 8px, rgba(14, 165, 233, 0.07) 8px 16px); border-top: 2px solid rgba(14, 165, 233, 0.7); }
+    .iv-grade { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1rem; }
+    .iv-turno h4 { font-size: 0.9rem; margin: 0 0 0.4rem; }
+    .iv-turno table td { padding: 0.3rem 0.5rem; font-size: 0.82rem; }
+    .iv-proprio { color: #0369a1; font-weight: 600; }
+    .ag-item { z-index: 2; }
+    .ag-item.fantasma { --c: #64748b !important; background: transparent; border: 1px dashed #64748b; border-left: 3px dashed #64748b; opacity: 0.75; }
+    .ag-item.fantasma .tt { text-decoration: line-through; }
+    .ag-item { position: absolute; border-radius: 6px; padding: 3px 6px; font-size: 0.7rem; line-height: 1.25; overflow: hidden; cursor: pointer;
+        border-left: 3px solid var(--c); background: color-mix(in srgb, var(--c) 18%, var(--bg-secondary)); color: var(--text-primary);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15); transition: transform .12s, box-shadow .12s; }
+    .ag-item:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25); z-index: 3; }
+    .ag-item .hr { color: var(--text-secondary); font-size: 0.64rem; }
+    .ag-item .tt { font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ag-item .sub { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ag-item .tag { display: inline-block; font-size: 0.58rem; font-weight: 700; padding: 0 4px; border-radius: 4px; background: var(--c); color: #fff; margin-right: 3px; vertical-align: 1px; }
+    .ag-item.cancelada { --c: #dc2626 !important; opacity: 0.85; }
+    .ag-item.cancelada .tt { text-decoration: line-through; }
+    .ag-sem-horario { font-size: 0.8rem; }
+    .ag-conf { padding: 1rem; margin-bottom: 1.25rem; }
+    .ag-conf summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    .ag-conf summary::-webkit-details-marker { display: none; }
+    .ag-conf ul { margin: 0.75rem 0 0; padding: 0; list-style: none; font-size: 0.8rem; }
+    .ag-conf li { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.4rem 0; border-top: 1px solid var(--border-subtle); }
+    .ag-conf li .nv { flex: 0 0 auto; font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 4px; color: #fff; margin-top: 2px; }
+    .ag-conf li .nv.erro { background: var(--status-red); }
+    .ag-conf li .nv.aviso { background: var(--status-yellow); }
+    .ag-conf li .nv.info { background: var(--status-blue); }
+    .ag-conf li .txt { flex: 1; }
+    .ag-rel { font-size: 0.62rem; margin-left: 3px; }
+    .ag-rel.falta { color: var(--text-muted); font-size: 0.58rem; }
+    .ag-head .idr { font-size: 0.64rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .ag-head .idr.difere { color: var(--status-yellow); }
+    .ag-sem-horario li { margin: 0.2rem 0 0.2rem 1rem; }
+
+    .ag-conflito { border: 1px solid rgba(245, 158, 11, 0.5); background: rgba(245, 158, 11, 0.08); border-radius: var(--radius-sm); padding: 0.75rem; font-size: 0.82rem; margin-bottom: 1rem; }
+    .ag-conflito ul { margin: 0.4rem 0 0.6rem 1.1rem; }
+    .ag-detalhe { display: grid; grid-template-columns: 110px 1fr; gap: 0.35rem 0.75rem; font-size: 0.85rem; margin-bottom: 1.25rem; }
+    .ag-detalhe dt { color: var(--text-muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+    .ag-linha2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    /* Formulário do agendamento em blocos */
+    .ag-secao { padding: 0.9rem 0 0.2rem; border-top: 1px solid var(--border-color); }
+    #ag-drawer form > .ag-secao:first-of-type { border-top: none; padding-top: 0.25rem; }
+    .ag-secao-titulo { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-accent, #818cf8); margin-bottom: 0.6rem; }
+    .ag-secao-destaque { border: 1px solid rgba(13, 148, 136, 0.45); background: rgba(13, 148, 136, 0.06); border-radius: 8px; padding: 0.8rem 0.9rem 0.2rem; margin: 0.6rem 0; }
+    .ag-check { display: flex; gap: 0.55rem; align-items: flex-start; font-size: 0.82rem; line-height: 1.35; margin-bottom: 0.75rem; cursor: pointer; }
+    .ag-check input { margin-top: 0.15rem; width: 16px; height: 16px; flex: none; }
+    .ag-ajuda { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .ag-drawer-acoes { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-top: 1.25rem; }
+    .ag-drawer-acoes .btn { flex: 1; min-width: 120px; }
+
+    .ag-dias { display: flex; gap: 0.35rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .ag-escala td, .ag-escala th { padding: 0.45rem 0.6rem; }
+    .ag-escala select { min-width: 170px; }
+    .ag-escala select.falta { border-color: var(--status-red); box-shadow: 0 0 0 1px var(--status-red); }
+    .ag-escala td small { display: block; font-size: 0.68rem; color: var(--text-muted); margin-top: 0.2rem; }
+    .ag-copiar { display: none; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.75rem; margin: 0.75rem 0; font-size: 0.85rem; }
+    .ag-copiar.open { display: block; }
+    .ag-copiar label { margin-right: 0.9rem; white-space: nowrap; }
+
+    .ag-tipo-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 600; color: #fff; background: var(--c); white-space: nowrap; }
+    .ag-filtros { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.6rem; align-items: end; margin-bottom: 1rem; }
+    .ag-filtros .form-group { margin-bottom: 0; }
+
+    /* Somente visualização (pedagógico, diretores de imagem) */
+    body.ag-ro .so-edita { display: none !important; }
+    body.ag-ro .ag-col, body.ag-ro .ag-livre { cursor: default; }
+    .ag-aviso-ro { font-size: 0.8rem; color: var(--text-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.5rem 0.75rem; margin-bottom: 1rem; display: none; }
+    body.ag-ro .ag-aviso-ro { display: block; }
+
+    /* Sob demanda: livre, mas só abre com o mínimo de aulas */
+    .ag-livre.demanda { border-color: rgba(202, 138, 4, 0.7); background: repeating-linear-gradient(135deg, rgba(16, 185, 129, 0.14) 0 8px, rgba(234, 179, 8, 0.14) 8px 16px); color: #a16207; }
+
+    /* Feriado: o dia inteiro trancado */
+    .ag-feriado { display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; flex-wrap: wrap; padding: 0.85rem 1rem; margin-bottom: 1rem;
+        border: 1px solid rgba(100, 116, 139, 0.5); background: repeating-linear-gradient(135deg, rgba(100, 116, 139, 0.16) 0 10px, rgba(100, 116, 139, 0.06) 10px 20px); border-radius: var(--radius-md); font-weight: 600; }
+    .ag-feriado form { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; font-weight: 400; }
+    .ag-feriado .form-input { width: auto; padding: 0.4rem 0.6rem; }
+    #dia-turnos.feriado .ag-col { cursor: not-allowed; background-color: rgba(100, 116, 139, 0.10); }
+    #dia-turnos.feriado .ag-item { opacity: 0.55; }
+
+    /* Observações, menu de contexto e arrastar */
+    .ag-item .obs { font-size: 0.6rem; font-weight: 700; margin-left: 3px; }
+    .ag-item[draggable="true"] { cursor: grab; }
+    .ag-item.arrastando { opacity: 0.4; }
+    .ag-col.alvo { outline: 2px dashed var(--accent-start); outline-offset: -2px; background-color: var(--bg-glass); }
+    .ag-col.alvo-nao { outline: 2px dashed var(--status-red); outline-offset: -2px; }
+    /* Prévia de onde o bloco vai cair ao soltar */
+    .ag-previa { position: absolute; left: 3px; right: 3px; z-index: 6; pointer-events: none; border-radius: 6px; padding: 3px 6px;
+        font-size: 0.68rem; font-weight: 700; border: 2px dashed var(--status-green); background: rgba(16, 185, 129, 0.22); color: var(--status-green); }
+    .ag-previa.nao { border-color: var(--status-red); background: rgba(239, 68, 68, 0.18); color: var(--status-red); }
+    .ag-previa small { display: block; font-weight: 500; font-size: 0.62rem; }
+    .ag-ctx { position: fixed; z-index: 2000; min-width: 210px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); padding: 0.3rem; display: none; }
+    .ag-ctx.open { display: block; }
+    .ag-ctx button { display: block; width: 100%; text-align: left; background: transparent; border: none; color: var(--text-primary); font-family: inherit; font-size: 0.82rem; padding: 0.45rem 0.6rem; border-radius: 6px; cursor: pointer; }
+    .ag-ctx button:hover { background: var(--bg-glass); }
+    .ag-ctx .ctx-titulo { font-size: 0.7rem; color: var(--text-muted); padding: 0.3rem 0.6rem; border-bottom: 1px solid var(--border-subtle); margin-bottom: 0.2rem; }
+    .ag-obs-lista { list-style: none; margin: 0 0 0.75rem; padding: 0; font-size: 0.82rem; }
+    .ag-obs-lista li { border-left: 3px solid var(--accent-start); background: var(--bg-glass); border-radius: 6px; padding: 0.45rem 0.6rem; margin-bottom: 0.4rem; display: flex; gap: 0.5rem; justify-content: space-between; align-items: flex-start; }
+    .ag-obs-lista small { color: var(--text-muted); display: block; font-size: 0.7rem; margin-top: 0.15rem; }
+    .ag-remanejo { border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 0.5rem 0.6rem; margin-bottom: 0.5rem; background: var(--bg-secondary); }
+    .ag-remanejo .desc { font-weight: 600; margin-bottom: 0.35rem; }
+    .ag-remanejo .form-select { width: 100%; }
+    .ag-config td, .ag-config th { padding: 0.45rem 0.6rem; }
+
+    @media print {
+        .sidebar, .sidebar-toggle-btn, .tabs, .ag-toolbar, .ag-nao-imprime, #toast-container { display: none !important; }
+        .main-content { margin: 0 !important; padding: 0 !important; }
+        body::before { display: none; }
+        .card { box-shadow: none !important; break-inside: avoid; }
+        .ag-scroll { overflow: visible; }
+        .ag-print-titulo { display: block !important; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-agenda"/></svg> Agenda dos estúdios</h1>
+        <p class="page-subtitle">Uso dos estúdios dia a dia: aulas da grade, agendamentos extras e diretor de cada estúdio.</p>
+    </div>
+</div>
+
+<div class="tabs ag-nao-imprime" id="abas-principais" style="margin-bottom: 1.25rem;">
+    <button class="tab-btn active" data-tab="dia" onclick="trocarAba('dia')">📅 Agenda do Dia</button>
+    <button class="tab-btn" data-tab="lista" onclick="trocarAba('lista')">📌 Agendamentos</button>
+    <button class="tab-btn" data-tab="escala" onclick="trocarAba('escala')">🎥 Escala de Diretores</button>
+    <button class="tab-btn so-edita" data-tab="transmissao" onclick="trocarAba('transmissao')">📺 Link e chave do dia</button>
+    <button class="tab-btn" data-tab="trancados" onclick="trocarAba('trancados')">🔒 Trancados e intervalos</button>
+    <button class="tab-btn" data-tab="estudios" onclick="trocarAba('estudios')">⚙️ Estúdios e feriados</button>
+</div>
+<div class="ag-aviso-ro ag-nao-imprime">👀 Você está vendo a agenda em <b>modo consulta</b>: dá para ver a disponibilidade dos estúdios,
+    mas agendar, remanejar e trocar diretor é feito pela direção de imagem (Diretor-Chefe).</div>
+
+<!-- ═══ Aba: Agenda do Dia ═══ -->
+<section id="aba-dia">
+    <div class="ag-toolbar">
+        <div class="grupo">
+            <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDia(-1)" title="Dia anterior">◀</button>
+            <input type="date" id="dia-data" class="form-input" onchange="carregarDia()">
+            <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDia(1)" title="Próximo dia">▶</button>
+            <button class="btn btn-secondary btn-sm" onclick="irParaHoje()">Hoje</button>
+            <span class="ag-dia-label" id="dia-label"></span>
+        </div>
+        <div class="grupo">
+            <button class="btn btn-primary btn-sm so-edita" onclick="abrirAgendamento()">+ Agendar</button>
+            <button class="btn btn-secondary btn-sm so-edita" id="btn-feriado" onclick="mostrarFormFeriado()" title="Tranca a agenda inteira neste dia">🎉 Feriado</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportarExcel()" title="Baixa no formato da planilha antiga">⬇️ Excel</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+        </div>
+    </div>
+
+    <h2 class="ag-print-titulo" id="print-titulo" style="display:none; margin-bottom: 0.5rem;"></h2>
+    <div class="ag-resumo" id="dia-resumo"></div>
+    <div class="ag-legenda" id="dia-legenda"></div>
+    <div id="dia-feriado"></div>
+    <div id="dia-conferencia"></div>
+    <div class="tabs ag-turno-tabs" id="turno-tabs"></div>
+    <div id="dia-turnos"><div class="spinner"></div></div>
+</section>
+
+<!-- ═══ Aba: Agendamentos ═══ -->
+<section id="aba-lista" style="display:none;">
+    <div class="card">
+        <div class="ag-filtros">
+            <div class="form-group"><label class="form-label">De</label><input type="date" id="l-inicio" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Até</label><input type="date" id="l-fim" class="form-input"></div>
+            <div class="form-group"><label class="form-label">Estúdio</label><select id="l-estudio" class="form-select"><option value="">Todos</option></select></div>
+            <div class="form-group"><label class="form-label">Tipo</label><select id="l-tipo" class="form-select"><option value="">Todos</option></select></div>
+            <div class="form-group"><label class="form-label">Status</label>
+                <select id="l-status" class="form-select">
+                    <option value="">Todos</option>
+                    <option value="AGENDADO">Agendado</option>
+                    <option value="CANCELADO">Cancelado</option>
+                </select>
+            </div>
+            <div class="form-group"><label class="form-label">Busca</label><input type="text" id="l-busca" class="form-input" placeholder="Título, professor, chamado"></div>
+            <div style="display:flex; gap:0.5rem;">
+                <button class="btn btn-primary btn-sm" style="flex:1;" onclick="carregarLista()">Filtrar</button>
+                <button class="btn btn-secondary btn-sm so-edita" style="flex:1;" onclick="abrirAgendamento()">+ Novo</button>
+            </div>
+        </div>
+        <div id="lista-total" style="font-size:0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;"></div>
+        <div id="lista-tabela"></div>
+    </div>
+</section>
+
+<!-- ═══ Aba: Escala de Diretores ═══ -->
+<section id="aba-escala" style="display:none;">
+    <div class="card">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            Escala <b>diária</b>: escolha o dia e o diretor de imagem de cada estúdio em cada turno. Vale só para aquele dia —
+            para não montar do zero, use <b>Copiar este dia para…</b>. Em vermelho: estúdio com aula no turno e sem diretor.
+        </p>
+        <div class="ag-toolbar" style="margin-bottom: 0.75rem;">
+            <div class="grupo">
+                <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDiaEscala(-1)" title="Dia anterior">◀</button>
+                <input type="date" id="escala-data" class="form-input" onchange="carregarEscala()">
+                <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDiaEscala(1)" title="Próximo dia">▶</button>
+                <span class="ag-dia-label" id="escala-label"></span>
+            </div>
+            <div class="grupo">
+                <span id="escala-status" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
+                <button class="btn btn-secondary btn-sm so-edita" onclick="abrirCopiarEscala()">📋 Copiar este dia para…</button>
+            </div>
+        </div>
+        <div class="ag-copiar" id="escala-copiar">
+            <div id="escala-copiar-dias" style="margin-bottom: 0.6rem; display:flex; flex-wrap:wrap; gap:0.3rem 0.9rem;"></div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.6rem;">A escala dos dias marcados será substituída pela deste dia. Feriados ficam de fora.</div>
+            <button class="btn btn-primary btn-sm" onclick="copiarEscala()">Copiar</button>
+        </div>
+        <div id="escala-tabela" style="margin-top: 0.75rem;"></div>
+    </div>
+</section>
+
+<!-- ═══ Aba: Link do YouTube e chave do dia ═══ -->
+<section id="aba-transmissao" style="display:none;">
+    <div class="card">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            O link do YouTube e a chave mudam <b>todo dia</b>. Informe uma vez por <b>estúdio</b> e <b>turno</b>:
+            vale para todas as aulas daquele estúdio no turno. Os relatórios do diretor de imagem e do assistente
+            puxam o link sozinhos, e a chave aparece só para o diretor escalado.
+        </p>
+        <div class="ag-toolbar" style="margin-bottom: 0.75rem;">
+            <div class="grupo">
+                <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDiaTransmissao(-1)" title="Dia anterior">◀</button>
+                <input type="date" id="tx-data" class="form-input" onchange="carregarTransmissao()">
+                <button class="btn btn-secondary btn-sm ag-btn-icon" onclick="mudarDiaTransmissao(1)" title="Próximo dia">▶</button>
+                <span class="ag-dia-label" id="tx-label"></span>
+            </div>
+            <div class="grupo">
+                <span id="tx-status" style="font-size: 0.8rem; color: var(--text-secondary);"></span>
+                <button class="btn btn-primary btn-sm" onclick="salvarTransmissao()">💾 Salvar link e chave do dia</button>
+            </div>
+        </div>
+        <div id="tx-tabela"></div>
+    </div>
+</section>
+
+<!-- ═══ Aba: Horários trancados ═══ -->
+<section id="aba-trancados" style="display:none;">
+    <div class="card" style="margin-bottom: 1.25rem;">
+        <div class="form-section-title">☕ Intervalos</div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            A pausa de cada turno nos estúdios. Aparece em azul na agenda e não conta como horário disponível.
+            Quando mudar, a mudança vale <b>do dia escolhido em diante</b> (ou só nesse dia): os dias que já passaram
+            continuam com o intervalo que tinham.
+        </p>
+        <div class="ag-filtros" style="align-items:end; margin-bottom: 0.75rem;">
+            <div class="form-group"><label class="form-label">Ver o que vale no dia</label>
+                <input type="date" id="iv-ver-data" class="form-input" onchange="carregarIntervalos()"></div>
+        </div>
+        <div id="iv-quadro" class="iv-grade"></div>
+        <form class="ag-filtros so-edita" onsubmit="salvarIntervalo(event)" style="align-items:end; margin-top: 1rem;">
+            <div class="form-group"><label class="form-label">Turno</label>
+                <select id="iv-turno" class="form-select"><option value="manha">Manhã</option><option value="tarde">Tarde</option></select></div>
+            <div class="form-group"><label class="form-label">Estúdio</label><select id="iv-estudio" class="form-select" onchange="ajustarFormIntervalo()"></select></div>
+            <div class="form-group"><label class="form-label">Das</label><input type="time" id="iv-inicio" class="form-input" step="300"></div>
+            <div class="form-group"><label class="form-label">Até</label><input type="time" id="iv-fim" class="form-input" step="300"></div>
+            <div class="form-group"><label class="form-label">A partir de</label><input type="date" id="iv-data" class="form-input" required></div>
+            <div class="form-group"><label class="form-label">Vale</label>
+                <select id="iv-alcance" class="form-select"><option value="frente">Deste dia em diante</option><option value="dia">Só neste dia</option></select></div>
+            <div class="form-group" style="grid-column: span 2;"><label class="form-label">Motivo</label><input type="text" id="iv-motivo" class="form-input" maxlength="255" placeholder="Ex: evento no estúdio"></div>
+            <div class="form-group" style="grid-column: 1 / -1;"><label style="font-size:0.85rem; display:flex; gap:0.4rem; align-items:center;">
+                <input type="checkbox" id="iv-sem" onchange="ajustarFormIntervalo()"> <span id="iv-sem-rotulo">Sem intervalo</span></label></div>
+            <div><button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Salvar intervalo</button></div>
+        </form>
+        <details style="margin-top: 1rem;"><summary style="cursor:pointer; font-size:0.85rem;">📜 Histórico de mudanças</summary>
+            <div id="iv-historico" style="margin-top: 0.6rem;"></div></details>
+    </div>
+    <div class="card">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            O "laranja" da planilha: períodos em que o estúdio não recebe agendamento (ex.: fim da tarde dos estúdios
+            cuja noite começa às 18:00). Aparecem hachurados na agenda e o sistema avisa antes de agendar em cima.
+            <b>Sob demanda</b>: o horário continua disponível, mas só abre com um mínimo de aulas (não compensa chamar
+            diretor horista/PJ para uma aula só).
+            Além disso, a agenda só mostra como <b style="color:var(--status-green)">disponível</b> o espaço livre de
+            pelo menos <b id="regra-duracao">45</b> min, com <b id="regra-margem">10</b> min de margem antes da próxima aula.
+        </p>
+        <form class="ag-filtros so-edita" onsubmit="salvarBloqueio(event)" style="align-items:end;">
+            <input type="hidden" id="bq-id">
+            <div class="form-group"><label class="form-label">Estúdio</label><select id="bq-estudio" class="form-select" required></select></div>
+            <div class="form-group"><label class="form-label">Das</label><input type="time" id="bq-inicio" class="form-input" step="300" required></div>
+            <div class="form-group"><label class="form-label">Até</label><input type="time" id="bq-fim" class="form-input" step="300" required></div>
+            <div class="form-group"><label class="form-label">Tipo</label>
+                <select id="bq-tipo" class="form-select" onchange="document.getElementById('bq-grupo-minimo').style.display = this.value === 'SOB_DEMANDA' ? '' : 'none'">
+                    <option value="TRANCADO">🔒 Trancado</option>
+                    <option value="SOB_DEMANDA">⏳ Sob demanda</option>
+                </select></div>
+            <div class="form-group" id="bq-grupo-minimo" style="display:none;"><label class="form-label">Mínimo de aulas</label><input type="number" id="bq-minimo" class="form-input" min="1" max="20" placeholder="3"></div>
+            <div class="form-group" style="grid-column: span 2;"><label class="form-label">Motivo</label><input type="text" id="bq-motivo" class="form-input" maxlength="255" placeholder="Ex: noite começa às 18:00"></div>
+            <div class="form-group" style="grid-column: 1 / -1;"><label class="form-label">Dias</label><div id="bq-dias" style="display:flex; flex-wrap:wrap; gap:0.3rem 0.9rem; font-size:0.85rem;"></div></div>
+            <div style="display:flex; gap:0.5rem;">
+                <button type="submit" class="btn btn-primary btn-sm" id="bq-salvar" style="flex:1;">Adicionar</button>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="limparBloqueio()" style="flex:1;">Limpar</button>
+            </div>
+        </form>
+        <div id="bq-tabela"></div>
+    </div>
+</section>
+
+<!-- ═══ Aba: Estúdios e feriados ═══ -->
+<section id="aba-estudios" style="display:none;">
+    <div class="card" style="margin-bottom: 1.25rem;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+            Usado para <b>sugerir o estúdio</b> ao remanejar aula ou marcar evento: primeiro os livres; para evento,
+            a prioridade definida aqui (1 = primeira opção); depois os estúdios preparados para <b>Libras</b>.
+            O nome e o horário de funcionamento de cada estúdio continuam em Configurações.
+        </p>
+        <div id="cfg-tabela"></div>
+    </div>
+    <div class="card">
+        <div class="form-section-title">🎉 Feriados</div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">No feriado a agenda do dia fica trancada: nada pode ser agendado, remanejado ou cancelado.</p>
+        <form class="ag-filtros so-edita" onsubmit="salvarFeriado(event)" style="align-items:end;">
+            <div class="form-group"><label class="form-label">Data</label><input type="date" id="fer-data" class="form-input" required></div>
+            <div class="form-group" style="grid-column: span 2;"><label class="form-label">Nome</label><input type="text" id="fer-nome" class="form-input" maxlength="120" required placeholder="Ex: Dia do Piauí"></div>
+            <div><button type="submit" class="btn btn-primary btn-sm" style="width:100%;">Marcar feriado</button></div>
+        </form>
+        <div id="fer-tabela"></div>
+    </div>
+</section>
+
+<!-- Menu do botão direito -->
+<div class="ag-ctx" id="ag-ctx"></div>
+
+<!-- Drawer: Agendamento -->
+<div class="drawer-overlay" id="ag-overlay" onclick="fecharDrawers()"></div>
+<div class="drawer" id="ag-drawer">
+    <div class="drawer-header"><h3 id="ag-titulo">Novo agendamento</h3><button class="drawer-close" onclick="fecharDrawers()">✕</button></div>
+    <div id="ag-conflito"></div>
+    <form onsubmit="salvarAgendamento(event)">
+        <input type="hidden" id="ag-id">
+
+        <div class="ag-secao">
+            <div class="ag-secao-titulo">📅 Quando e onde</div>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label">Data</label><input type="date" id="ag-data" class="form-input" required></div>
+                <div class="form-group"><label class="form-label">Estúdio</label><select id="ag-estudio" class="form-select" required></select></div>
+            </div>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label">Início</label><input type="time" id="ag-inicio" class="form-input" step="300" required></div>
+                <div class="form-group"><label class="form-label">Fim</label><input type="time" id="ag-fim" class="form-input" step="300" required></div>
+            </div>
+        </div>
+
+        <div class="ag-secao">
+            <div class="ag-secao-titulo">🎬 O que vai acontecer</div>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label">Tipo</label><select id="ag-tipo" class="form-select" required onchange="ajustarCamposTipo()"></select></div>
+                <div class="form-group"><label class="form-label">Canal (SEDUC-PI)</label><select id="ag-canal" class="form-select"><option value="">—</option></select></div>
+            </div>
+            <div class="form-group" id="ag-grupo-evento" style="display:none;"><label class="form-label">Nome do evento <span style="color:var(--status-red);">*</span></label>
+                <input type="text" id="ag-nome-evento" class="form-input" maxlength="255" placeholder="Ex: Live SEDUC — Abertura dos Jogos Escolares"></div>
+            <div class="form-group" id="ag-grupo-departamento" style="display:none;"><label class="form-label">Departamento / solicitante</label>
+                <input type="text" id="ag-departamento" class="form-input" maxlength="120" list="ag-departamentos" placeholder="UETEV, SUGED…">
+                <datalist id="ag-departamentos"></datalist></div>
+            <div class="form-group"><label class="form-label">Título</label>
+                <input type="text" id="ag-titulo-in" class="form-input" maxlength="255" required placeholder="Ex: Química — 2ª série"></div>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label">Turma</label>
+                    <input type="text" id="ag-turma-nome" class="form-input" list="ag-turmas" autocomplete="off" placeholder="Digite para buscar" oninput="escolherTurmaDigitada()" onchange="escolherTurmaDigitada(true)">
+                    <datalist id="ag-turmas"></datalist>
+                    <input type="hidden" id="ag-turma"></div>
+                <div class="form-group"><label class="form-label">Professor</label>
+                    <input type="text" id="ag-professor" class="form-input" maxlength="255" list="ag-professores" autocomplete="off" placeholder="Digite para buscar">
+                    <datalist id="ag-professores"></datalist></div>
+            </div>
+        </div>
+
+        <div class="ag-secao ag-secao-destaque" id="ag-secao-gravacao" style="display:none;">
+            <div class="ag-secao-titulo">🎥 Ligação com a aula da grade</div>
+            <div id="ag-grupo-solicitacao" style="display:none;">
+                <label class="ag-check"><input type="checkbox" id="ag-reposicao" onchange="ajustarCamposTipo()">
+                    <span><b>Reposição</b> — a aula da grade não aconteceu e está sendo reposta nesta gravação</span></label>
+                <div class="form-group" id="ag-grupo-exibicao"><label class="form-label" id="ag-label-data-ref">Data da exibição (aula na grade)</label>
+                    <input type="date" id="ag-data-exibicao" class="form-input" onchange="carregarAulasExibicao()"></div>
+            </div>
+            <div class="form-group" id="ag-grupo-aula-exibida" style="display:none;"><label class="form-label" id="ag-label-aula-ref">Aula da grade que vai ao ar com esta gravação</label>
+                <select id="ag-aula-exibida" class="form-select"><option value="">— escolha a turma e a data —</option></select>
+                <p id="ag-ajuda-aula-ref" class="ag-ajuda"></p></div>
+        </div>
+
+        <div class="ag-secao">
+            <div class="ag-secao-titulo">🎫 Pedido e chamado</div>
+            <label class="ag-check" title="Pedido da SEDUC: o nº do chamado passa a ser obrigatório">
+                <input type="checkbox" id="ag-seduc" onchange="ajustarCamposTipo()">
+                <span><b>Pedido da SEDUC</b> — o nº do chamado passa a ser obrigatório</span></label>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label" id="ag-label-chamado">Nº do chamado</label>
+                    <input type="text" id="ag-chamado" class="form-input" maxlength="50" placeholder="17690"></div>
+                <div class="form-group"><label class="form-label">Link do chamado</label><input type="url" id="ag-link" class="form-input" maxlength="500" placeholder="https://…"></div>
+            </div>
+        </div>
+
+        <div class="ag-secao" id="ag-grupo-transmissao">
+            <div class="ag-secao-titulo">📺 Transmissão</div>
+            <div class="ag-linha2">
+                <div class="form-group"><label class="form-label">Link do YouTube</label>
+                    <input type="url" id="ag-youtube-link" class="form-input" maxlength="500" placeholder="https://youtube.com/live/..."></div>
+                <div class="form-group"><label class="form-label">Chave de transmissão</label>
+                    <input type="text" id="ag-chave-transmissao" class="form-input" maxlength="255" placeholder="xxxx-xxxx-xxxx-xxxx-xxxx"></div>
+            </div>
+        </div>
+
+        <div class="ag-secao">
+            <div class="form-group"><label class="form-label">Observação</label><textarea id="ag-descricao" class="form-textarea" rows="3"></textarea></div>
+        </div>
+        <div class="ag-drawer-acoes so-edita">
+            <button type="submit" class="btn btn-primary" id="ag-salvar">Salvar</button>
+        </div>
+        <div class="ag-drawer-acoes so-edita" id="ag-acoes-edicao" style="display:none;">
+            <button type="button" class="btn btn-secondary" id="ag-btn-status" onclick="alternarStatusAgendamento()"></button>
+            <button type="button" class="btn btn-danger" id="ag-btn-excluir" onclick="excluirAgendamento()">Excluir</button>
+        </div>
+    </form>
+    <div id="ag-obs" style="margin-top: 1.25rem;"></div>
+</div>
+
+<!-- Drawer: Aula da grade -->
+<div class="drawer" id="aula-drawer">
+    <div class="drawer-header"><h3 id="aula-titulo">Aula da grade</h3><button class="drawer-close" onclick="fecharDrawers()">✕</button></div>
+    <dl class="ag-detalhe" id="aula-detalhe"></dl>
+    <div id="aula-obs"></div>
+    <div id="aula-acoes" class="so-edita"></div>
+</div>
+
+<!-- Drawer: link e chave da transmissão (aba Escala) -->
+<div class="drawer" id="link-drawer">
+    <div class="drawer-header"><h3>📺 Transmissão</h3><button class="drawer-close" onclick="fecharDrawers()">✕</button></div>
+    <p id="link-titulo" style="font-weight:600; margin-bottom:0.75rem;"></p>
+    <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:0.75rem;">Vale para todas as aulas deste estúdio no turno, só neste dia. Os relatórios puxam sozinhos; a chave aparece só para o diretor escalado.</p>
+    <div class="form-group"><label class="form-label">Link do YouTube</label><input type="url" id="link-youtube" class="form-input" maxlength="500" placeholder="https://youtube.com/live/…"></div>
+    <div class="form-group"><label class="form-label">Chave de transmissão</label><input type="text" id="link-chave" class="form-input" maxlength="255" autocomplete="off"></div>
+    <div class="ag-drawer-acoes"><button class="btn btn-primary" onclick="salvarLinkTransmissao()">Salvar</button></div>
+</div>
+
+<!-- Drawer: Diretor do estúdio no dia -->
+<div class="drawer" id="dir-drawer">
+    <div class="drawer-header"><h3>Diretor do estúdio</h3><button class="drawer-close" onclick="fecharDrawers()">✕</button></div>
+    <dl class="ag-detalhe" id="dir-detalhe"></dl>
+    <div class="so-edita">
+    <div class="form-group"><label class="form-label">Diretor escalado neste dia</label><select id="dir-select" class="form-select"></select></div>
+    <div class="form-section-title" style="margin-top:0.5rem;">Outros diretores no turno (opcional)</div>
+    <p style="font-size:0.75rem; color:var(--text-muted); margin:-0.25rem 0 0.5rem;">Ex.: evento que atravessa o turno, ou o diretor passou mal e outro assumiu. Cada um assume a partir do horário informado (até 6 trocas).</p>
+    <div id="dir-trocas"></div>
+    <button type="button" class="btn btn-secondary btn-sm" onclick="adicionarTrocaDiretor()" style="margin-bottom:0.75rem;">+ adicionar diretor</button>
+    <div class="form-group"><label class="form-label">Observação</label><input type="text" id="dir-obs" class="form-input" maxlength="255" placeholder="Ex: cobrindo férias"></div>
+    <div class="form-section-title" style="margin-top:0.5rem;">📺 Transmissão do estúdio neste turno</div>
+    <p style="font-size:0.75rem; color:var(--text-muted); margin:-0.25rem 0 0.5rem;">Vale para todas as aulas do estúdio no turno, neste dia. Para o dia inteiro de uma vez, use a aba <b>Link e chave do dia</b>.</p>
+    <div class="form-group"><label class="form-label">Link do YouTube</label><input type="url" id="dir-youtube" class="form-input" maxlength="500" placeholder="https://youtube.com/live/…"></div>
+    <div class="form-group"><label class="form-label">Chave de transmissão</label><input type="text" id="dir-chave" class="form-input" maxlength="255" autocomplete="off" placeholder="xxxx-xxxx-xxxx-xxxx"></div>
+    <p style="font-size:0.75rem; color:var(--text-muted);">Para montar a escala do dia inteiro de uma vez, use a aba <b>Escala de Diretores</b>.</p>
+    <div class="ag-drawer-acoes">
+        <button class="btn btn-primary" onclick="salvarDiretorDia()">Salvar escala do dia</button>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const API = '/api/v1/agenda-estudios';
+    // Editam: Admin e Diretor-Chefe. Consultam (sem agendar): pedagógico, auditoria e diretores de imagem.
+    const PAPEIS = ['admin', 'diretor_chefe', 'gestor', 'coordenador', 'auditor'];
+    const PX_MIN = 1.3;               // altura (px) de cada minuto na agenda
+    const TURNO_ICONE = { manha: '☀️', tarde: '🌤️', noite: '🌙' };
+    const COR_AULA = '#15803d';       // aula da grade: verde
+    const COR_GRAVACAO_GRADE = '#c2410c';  // gravação da grade (MP): laranja — pode mudar de horário no dia
+    let COR_CANCELADA = '#dc2626';    // vermelho só para cancelado
+    let PODE_EDITAR = false;
+
+    let OPCOES = { estudios: [], diretores: [], turmas: [], tipos: [], turnos: [], dias_semana: [] };
+    let AGENDA = null;
+    let turnoFiltro = null;   // null = escolher pelo horário atual; '' = dia inteiro
+    let agendamentoAtual = null;
+    let aulaAtual = null;
+    let diretorAtual = null;
+
+    // ─── Utilitários ───────────────────────────────────────────────
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function isoHoje() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+    function isoParaBr(iso) { const [a, m, d] = String(iso).split('-'); return `${d}/${m}/${a}`; }
+    function somarDias(iso, n) {
+        const [a, m, d] = iso.split('-').map(Number);
+        const dt = new Date(a, m - 1, d + n);
+        return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    }
+    function paraMin(hhmm) { const [h, m] = String(hhmm).split(':').map(Number); return h * 60 + m; }
+    function paraHora(min) { return `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`; }
+    function tipoInfo(tipo) { return OPCOES.tipos.find(t => t.valor === tipo) || { label: tipo, cor: COR_AULA }; }
+    const DIAS_CURTOS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+    function diaCurto(iso) { const [a, m, d] = iso.split('-').map(Number); return DIAS_CURTOS[(new Date(a, m - 1, d).getDay() + 6) % 7]; }
+
+    /** fetch com JSON; em erro lança Error com .status e .detail (inclusive detalhe estruturado do 409). */
+    async function api(method, url, body) {
+        const res = await fetch(url, {
+            method,
+            headers: { 'Authorization': `Bearer ${getToken()}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        if (res.status === 401) { logout(); throw new Error('Sessão expirada.'); }
+        if (res.status === 204) return null;
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+            const d = data.detail;
+            const msg = (d && typeof d === 'object' && !Array.isArray(d)) ? (d.message || 'Erro.') : formatApiDetail(d);
+            const err = new Error(msg);
+            err.status = res.status;
+            err.detail = d;
+            throw err;
+        }
+        return data;
+    }
+
+    // ─── Inicialização ─────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserProfile();
+        const user = getUser();
+        if (!user || !PAPEIS.includes(user.role)) {
+            showToast('Você não tem acesso à Agenda de Estúdios.', 'error');
+            setTimeout(() => window.location.replace(user && user.role === 'diretor_imagem' ? '/diretor-imagem/historico' : '/dashboard'), 1200);
+            return;
+        }
+        try {
+            OPCOES = await api('GET', `${API}/opcoes`);
+        } catch (e) { showToast(e.message, 'error'); return; }
+        PODE_EDITAR = !!OPCOES.pode_editar;
+        document.body.classList.toggle('ag-ro', !PODE_EDITAR);
+        if (OPCOES.cor_cancelado) COR_CANCELADA = OPCOES.cor_cancelado;
+        preencherSelects();
+        const params = new URLSearchParams(location.search);
+        document.getElementById('dia-data').value = params.get('data') || isoHoje();
+        document.getElementById('l-inicio').value = isoHoje();
+        document.getElementById('l-fim').value = somarDias(isoHoje(), 30);
+        montarLegenda();
+        carregarDia();
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') { fecharDrawers(); fecharCtx(); } });
+        document.addEventListener('click', fecharCtx);
+        window.addEventListener('scroll', fecharCtx, true);
+    });
+
+    // Tipos que são gravação de aula (o tipo único "Gravação" + os tipos antigos já gravados)
+    const TIPOS_GRAVACAO = ['GRAVACAO', 'GRAVACAO_ANTECIPADA', 'REPOSICAO', 'ASSINCRONA', 'CURSO_TECNICO', 'REGRAVACAO'];
+
+    function preencherSelects() {
+        const est = OPCOES.estudios.map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('');
+        document.getElementById('ag-estudio').innerHTML = est;
+        document.getElementById('l-estudio').innerHTML = '<option value="">Todos</option>' + est;
+        const tipos = OPCOES.tipos.map(t => `<option value="${t.valor}">${esc(t.label)}</option>`).join('');
+        // tipos antigos (oculto) continuam abrindo registros já gravados, mas não aparecem para novos
+        document.getElementById('ag-tipo').innerHTML = OPCOES.tipos.map(t =>
+            `<option value="${t.valor}" ${t.oculto ? 'hidden' : ''}>${esc(t.label)}</option>`).join('');
+        document.getElementById('l-tipo').innerHTML = '<option value="">Todos</option>' + tipos
+            + '<option value="AULA_CANCELADA">Aula cancelada</option><option value="AULA_REMANEJADA">Aula remanejada</option>';
+        document.getElementById('ag-canal').innerHTML = '<option value="">—</option>' + (OPCOES.canais || []).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+        document.getElementById('ag-departamentos').innerHTML = (OPCOES.departamentos || []).map(d => `<option value="${esc(d)}"></option>`).join('');
+        document.getElementById('bq-estudio').innerHTML = est;
+        document.getElementById('bq-dias').innerHTML = OPCOES.dias_semana.map(d =>
+            `<label><input type="checkbox" value="${d.valor}" ${d.valor < 5 ? 'checked' : ''}> ${esc(d.label)}</label>`).join('');
+        if (OPCOES.regras) {
+            document.getElementById('regra-duracao').textContent = OPCOES.regras.duracao_minima;
+            document.getElementById('regra-margem').textContent = OPCOES.regras.margem_seguranca;
+        }
+        document.getElementById('ag-turmas').innerHTML = OPCOES.turmas.map(t => `<option value="${esc(t.nome)}"></option>`).join('');
+        document.getElementById('ag-professores').innerHTML = (OPCOES.professores || []).map(p => `<option value="${esc(p)}"></option>`).join('');
+    }
+
+    /** Turma digitada → id da turma (só aceita uma turma cadastrada). */
+    function escolherTurmaDigitada(aoSair = false) {
+        const inp = document.getElementById('ag-turma-nome');
+        const nome = inp.value.trim().toLowerCase();
+        const t = OPCOES.turmas.find(x => (x.nome || '').toLowerCase() === nome);
+        document.getElementById('ag-turma').value = t ? t.id : '';
+        if (aoSair && inp.value.trim() && !t) {
+            showToast('Escolha uma turma da lista.', 'error');
+            inp.value = '';
+        }
+        if (aoSair) carregarAulasExibicao();
+    }
+
+    /** Gravação antecipada: lista as aulas da grade da turma no dia da exibição. */
+    async function carregarAulasExibicao(selecionada) {
+        const sel = document.getElementById('ag-aula-exibida');
+        const turma = document.getElementById('ag-turma').value;
+        const data = document.getElementById('ag-data-exibicao').value;
+        const atual = selecionada !== undefined ? selecionada : sel.value;
+        if (!turma || !data) {
+            sel.innerHTML = '<option value="">— escolha a turma e a data —</option>';
+            return;
+        }
+        try {
+            const aulas = await api('GET', `${API}/aulas-da-turma?turma_id=${turma}&data=${data}`);
+            sel.innerHTML = '<option value="">— não ligar a uma aula —</option>' +
+                aulas.map(a => `<option value="${a.grade_id}">${esc(a.descricao)}</option>`).join('');
+            if (!aulas.length) sel.innerHTML = '<option value="">— a turma não tem aula na grade nesse dia —</option>';
+            sel.value = atual || '';
+        } catch (e) { sel.innerHTML = '<option value="">— não foi possível carregar —</option>'; }
+    }
+
+    function montarLegenda() {
+        const itens = [
+            `<span><i style="background:${COR_AULA}"></i>Aula da grade</span>`,
+            `<span><i style="background:${COR_GRAVACAO_GRADE}"></i>Gravação da grade (MP)</span>`,
+            ...OPCOES.tipos.filter(t => !t.oculto).map(t => `<span><i style="background:${t.cor}"></i>${esc(t.label)}</span>`),
+            `<span><i style="background:${COR_CANCELADA}"></i>Cancelado / trancado</span>`,
+            `<span><i style="background:rgba(16,185,129,0.25); border:1px dashed rgba(16,185,129,0.6);"></i>Disponível para agendar</span>`,
+            `<span><i style="background:repeating-linear-gradient(135deg, rgba(249,115,22,.5) 0 3px, transparent 3px 6px);"></i>Horário trancado</span>`,
+            `<span><i style="background:rgba(14,165,233,0.3); border-top:2px solid rgba(14,165,233,0.8);"></i>Intervalo</span>`,
+            `<span><i style="background:repeating-linear-gradient(135deg, rgba(16,185,129,.4) 0 3px, rgba(234,179,8,.4) 3px 6px);"></i>Sob demanda (mín. ${OPCOES.minimo_sob_demanda || 3} aulas)</span>`,
+            `<span>💬 Observação</span>`,
+        ];
+        document.getElementById('dia-legenda').innerHTML = itens.join('');
+    }
+
+    function trocarAba(aba) {
+        document.querySelectorAll('#abas-principais .tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === aba));
+        ['dia', 'lista', 'escala', 'transmissao', 'trancados', 'estudios'].forEach(a => document.getElementById(`aba-${a}`).style.display = a === aba ? '' : 'none');
+        if (aba === 'transmissao') { document.getElementById('tx-data').value = dataAtual(); carregarTransmissao(); }
+        if (aba === 'trancados') { carregarBloqueios(); prepararIntervalos(); }
+        if (aba === 'estudios') carregarEstudiosConfig();
+        if (aba === 'lista') carregarLista();
+        if (aba === 'escala') { document.getElementById('escala-data').value = dataAtual(); carregarEscala(); }
+        if (aba === 'dia') carregarDia();
+    }
+
+    // ─── Agenda do Dia ─────────────────────────────────────────────
+
+    function dataAtual() { return document.getElementById('dia-data').value || isoHoje(); }
+    function mudarDia(n) { document.getElementById('dia-data').value = somarDias(dataAtual(), n); carregarDia(); }
+    function irParaHoje() { document.getElementById('dia-data').value = isoHoje(); carregarDia(); }
+    function filtrarTurno(t) {
+        turnoFiltro = t;
+        const p = new URLSearchParams(location.search);
+        p.set('turno', t || 'dia');
+        history.replaceState(null, '', `?${p}`);
+        renderDia();
+        const abas = document.getElementById('turno-tabs');
+        if (abas.getBoundingClientRect().top < 0) abas.scrollIntoView({ block: 'start' });
+    }
+
+    /** Turno que abre: o do horário atual (se for hoje) ou a manhã. */
+    function turnoPadrao() {
+        if (dataAtual() !== isoHoje()) return 'manha';
+        const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+        return m < 12 * 60 + 20 ? 'manha' : (m < 18 * 60 + 20 ? 'tarde' : 'noite');
+    }
+
+    function renderAbasTurno() {
+        const conta = t => t.estudios.reduce((n, c) => n + c.itens.filter(i => !i.fantasma && !i.cancelada).length, 0);
+        const abas = AGENDA.turnos.map(t => `<button class="tab-btn ${turnoFiltro === t.turno ? 'active' : ''}" onclick="filtrarTurno('${t.turno}')"
+                title="${t.inicio} – ${t.fim}${(t.gravacoes_sem_estudio || []).length ? ' · ' + t.gravacoes_sem_estudio.length + ' gravação(ões) da grade sem estúdio' : ''}">${TURNO_ICONE[t.turno] || ''} ${esc(t.label)}<span class="qtd">${conta(t)}</span>${(t.gravacoes_sem_estudio || []).length ? `<span class="qtd" style="background:#c2410c;color:#fff;">🎥 ${t.gravacoes_sem_estudio.length}</span>` : ''}</button>`).join('');
+        document.getElementById('turno-tabs').innerHTML = abas +
+            `<button class="tab-btn ${turnoFiltro === '' ? 'active' : ''}" onclick="filtrarTurno('')" title="Todos os turnos (bom para imprimir)">📋 Dia inteiro</button>`;
+    }
+
+    let seqDia = 0;
+    async function carregarDia() {
+        const data = dataAtual();
+        const seq = ++seqDia;
+        if (turnoFiltro === null) {
+            const t = new URLSearchParams(location.search).get('turno');
+            turnoFiltro = t === 'dia' ? '' : (['manha', 'tarde', 'noite'].includes(t) ? t : turnoPadrao());
+        }
+        history.replaceState(null, '', `?data=${data}&turno=${turnoFiltro || 'dia'}`);
+        try {
+            const agenda = await api('GET', `${API}/dia?data=${data}`);
+            if (seq !== seqDia) return;
+            AGENDA = agenda;
+            renderDia();
+        } catch (e) {
+            document.getElementById('dia-turnos').innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`;
+        }
+    }
+
+    function renderDia() {
+        if (!AGENDA) return;
+        const label = `${AGENDA.dia_semana_label}, ${isoParaBr(AGENDA.data)}`;
+        document.getElementById('dia-label').textContent = label;
+        document.getElementById('print-titulo').textContent = `Agenda de Estúdios — ${label}`;
+
+        const r = AGENDA.resumo;
+        document.getElementById('dia-resumo').innerHTML = `
+            <div class="ag-num"><b>${r.aulas}</b><span>Aulas da grade</span></div>
+            <div class="ag-num"><b>${r.agendamentos}</b><span>Agendamentos extras</span></div>
+            ${r.aulas_remanejadas ? `<div class="ag-num"><b>${r.aulas_remanejadas}</b><span>Aulas remanejadas</span></div>` : ''}
+            ${AGENDA.data >= isoHoje() ? `<div class="ag-num ok"><b>${r.horarios_disponiveis}</b><span>Horários disponíveis</span></div>` : ''}
+            <div class="ag-num ${r.aulas_canceladas + r.agendamentos_cancelados ? 'alerta' : ''}"><b>${r.aulas_canceladas + r.agendamentos_cancelados}</b><span>Cancelados</span></div>
+            <div class="ag-num ${r.estudios_sem_diretor ? 'alerta' : 'ok'}"><b>${r.estudios_sem_diretor}</b><span>Estúdios em uso sem diretor</span></div>
+            ${r.conferir_relatorios ? `<div class="ag-num"><b>${r.aulas_com_relatorio}/${r.aulas_com_relatorio + r.aulas_sem_relatorio}</b><span>Aulas com relatório registrado</span></div>` : ''}
+            <div class="ag-num ${r.inconsistencias ? 'alerta' : 'ok'}" style="cursor:pointer;" onclick="abrirConferencia()"><b>${r.inconsistencias}</b><span>Pontos a conferir</span></div>`;
+        renderConferencia();
+        renderFeriado();
+        renderAbasTurno();
+
+        const turnos = AGENDA.turnos.filter(t => !turnoFiltro || t.turno === turnoFiltro);
+        let html = turnos.map(renderTurno).join('');
+        if (AGENDA.gravacoes_sem_horario.length && !turnoFiltro) {
+            const nomeEst = id => (OPCOES.estudios.find(e => e.id === id) || {}).nome || '';
+            html += `<div class="card ag-turno ag-sem-horario"><div class="ag-turno-titulo">🎞️ Gravações da grade sem horário definido</div><ul>` +
+                AGENDA.gravacoes_sem_horario.map(g => `<li><b>${esc(g.disciplina || 'Gravação')}</b> — ${esc(g.turma)}${g.professor ? ' · ' + esc(g.professor) : ''}${g.estudio_id ? ' · ' + esc(nomeEst(g.estudio_id)) : ''}</li>`).join('') +
+                `</ul></div>`;
+        }
+        const alvoTurnos = document.getElementById('dia-turnos');
+        alvoTurnos.classList.toggle('feriado', !!AGENDA.feriado);
+        alvoTurnos.innerHTML = html || '<div class="empty-state"><p>Nenhum estúdio ativo cadastrado.</p></div>';
+    }
+
+    // ─── Feriado ───────────────────────────────────────────────────
+    function renderFeriado() {
+        const alvo = document.getElementById('dia-feriado');
+        const f = AGENDA.feriado;
+        document.getElementById('btn-feriado').style.display = f ? 'none' : '';
+        alvo.innerHTML = f ? `<div class="ag-feriado"><span>🎉 Feriado: ${esc(f.nome)} — agenda trancada neste dia.</span>
+            <button class="btn btn-secondary btn-sm so-edita" onclick="desmarcarFeriado(${f.id})">Desmarcar feriado</button></div>` : '';
+    }
+    function mostrarFormFeriado() {
+        if (AGENDA && AGENDA.feriado) return;
+        document.getElementById('dia-feriado').innerHTML = `<div class="ag-feriado"><span>🎉 Marcar ${isoParaBr(dataAtual())} como feriado</span>
+            <form onsubmit="marcarFeriadoDoDia(event)"><input type="text" id="fer-nome-dia" class="form-input" maxlength="120" required placeholder="Nome do feriado">
+            <button type="submit" class="btn btn-primary btn-sm">Marcar</button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="renderFeriado()">Voltar</button></form></div>`;
+        document.getElementById('fer-nome-dia').focus();
+    }
+    async function marcarFeriadoDoDia(ev) {
+        ev.preventDefault();
+        try {
+            await api('POST', `${API}/feriados`, { data: dataAtual(), nome: document.getElementById('fer-nome-dia').value.trim() });
+            showToast('Feriado marcado: a agenda do dia ficou trancada.', 'success');
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function desmarcarFeriado(id) {
+        try {
+            await api('DELETE', `${API}/feriados/${id}`);
+            showToast('Feriado desmarcado.', 'success');
+            recarregarVisao();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    const NIVEL_LABEL = { erro: 'ERRO', aviso: 'ATENÇÃO', info: 'INFO' };
+    function renderConferencia() {
+        const lista = AGENDA.conferencia || [];
+        const alvo = document.getElementById('dia-conferencia');
+        if (!lista.length) {
+            alvo.innerHTML = `<div class="card ag-conf ag-nao-imprime" style="font-size:0.85rem;">✅ Conferência com o sistema: nada divergente neste dia (grade, estúdios, diretores e relatórios batem).</div>`;
+            return;
+        }
+        const n = AGENDA.resumo.inconsistencias;
+        alvo.innerHTML = `<details class="card ag-conf ag-nao-imprime" id="conf-detalhes" ${n ? 'open' : ''}>
+            <summary><span>🔎 Conferência com o sistema — ${lista.length} ponto(s)</span><small style="color:var(--text-muted); font-weight:500;">clique para ${n ? 'recolher' : 'ver'}</small></summary>
+            <ul>${lista.map(c => `<li><span class="nv ${c.nivel}">${NIVEL_LABEL[c.nivel] || c.nivel}</span>
+                <span class="txt">${esc(c.mensagem)}</span>
+                ${c.agendamento_id ? `<button class="btn btn-secondary btn-sm so-edita" onclick="removerRegistro('${c.agendamento_id}')">Remover</button>` : ''}
+            </li>`).join('')}</ul>
+        </details>`;
+    }
+    function abrirConferencia() {
+        const d = document.getElementById('conf-detalhes');
+        if (d) { d.open = true; d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    }
+    async function removerRegistro(id) {
+        try {
+            await api('DELETE', `${API}/agendamentos/${id}`);
+            showToast('Registro removido.', 'success');
+            recarregarVisao();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    /**
+     * Distribui itens que se sobrepõem lado a lado dentro da coluna.
+     * Quando uma aula cancelada divide o horário com o que está valendo
+     * (ex.: gravação no lugar da aula), o cancelado fica numa faixa estreita
+     * à esquerda e o que vale ocupa o resto.
+     */
+    function distribuirFaixas(itens) {
+        const ord = itens.map(it => ({ it, ini: paraMin(it.inicio), fim: paraMin(it.fim) }))
+            .sort((a, b) => a.ini - b.ini || b.fim - a.fim);
+        const saida = [];
+        const faixas = lista => {
+            const fims = [];
+            lista.forEach(g => {
+                let f = fims.findIndex(fimFaixa => fimFaixa <= g.ini);
+                if (f === -1) { f = fims.length; fims.push(0); }
+                fims[f] = g.fim;
+                g.faixa = f;
+            });
+            return fims.length;
+        };
+        let grupo = [], fimGrupo = -1;
+        const fechar = () => {
+            const inativo = g => g.it.cancelada || g.it.fantasma;
+            const ativos = grupo.filter(g => !inativo(g));
+            const cancelados = grupo.filter(inativo);
+            const nA = faixas(ativos), nC = faixas(cancelados);
+            const larguraC = nA && nC ? 30 : 100;   // % da coluna para os cancelados
+            const larguraA = nA && nC ? 70 : 100;
+            cancelados.forEach(g => saida.push({ it: g.it, left: g.faixa * larguraC / nC, width: larguraC / nC }));
+            ativos.forEach(g => saida.push({ it: g.it, left: (nC ? 100 - larguraA : 0) + g.faixa * larguraA / nA, width: larguraA / nA }));
+            grupo = [];
+        };
+        ord.forEach(o => {
+            if (grupo.length && o.ini >= fimGrupo) fechar();
+            grupo.push(o);
+            fimGrupo = Math.max(fimGrupo, o.fim);
+        });
+        if (grupo.length) fechar();
+        return saida;
+    }
+
+    function renderTurno(t) {
+        const ini = paraMin(t.inicio), fim = paraMin(t.fim);
+        const altura = Math.round((fim - ini) * PX_MIN) + 10;  // folga para o último rótulo
+        const cols = t.estudios.length;
+
+        let regua = '';
+        for (let m = Math.ceil(ini / 30) * 30; m <= fim; m += 30) {
+            regua += `<span style="top:${Math.round((m - ini) * PX_MIN)}px">${paraHora(m)}</span>`;
+        }
+        const offset = ((Math.ceil(ini / 30) * 30) - ini) * PX_MIN;
+
+        const cabecalhos = t.estudios.map(c => {
+            const d = c.diretor;
+            let cls = 'ag-dir', txt;
+            if (d && d.diretor_id && d.ativo === false) { txt = `⚠️ ${esc(d.nome)} (inativo)`; cls += ' falta'; }
+            else if (d && d.diretor_id && (d.trocas || []).length) txt = `🎥 ${esc(d.nome)}` + d.trocas.map(x => ` → ${esc(x.nome || '')}${x.a_partir ? ' (' + x.a_partir + ')' : ''}`).join('');
+            else if (d && d.diretor_id) txt = `🎥 ${esc(d.nome)}`;
+            else if (c.em_uso) { txt = '⚠️ Sem diretor'; cls += ' falta'; }
+            else { txt = '+ diretor'; cls += ' vazio'; }
+            const tx = c.transmissao || {};
+            const temTx = !!(tx.youtube_link || tx.chave_transmissao);
+            const txBtn = PODE_EDITAR
+                ? `<button class="ag-tx ${temTx ? 'ok' : (c.em_uso ? 'falta' : '')}" onclick="abrirLinkTransmissao('${t.turno}', ${c.estudio_id}, AGENDA.data)" title="Link do YouTube e chave deste estúdio no turno">📺 ${temTx ? 'link e chave ✓' : 'link e chave'}</button>`
+                : '';
+            const troca = '';
+            const idr = (c.diretor_relatorio || []);
+            const idrHtml = idr.length
+                ? `<div class="idr ${d && d.nome && !idr.includes(d.nome) ? 'difere' : ''}" title="Quem fez o relatório de imagem deste estúdio/turno">📝 Relatório: ${idr.map(esc).join(', ')}</div>`
+                : '';
+            return `<div class="ag-head">
+                <div class="est">${esc(c.estudio_nome)}</div>
+                <div class="turmas">${c.turmas.map(esc).join('<br>') || '&nbsp;'}</div>
+                <button class="${cls}" onclick="abrirDiretor('${t.turno}', ${c.estudio_id})" title="${d && d.observacao ? esc(d.observacao) : (PODE_EDITAR ? 'Escalar o diretor deste estúdio neste dia' : 'Diretor do estúdio')}">${txt} ${troca}</button>
+                ${txBtn}
+                ${idrHtml}
+            </div>`;
+        }).join('');
+
+        const colunas = t.estudios.map(c => {
+            const itens = distribuirFaixas(c.itens).map(({ it, left, width }) => {
+                const top = Math.round((paraMin(it.inicio) - ini) * PX_MIN);
+                const h = Math.max(22, Math.round((paraMin(it.fim) - paraMin(it.inicio)) * PX_MIN) - 2);
+                const cor = it.tipo === 'AULA' ? (it.gravacao ? COR_GRAVACAO_GRADE : COR_AULA) : (it.cor || COR_AULA);
+                const tag = it.cancelada ? '<span class="tag">CANCELADO</span>'
+                    : it.fantasma ? `<span class="tag">→ ${esc(it.remanejada_para)}</span>`
+                    : it.remanejada ? `<span class="tag">${it.gravacao ? '🎥 GRAVAÇÃO MOVIDA' : 'REMANEJADA'}</span>`
+                    : it.gravacao ? '<span class="tag">🎥 GRAVAÇÃO</span>'
+                    : (it.tipo !== 'AULA' ? `<span class="tag">${esc(tipoInfo(it.tipo).label)}</span>` : '');
+                const sub = [
+                    it.remanejada && !it.fantasma && it.remanejada_de ? `do ${it.remanejada_de}` : null,
+                    it.horario_mudou && !it.fantasma ? `na grade ${it.inicio_grade}–${it.fim_grade}` : null,
+                    it.professor, it.tipo !== 'AULA' ? it.turma : null, it.departamento,
+                    (it.tipo !== 'AULA' || (it.remanejada && !it.fantasma)) ? it.canal : null,
+                    it.chamado ? `#${it.chamado}` : null,
+                ].filter(Boolean).map(esc).join(' · ');
+                const hr = `${it.inicio}–${it.fim}${it.ordinal ? ' · ' + esc(it.ordinal) : ''}`;
+                const ref = it.tipo === 'AULA' ? it.grade_id : it.agendamento_id;
+                const acao = it.tipo === 'AULA'
+                    ? `abrirAula('${t.turno}', ${c.estudio_id}, '${it.grade_id}')`
+                    : `abrirAgendamentoDoDia('${t.turno}', ${c.estudio_id}, '${it.agendamento_id}')`;
+                // Arrastar: aula só para o lado (outro estúdio, mesmo horário); gravação da grade e evento para qualquer lado
+                const arrastavel = PODE_EDITAR && !AGENDA.feriado && !it.cancelada && !it.fantasma;
+                const nObs = (it.observacoes || []).length;
+                return `<div class="ag-item ${it.cancelada ? 'cancelada' : ''} ${it.fantasma ? 'fantasma' : ''}" style="--c:${cor}; top:${top}px; height:${h}px; left:calc(${left}% + 2px); width:calc(${width}% - 4px);"
+                    ${arrastavel ? `draggable="true" ondragstart="iniciarArraste(event, '${t.turno}', ${c.estudio_id}, '${it.tipo === 'AULA' ? 'aula' : 'ag'}', '${ref}')" ondragend="fimArraste(event)"` : ''}
+                    oncontextmenu="abrirCtx(event, '${t.turno}', ${c.estudio_id}, '${it.tipo === 'AULA' ? 'aula' : 'ag'}', '${ref}')"
+                    onclick="event.stopPropagation(); ${acao}" title="${esc(it.titulo)} — ${hr}${nObs ? ' · ' + nObs + ' observação(ões)' : ''}">
+                    <div class="hr">${tag}${hr}${seloRelatorio(it)}${nObs ? `<span class="obs">💬${nObs}</span>` : ''}</div>
+                    <div class="tt">${esc(it.titulo)}</div>
+                    ${sub ? `<div class="sub">${sub}</div>` : ''}
+                </div>`;
+            }).join('');
+            const pos = (a, b) => `top:${Math.round((paraMin(a) - ini) * PX_MIN)}px; height:${Math.max(14, Math.round((paraMin(b) - paraMin(a)) * PX_MIN) - 2)}px;`;
+            const trancados = (c.bloqueios || []).map(b => {
+                const a = paraMin(b.inicio) < ini ? t.inicio : b.inicio, z = paraMin(b.fim) > fim ? t.fim : b.fim;
+                if (b.tipo === 'SOB_DEMANDA') return '';  // sob demanda aparece no verde, com o aviso
+                return `<div class="ag-trancado" style="${pos(a, z)}" title="Horário trancado${b.motivo ? ': ' + esc(b.motivo) : ''}">🔒 ${b.inicio}–${b.fim}</div>`;
+            }).join('');
+            const iv = c.intervalo;
+            const intervalo = iv && paraMin(iv.fim) > ini && paraMin(iv.inicio) < fim
+                ? `<div class="ag-intervalo" style="${pos(iv.inicio, iv.fim)}" title="Intervalo ${iv.inicio}–${iv.fim}${iv.origem === 'estudio' ? ' (horário próprio deste estúdio)' : ''}${iv.so_neste_dia ? ' · só neste dia' : ''}${iv.motivo ? ' · ' + esc(iv.motivo) : ''}">☕ Intervalo ${iv.inicio}–${iv.fim}</div>`
+                : '';
+            const livres = (c.livres || []).map(l => {
+                const txt = l.sob_demanda ? `Sob demanda ${l.inicio}–${l.fim} · mín. ${l.minimo_aulas} aulas` : `Disponível ${l.inicio}–${l.fim}`;
+                const dica = l.sob_demanda
+                    ? `Sob demanda: só abre com pelo menos ${l.minimo_aulas} aulas (diretor horista/PJ)`
+                    : `Disponível para agendar: ${l.inicio}–${l.fim}`;
+                return `<div class="ag-livre ${l.sob_demanda ? 'demanda' : ''}" style="${pos(l.inicio, l.fim)}" ${PODE_EDITAR ? `onclick="event.stopPropagation(); agendarNoLivre(${c.estudio_id}, '${l.inicio}', '${l.fim}')"` : ''}
+                    title="${dica}">${txt}</div>`;
+            }).join('');
+            return `<div class="ag-col" style="height:${altura}px; --h30:${30 * PX_MIN}px; background-position: 0 ${offset}px;"
+                data-turno="${t.turno}" data-estudio="${c.estudio_id}" data-ini="${ini}" data-fim="${fim}"
+                ondragover="sobreColuna(event)" ondragleave="saindoColuna(event)" ondrop="soltarNaColuna(event)"
+                onclick="cliqueColuna(event, ${c.estudio_id}, ${ini})">${trancados}${intervalo}${livres}${itens}</div>`;
+        }).join('');
+
+        return `<div class="card ag-turno">
+            <div class="ag-turno-titulo"><span>${TURNO_ICONE[t.turno] || ''} ${esc(t.label)}</span><small>${t.inicio} – ${t.fim}</small></div>
+            ${faixaGravacoesSemEstudio(t)}
+            <div class="ag-scroll"><div class="ag-grid" style="grid-template-columns: 52px repeat(${cols}, minmax(150px, 1fr));">
+                <div class="ag-head" style="border-left:none;"></div>${cabecalhos}
+                <div class="ag-regua" style="height:${altura}px;">${regua}</div>${colunas}
+            </div></div>
+        </div>`;
+    }
+
+    /**
+     * Gravações da grade (MP) que ainda não têm estúdio: ficam numa faixa acima do turno.
+     * O diretor-chefe arrasta para o estúdio (e o horário) em que a gravação vai acontecer neste dia.
+     */
+    function faixaGravacoesSemEstudio(t) {
+        const lista = t.gravacoes_sem_estudio || [];
+        if (!lista.length) return '';
+        const pode = PODE_EDITAR && !AGENDA.feriado;
+        const chips = lista.map(g => {
+            const det = [g.turma, g.professor].filter(Boolean).map(esc).join(' · ');
+            return `<div class="ag-grav-chip ${g.cancelada ? 'cancelada' : ''}" ${pode && !g.cancelada ? `draggable="true"
+                    ondragstart="iniciarArrasteFaixa(event, '${t.turno}', '${g.grade_id}')" ondragend="fimArraste(event)"` : ''}
+                    onclick="abrirAula('${t.turno}', null, '${g.grade_id}')"
+                    title="${esc(g.titulo)} — ${g.inicio}–${g.fim} (horário da grade)${pode ? ' · arraste para um estúdio ou clique para escolher' : ''}">
+                    <span class="hr">🎥 ${g.inicio}–${g.fim}</span><b>${esc(g.titulo)}</b>${det ? `<span class="sub">${det}</span>` : ''}
+                </div>`;
+        }).join('');
+        return `<div class="ag-grav-faixa">
+            <div class="ag-grav-faixa-titulo">🎥 Gravações da grade sem estúdio <small>${pode ? 'arraste para o estúdio e o horário em que vão acontecer neste dia' : 'ainda sem estúdio definido'}</small></div>
+            <div class="ag-grav-chips">${chips}</div>
+        </div>`;
+    }
+    function iniciarArrasteFaixa(ev, turno, gradeId) {
+        const t = AGENDA.turnos.find(x => x.turno === turno);
+        const it = t && (t.gravacoes_sem_estudio || []).find(g => g.grade_id === gradeId);
+        if (!it) { ev.preventDefault(); return; }
+        ARRASTE = { turno, estudioId: null, tipo: 'aula', ref: gradeId, it, dy: 8 };
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', gradeId);
+        ev.currentTarget.classList.add('arrastando');
+        fecharCtx();
+    }
+
+    const STATUS_REL = { RASCUNHO: 'Rascunho', AGUARDANDO_VALIDACAO: 'Aguardando validação', VALIDADO: 'Validado', FINALIZADO: 'Finalizado (legado)' };
+    function seloRelatorio(it) {
+        if (it.tipo !== 'AULA' || it.cancelada || !AGENDA.resumo.conferir_relatorios) return '';
+        if (!it.relatorio) return '<span class="ag-rel falta" title="Sem relatório de aula registrado">○ sem relatório</span>';
+        const ok = it.relatorio.status === 'VALIDADO';
+        return `<span class="ag-rel" title="Relatório de aula: ${esc(STATUS_REL[it.relatorio.status] || it.relatorio.status)}">${ok ? '✅' : '📝'}</span>`;
+    }
+
+    function agendarNoLivre(estudioId, inicio, fim) {
+        const f = Math.min(paraMin(fim), paraMin(inicio) + 60);
+        abrirAgendamento({ estudio_id: estudioId, horario_inicio: inicio, horario_fim: paraHora(f) });
+    }
+
+    function cliqueColuna(ev, estudioId, iniTurno) {
+        if (!PODE_EDITAR || AGENDA.feriado) return;
+        const y = ev.clientY - ev.currentTarget.getBoundingClientRect().top;
+        const inicio = iniTurno + Math.floor(y / PX_MIN / 10) * 10;
+        abrirAgendamento({ estudio_id: estudioId, horario_inicio: paraHora(inicio), horario_fim: paraHora(inicio + 60) });
+    }
+
+    function exportarExcel() {
+        const data = dataAtual();
+        fetch(`${API}/exportar?data_inicio=${data}&data_fim=${data}`, { headers: { 'Authorization': `Bearer ${getToken()}` } })
+            .then(r => { if (!r.ok) throw new Error('Falha ao exportar.'); return r.blob(); })
+            .then(blob => {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `agenda_estudios_${isoParaBr(data).replaceAll('/', '-')}.xlsx`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            })
+            .catch(e => showToast(e.message, 'error'));
+    }
+
+    // ─── Drawers ───────────────────────────────────────────────────
+
+    function abrirDrawer(id) {
+        ['ag-drawer', 'aula-drawer', 'dir-drawer', 'link-drawer'].forEach(d => document.getElementById(d).classList.toggle('open', d === id));
+        document.getElementById('ag-overlay').classList.add('open');
+    }
+    function fecharDrawers() {
+        ['ag-drawer', 'aula-drawer', 'dir-drawer', 'link-drawer'].forEach(d => document.getElementById(d).classList.remove('open'));
+        document.getElementById('ag-overlay').classList.remove('open');
+    }
+    function recarregarVisao() {
+        const aba = document.querySelector('#abas-principais .tab-btn.active').dataset.tab;
+        if (aba === 'lista') carregarLista(); else carregarDia();
+    }
+
+    // Agendamento
+    function abrirAgendamento(pre = {}) {
+        agendamentoAtual = pre.id ? pre : null;
+        document.getElementById('ag-titulo').textContent = !PODE_EDITAR ? 'Agendamento' : (pre.id ? 'Editar agendamento' : 'Novo agendamento');
+        document.getElementById('ag-conflito').innerHTML = '';
+        document.getElementById('ag-id').value = pre.id || '';
+        document.getElementById('ag-data').value = pre.data || dataAtual();
+        document.getElementById('ag-estudio').value = pre.estudio_id || (OPCOES.estudios[0] || {}).id || '';
+        document.getElementById('ag-inicio').value = pre.horario_inicio || '';
+        document.getElementById('ag-fim').value = pre.horario_fim || '';
+        document.getElementById('ag-tipo').value = pre.tipo || 'GRAVACAO';
+        document.getElementById('ag-titulo-in').value = pre.titulo || '';
+        document.getElementById('ag-professor').value = pre.professor || '';
+        document.getElementById('ag-turma').value = pre.turma_id || '';
+        document.getElementById('ag-turma-nome').value = ((OPCOES.turmas.find(t => t.id === pre.turma_id) || {}).nome) || '';
+        document.getElementById('ag-chamado').value = pre.chamado || '';
+        document.getElementById('ag-link').value = pre.chamado_link || '';
+        document.getElementById('ag-descricao').value = pre.descricao || '';
+        document.getElementById('ag-canal').value = pre.canal_iptv_id || '';
+        document.getElementById('ag-departamento').value = pre.departamento || '';
+        document.getElementById('ag-nome-evento').value = pre.nome_evento || '';
+        document.getElementById('ag-youtube-link').value = pre.chamado_link || '';
+        document.getElementById('ag-chave-transmissao').value = pre.chave_transmissao || '';
+        document.getElementById('ag-seduc').checked = pre.solicitante_antecipacao === 'SEDUC';
+        document.getElementById('ag-reposicao').checked = !!pre.reposicao || pre.tipo === 'REPOSICAO';
+        document.getElementById('ag-data-exibicao').value = pre.data_referencia || '';
+        carregarAulasExibicao(pre.grade_exibicao_id || '');
+        ajustarCamposTipo();
+        const edicao = !!pre.id;
+        document.getElementById('ag-acoes-edicao').style.display = edicao ? 'flex' : 'none';
+        if (edicao) {
+            document.getElementById('ag-btn-status').textContent = pre.status === 'CANCELADO' ? '↩️ Reativar' : '🚫 Cancelar agendamento';
+        }
+        document.querySelectorAll('#ag-drawer form input, #ag-drawer form select, #ag-drawer form textarea')
+            .forEach(el => { el.disabled = !PODE_EDITAR; });
+        const obsAlvo = document.getElementById('ag-obs');
+        if (edicao) {
+            const it = acharItemAgendamento(pre.id);
+            renderObservacoes(obsAlvo, { data: pre.data, agendamento_id: pre.id }, (it && it.observacoes) || []);
+        } else obsAlvo.innerHTML = '';
+        abrirDrawer('ag-drawer');
+    }
+
+    function ajustarCamposTipo() {
+        const tipo = document.getElementById('ag-tipo').value;
+        const ehEvento = tipo === 'EVENTO';
+        const grupoEv = document.getElementById('ag-grupo-evento');
+        const inputEv = document.getElementById('ag-nome-evento');
+        if (grupoEv) grupoEv.style.display = ehEvento ? '' : 'none';
+        if (inputEv) inputEv.required = ehEvento;
+        document.getElementById('ag-grupo-departamento').style.display = ['EVENTO', 'PODCAST', 'RESERVA'].includes(tipo) ? '' : 'none';
+        // Gravação: pode ser antecipada (aula da grade em data futura) ou reposição (aula que não aconteceu)
+        const gravacao = TIPOS_GRAVACAO.includes(tipo);
+        const repo = gravacao && document.getElementById('ag-reposicao').checked;
+        document.getElementById('ag-secao-gravacao').style.display = gravacao ? '' : 'none';
+        document.getElementById('ag-grupo-solicitacao').style.display = gravacao ? '' : 'none';
+        document.getElementById('ag-grupo-exibicao').style.display = gravacao ? '' : 'none';
+        document.getElementById('ag-grupo-aula-exibida').style.display = gravacao ? '' : 'none';
+        document.getElementById('ag-data-exibicao').required = repo;
+        document.getElementById('ag-label-data-ref').innerHTML = repo
+            ? 'Data da aula que não aconteceu <span style="color:var(--status-red);">*</span>'
+            : 'Data da exibição (aula na grade)';
+        document.getElementById('ag-label-aula-ref').textContent = repo
+            ? 'Aula da grade que está sendo reposta' : 'Aula da grade que vai ao ar com esta gravação';
+        document.getElementById('ag-ajuda-aula-ref').textContent = repo
+            ? 'A reposição entra no mês em que a gravação acontece.'
+            : 'Assim o relatório do dia da exibição já mostra que é a aula gravada antes (não é lançada como outra gravação).';
+        // Caixa SEDUC em todo agendamento: marcada = pedido da SEDUC, nº do chamado obrigatório
+        const seduc = document.getElementById('ag-seduc').checked;
+        document.getElementById('ag-chamado').required = seduc;
+        document.getElementById('ag-label-chamado').innerHTML = seduc
+            ? 'Nº do chamado <span style="color:var(--status-red);">* SEDUC</span>' : 'Nº do chamado';
+        document.getElementById('ag-titulo-in').placeholder = ehEvento
+            ? 'Título / Descrição resumida do agendamento'
+            : 'Ex: Química — 2ª série';
+    }
+
+    function acharItemAgendamento(id) {
+        for (const t of (AGENDA ? AGENDA.turnos : [])) for (const c of t.estudios) {
+            const it = c.itens.find(i => i.agendamento_id === id && i.tipo !== 'AULA');
+            if (it) return it;
+        }
+        return null;
+    }
+
+    function abrirAgendamentoDoDia(turno, estudioId, agendamentoId) {
+        const col = acharColuna(turno, estudioId);
+        const it = col && col.itens.find(i => i.agendamento_id === agendamentoId);
+        if (it && it.registro) abrirAgendamento(it.registro);
+    }
+
+    function dadosAgendamento(cancelarAulas = false) {
+        const ehEvento = document.getElementById('ag-tipo').value === 'EVENTO';
+        const nomeEv = ehEvento ? (document.getElementById('ag-nome-evento').value.trim() || null) : null;
+        let tit = document.getElementById('ag-titulo-in').value.trim();
+        if (ehEvento && !tit && nomeEv) tit = nomeEv;
+        return {
+            data: document.getElementById('ag-data').value,
+            estudio_id: Number(document.getElementById('ag-estudio').value),
+            horario_inicio: document.getElementById('ag-inicio').value,
+            horario_fim: document.getElementById('ag-fim').value,
+            tipo: document.getElementById('ag-tipo').value,
+            titulo: tit,
+            nome_evento: nomeEv,
+            chave_transmissao: document.getElementById('ag-chave-transmissao').value.trim() || null,
+            professor: document.getElementById('ag-professor').value.trim() || null,
+            turma_id: document.getElementById('ag-turma').value || null,
+            chamado: document.getElementById('ag-chamado').value.trim() || null,
+            chamado_link: document.getElementById('ag-youtube-link').value.trim() || document.getElementById('ag-link').value.trim() || null,
+            descricao: document.getElementById('ag-descricao').value.trim() || null,
+            canal_iptv_id: document.getElementById('ag-canal').value ? Number(document.getElementById('ag-canal').value) : null,
+            departamento: ['EVENTO', 'PODCAST', 'RESERVA'].includes(document.getElementById('ag-tipo').value)
+                ? (document.getElementById('ag-departamento').value.trim() || null) : null,
+            solicitante_antecipacao: document.getElementById('ag-seduc').checked ? 'SEDUC' : null,
+            reposicao: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
+                && document.getElementById('ag-reposicao').checked,
+            data_referencia: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
+                ? (document.getElementById('ag-data-exibicao').value || null) : null,
+            grade_exibicao_id: TIPOS_GRAVACAO.includes(document.getElementById('ag-tipo').value)
+                ? (document.getElementById('ag-aula-exibida').value || null) : null,
+            remanejar_aulas: cancelarAulas ? destinosEscolhidos() : [],
+            confirmar_avisos: cancelarAulas,
+        };
+    }
+
+    /** Destino de cada aula do horário (diálogo de conflito). Nenhuma aula fica sem estúdio. */
+    function destinosEscolhidos() {
+        return Array.from(document.querySelectorAll('#ag-conflito select[data-grade]')).map(sel => ({
+            grade_id: sel.dataset.grade,
+            estudio_id: sel.value === 'CANCELAR' ? null : Number(sel.value),
+        }));
+    }
+
+    async function salvarAgendamento(ev, cancelarAulas = false) {
+        if (ev) ev.preventDefault();
+        const id = document.getElementById('ag-id').value;
+        const body = dadosAgendamento(cancelarAulas);
+        const btn = document.getElementById('ag-salvar');
+        btn.disabled = true;
+        try {
+            const r = id ? await api('PUT', `${API}/agendamentos/${id}`, body) : await api('POST', `${API}/agendamentos`, body);
+            const partes = [];
+            if (r.aulas_remanejadas) partes.push(`${r.aulas_remanejadas} aula(s) remanejada(s)`);
+            if (r.aulas_canceladas) partes.push(`${r.aulas_canceladas} aula(s) cancelada(s)`);
+            showToast(partes.length ? `Agendado. ${partes.join(' e ')} neste dia (a grade não muda).` : 'Agendamento salvo.', 'success');
+            fecharDrawers();
+            if (body.data !== dataAtual() && document.querySelector('#abas-principais .tab-btn.active').dataset.tab === 'dia') {
+                document.getElementById('dia-data').value = body.data;
+            }
+            recarregarVisao();
+        } catch (e) {
+            if (e.status === 409 && e.detail && e.detail.tipo === 'confirmar') {
+                const aulas = e.detail.aulas_detalhe || [], avisos = e.detail.avisos || [];
+                const anteriores = Object.fromEntries(destinosEscolhidos().map(d => [d.grade_id, d.estudio_id]));
+                const opcoesDestino = a => {
+                    const livres = (a.sugestoes || []).filter(x => x.livre);
+                    const ocupados = (a.sugestoes || []).filter(x => !x.livre);
+                    return livres.map(x => `<option value="${x.id}">✅ ${esc(x.nome)}${x.libras ? ' · Libras' : ''}</option>`).join('')
+                        + `<option value="CANCELAR">🚫 Cancelar a aula neste dia</option>`
+                        + ocupados.map(x => `<option value="${x.id}" disabled>⛔ ${esc(x.nome)} — ${esc(x.motivo || 'ocupado')}</option>`).join('');
+                };
+                document.getElementById('ag-conflito').innerHTML = `<div class="ag-conflito">
+                    ${aulas.length ? `<b>⚠️ Esse horário tem aula da grade no estúdio.</b>
+                        <div style="margin:0.3rem 0 0.6rem;">Escolha para onde cada aula vai <b>neste dia</b> (a grade não muda; nenhuma aula fica sem estúdio):</div>
+                        ${aulas.map(a => `<div class="ag-remanejo"><div class="desc">${esc(a.descricao)}</div>
+                            <select class="form-select" data-grade="${a.grade_id}">${opcoesDestino(a)}</select></div>`).join('')}` : ''}
+                    ${avisos.length ? `<div style="margin-top:${aulas.length ? '0.6rem' : '0'};"><b>ℹ️ Já existe no sistema:</b>
+                        <ul>${avisos.map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>` : ''}
+                    <div style="margin-top:0.6rem; display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="salvarAgendamento(null, true)">${aulas.length ? 'Remanejar aula(s) e agendar' : 'Agendar mesmo assim'}</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('ag-conflito').innerHTML=''">Voltar</button>
+                    </div></div>`;
+                document.querySelectorAll('#ag-conflito select[data-grade]').forEach(sel => {
+                    const v = anteriores[sel.dataset.grade];
+                    if (v !== undefined) sel.value = v === null ? 'CANCELAR' : String(v);
+                });
+                document.getElementById('ag-drawer').scrollTop = 0;
+            } else if (e.status === 409 && e.detail && e.detail.tipo === 'remanejo') {
+                showToast(e.message, 'error');
+            } else {
+                showToast(e.message, 'error');
+            }
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function alternarStatusAgendamento() {
+        if (!agendamentoAtual) return;
+        const novo = agendamentoAtual.status === 'CANCELADO' ? 'AGENDADO' : 'CANCELADO';
+        try {
+            await api('PATCH', `${API}/agendamentos/${agendamentoAtual.id}/status`, { status: novo });
+            showToast(novo === 'CANCELADO' ? 'Agendamento cancelado (continua visível em vermelho).' : 'Agendamento reativado.', 'success');
+            fecharDrawers();
+            recarregarVisao();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function excluirAgendamento() {
+        if (!agendamentoAtual) return;
+        const btn = document.getElementById('ag-btn-excluir');
+        if (btn.dataset.confirmar !== '1') {
+            btn.dataset.confirmar = '1';
+            btn.textContent = 'Confirmar exclusão';
+            setTimeout(() => { btn.dataset.confirmar = ''; btn.textContent = 'Excluir'; }, 4000);
+            return;
+        }
+        try {
+            await api('DELETE', `${API}/agendamentos/${agendamentoAtual.id}`);
+            showToast('Agendamento excluído.', 'success');
+            fecharDrawers();
+            recarregarVisao();
+        } catch (e) { showToast(e.message, 'error'); }
+        finally { btn.dataset.confirmar = ''; btn.textContent = 'Excluir'; }
+    }
+
+    // Aula da grade
+    function acharColuna(turno, estudioId) {
+        const t = AGENDA.turnos.find(x => x.turno === turno);
+        return t && t.estudios.find(c => c.estudio_id === estudioId);
+    }
+
+    function abrirAula(turno, estudioId, gradeId) {
+        let col = estudioId ? acharColuna(turno, estudioId) : null;
+        let it = col && col.itens.find(i => i.grade_id === gradeId);
+        if (!it && !estudioId) {
+            // Gravação da grade ainda sem estúdio (faixa do turno)
+            const t = AGENDA.turnos.find(x => x.turno === turno);
+            it = t && (t.gravacoes_sem_estudio || []).find(g => g.grade_id === gradeId);
+            col = { estudio_nome: 'Sem estúdio definido' };
+        }
+        if (!it) return;
+        aulaAtual = { ...it, estudio_nome: col.estudio_nome, estudio_id: estudioId };
+        document.getElementById('aula-titulo').textContent = it.gravacao ? '🎥 Gravação da grade' : 'Aula da grade';
+        document.getElementById('aula-detalhe').innerHTML = `
+            <dt>Tipo</dt><dd>${it.gravacao
+                ? '<span class="badge" style="background:rgba(194,65,12,0.15);color:#ea580c;">🎥 Gravação</span> <span style="font-size:0.75rem;color:var(--text-muted);">marcada na gestão de grade · pode mudar de estúdio e de horário neste dia</span>'
+                : '<span class="badge badge-green">Aula</span> <span style="font-size:0.75rem;color:var(--text-muted);">só troca de estúdio, no mesmo horário</span>'}</dd>
+            <dt>Data</dt><dd>${esc(AGENDA.dia_semana_label)}, ${isoParaBr(AGENDA.data)}</dd>
+            <dt>Horário</dt><dd>${it.inicio} – ${it.fim}${it.ordinal ? ' · ' + esc(it.ordinal) : ''}${it.horario_mudou ? ` <span style="font-size:0.75rem;color:var(--text-muted);">(na grade ${it.inicio_grade}–${it.fim_grade})</span>` : ''}</dd>
+            <dt>Estúdio</dt><dd>${esc(col.estudio_nome)}</dd>
+            <dt>Turma</dt><dd>${esc(it.turma)}${it.canal ? ' · ' + esc(it.canal) : ''}</dd>
+            <dt>Disciplina</dt><dd><b>${esc(it.titulo)}</b></dd>
+            <dt>Professor</dt><dd>${esc(it.professor || '—')}</dd>
+            <dt>Situação</dt><dd>${it.cancelada ? '<span class="badge badge-red">Cancelada neste dia</span>'
+                : it.remanejada ? `<span class="badge badge-yellow">${it.gravacao ? 'Movida neste dia' : 'Remanejada'}: ${esc(it.remanejada_de || 'sem estúdio')} → ${esc(it.remanejada_para)}${it.horario_mudou ? ' · ' + it.inicio + '–' + it.fim : ''}</span>`
+                : !estudioId ? '<span class="badge badge-yellow">Sem estúdio na grade — escolha abaixo onde vai acontecer neste dia</span>'
+                : '<span class="badge badge-green">Prevista</span>'}</dd>
+            ${AGENDA.resumo.conferir_relatorios ? `<dt>Relatório</dt><dd>${it.relatorio
+                ? `${esc(STATUS_REL[it.relatorio.status] || it.relatorio.status)}${it.relatorio.precisa_correcao ? ' · precisa correção' : ''} <span style="color:var(--text-muted);">(${esc(it.relatorio.estudio || '')} · ${esc(it.relatorio.horario || '')})</span>`
+                : '<span style="color:var(--text-muted);">nenhum relatório de aula registrado</span>'}</dd>` : ''}
+            ${(it.cancelada || it.remanejada) && it.motivo_cancelamento ? `<dt>Motivo</dt><dd>${esc(it.motivo_cancelamento)}</dd>` : ''}
+            ${it.remanejada && it.canal ? `<dt>Canal usado</dt><dd>${esc(it.canal)}</dd>` : ''}
+            ${it.chamado ? `<dt>Chamado</dt><dd>${it.chamado_link ? `<a href="${esc(it.chamado_link)}" target="_blank" rel="noopener">#${esc(it.chamado)}</a>` : '#' + esc(it.chamado)}</dd>` : ''}`;
+        renderObservacoes(document.getElementById('aula-obs'), { data: AGENDA.data, grade_id: it.grade_id }, it.observacoes || []);
+        const outrosEstudios = OPCOES.estudios.filter(e => e.id !== it.estudio_grade_id)
+            .map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('');
+        const blocoFixo = `<div class="form-section-title" style="margin-top:1.25rem;">📌 Estúdio fixo desta aula (vale toda semana)</div>
+               <p style="font-size:0.75rem; color:var(--text-muted); margin:-0.25rem 0 0.5rem;">Muda o estúdio na grade horária. É dele que sai o estúdio do relatório do assistente.</p>
+               <div class="ag-linha2">
+                   <div class="form-group"><select id="fixo-estudio" class="form-select">${outrosEstudios}</select></div>
+                   <div><button class="btn btn-secondary" style="width:100%;" onclick="definirEstudioFixo()">Fixar na grade</button></div>
+               </div>`;
+        const canais = '<option value="">— mesmo canal da grade —</option>' + (OPCOES.canais || []).map(c => `<option value="${c.id}">${esc(c.nome)}</option>`).join('');
+        const blocoRemanejarFim = `
+               <div class="form-group"><label class="form-label">Motivo</label><input type="text" id="rem-motivo" class="form-input" placeholder="Ex: manutenção no estúdio, evento"></div>
+               <div id="rem-conflito"></div>
+               <div class="ag-drawer-acoes"><button class="btn btn-secondary" onclick="remanejarAula()">${it.gravacao ? '🎥 Salvar estúdio e horário neste dia' : '🔀 Remanejar neste dia'}</button></div>`;
+        const todosEstudios = OPCOES.estudios.map(e => `<option value="${e.id}" ${e.id === estudioId ? 'selected' : ''}>${esc(e.nome)}</option>`).join('');
+        const blocoRemanejar = it.gravacao
+            ? `<div class="form-section-title" style="margin-top:1.25rem;">🎥 Mudar estúdio e/ou horário só neste dia</div>
+               <p style="font-size:0.75rem; color:var(--text-muted); margin:-0.25rem 0 0.5rem;">Gravação da grade: pode ir para outro estúdio e para outro horário. A grade horária não muda. Também dá para arrastar o bloco na agenda.</p>
+               <div class="ag-linha2">
+                   <div class="form-group"><label class="form-label">Estúdio</label><select id="rem-estudio" class="form-select">${todosEstudios}</select></div>
+                   <div class="form-group"><label class="form-label">Canal usado</label><select id="rem-canal" class="form-select">${canais}</select></div>
+               </div>
+               <div class="ag-linha2">
+                   <div class="form-group"><label class="form-label">Início</label><input type="time" id="rem-inicio" class="form-input" step="300" value="${it.inicio}"></div>
+                   <div class="form-group"><label class="form-label">Fim</label><input type="time" id="rem-fim" class="form-input" step="300" value="${it.fim}"></div>
+               </div>${blocoRemanejarFim}`
+            : `<div class="form-section-title" style="margin-top:1.25rem;">Remanejar para outro estúdio só neste dia</div>
+               <div class="ag-linha2">
+                   <div class="form-group"><label class="form-label">Estúdio de destino</label><select id="rem-estudio" class="form-select">${outrosEstudios}</select></div>
+                   <div class="form-group"><label class="form-label">Canal usado</label><select id="rem-canal" class="form-select">${canais}</select></div>
+               </div>${blocoRemanejarFim}`;
+        if (AGENDA.feriado) {
+            document.getElementById('aula-acoes').innerHTML = '<p style="font-size:0.8rem; color:var(--text-muted);">Feriado: a agenda deste dia está trancada.</p>';
+            abrirDrawer('aula-drawer');
+            return;
+        }
+        document.getElementById('aula-acoes').innerHTML = (it.cancelada || it.remanejada)
+            ? `<p style="font-size:0.8rem; color:var(--text-muted);">${it.cancelada ? 'A aula volta a aparecer como prevista.'
+                    : !it.estudio_grade_id ? 'A gravação sai do estúdio e volta para a faixa "sem estúdio" do turno.'
+                    : it.gravacao ? 'A gravação volta para o estúdio e o horário da grade.' : 'A aula volta para o estúdio da grade.'} Se o estúdio da grade estiver ocupado nesse horário, libere-o antes.</p>
+               <div class="ag-drawer-acoes"><button class="btn btn-primary" onclick="restaurarAula()">↩️ ${it.cancelada ? 'Restaurar aula' : !it.estudio_grade_id ? 'Tirar do estúdio' : it.gravacao ? 'Voltar para o estúdio e horário da grade' : 'Voltar para o estúdio da grade'}</button></div>
+               ${it.remanejada ? blocoRemanejar : ''}${blocoFixo}`
+            : `<div class="form-section-title">Cancelar esta aula só neste dia</div>
+               <div class="form-group"><label class="form-label">Motivo</label><input type="text" id="aula-motivo" class="form-input" placeholder="Ex: professor ausente, feriado, manutenção"></div>
+               <div class="ag-linha2">
+                   <div class="form-group"><label class="form-label">Nº do chamado</label><input type="text" id="aula-chamado" class="form-input" maxlength="50"></div>
+                   <div class="form-group"><label class="form-label">Link do chamado</label><input type="url" id="aula-link" class="form-input" maxlength="500"></div>
+               </div>
+               <div class="ag-drawer-acoes">
+                   <button class="btn btn-danger" onclick="cancelarAula()">🚫 Cancelar aula neste dia</button>
+               </div>
+               <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.75rem;">A grade horária não muda — só este dia fica marcado em vermelho e o estúdio fica livre para agendar.</p>
+               ${blocoRemanejar}${blocoFixo}`;
+        abrirDrawer('aula-drawer');
+        if (PODE_EDITAR && !it.fantasma && !it.gravacao) sugerirDestinos(it);
+    }
+
+    /** Ordena o select de destino pelas sugestões (livres primeiro) e trava os ocupados. */
+    async function sugerirDestinos(it) {
+        const sel = document.getElementById('rem-estudio');
+        if (!sel) return;
+        try {
+            const p = new URLSearchParams({ data: AGENDA.data, inicio: it.inicio, fim: it.fim, para: 'aula', grade_id: it.grade_id });
+            const sug = await api('GET', `${API}/sugestoes?${p}`);
+            if (!aulaAtual || aulaAtual.grade_id !== it.grade_id) return;
+            const efetivo = aulaAtual.estudio_id;
+            const fora = x => x.id === efetivo || x.id === it.estudio_grade_id;  // grade: use "voltar para o estúdio da grade"
+            sel.innerHTML = sug.filter(x => !fora(x)).map(x => x.livre
+                ? `<option value="${x.id}">✅ ${esc(x.nome)}${x.libras ? ' · Libras' : ''}</option>`
+                : `<option value="${x.id}" disabled>⛔ ${esc(x.nome)} — ${esc(x.motivo || 'ocupado')}</option>`).join('');
+            const primeiro = sug.find(x => x.livre && !fora(x));
+            if (primeiro) sel.value = primeiro.id;
+        } catch (e) { /* sem sugestão: fica a lista simples */ }
+    }
+
+    async function definirEstudioFixo() {
+        const estudio = Number(document.getElementById('fixo-estudio').value);
+        try {
+            const r = await api('PUT', `${API}/aulas/estudio-fixo`, { grade_id: aulaAtual.grade_id, estudio_id: estudio });
+            showToast(`Aula fixada no ${r.estudio} na grade (todas as semanas).`, 'success');
+            fecharDrawers();
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Observações (quantas forem precisas, com link do TomTicket) ──
+    let OBS_ALVO = null;
+    function renderObservacoes(alvo, ref, lista) {
+        OBS_ALVO = { alvo, ref, lista: [...lista] };
+        desenharObservacoes();
+    }
+    function desenharObservacoes() {
+        if (!OBS_ALVO) return;
+        const { alvo, lista } = OBS_ALVO;
+        const textos = (OPCOES.textos_prontos || []).map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('');
+        alvo.innerHTML = `<div class="form-section-title">💬 Observações ${lista.length ? `(${lista.length})` : ''}</div>
+            ${lista.length ? `<ul class="ag-obs-lista">${lista.map(o => `<li><div>${esc(o.texto)}
+                ${o.link ? ` · <a href="${esc(o.link)}" target="_blank" rel="noopener">🎫 chamado</a>` : ''}
+                <small>${esc(o.autor || '')}${o.criado_em ? ' · ' + new Date(o.criado_em + 'Z').toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : ''}</small></div>
+                <button class="btn btn-secondary btn-sm so-edita" title="Excluir" onclick="excluirObservacao(${o.id})">🗑️</button></li>`).join('')}</ul>`
+                : '<p style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">Nenhuma observação neste dia.</p>'}
+            ${AGENDA && AGENDA.feriado ? '' : `<div class="so-edita">
+                <div class="form-group"><select class="form-select" id="obs-pronto" onchange="if(this.value){document.getElementById('obs-texto').value=this.value; this.value='';}">
+                    <option value="">Texto pronto…</option>${textos}</select></div>
+                <div class="form-group"><textarea id="obs-texto" class="form-textarea" rows="2" maxlength="2000" placeholder="Escreva a observação"></textarea></div>
+                <div class="ag-linha2">
+                    <div class="form-group"><input type="url" id="obs-link" class="form-input" maxlength="500" placeholder="Link do TomTicket (opcional)"></div>
+                    <div><button type="button" class="btn btn-secondary" style="width:100%;" onclick="salvarObservacao()">+ Adicionar observação</button></div>
+                </div></div>`}`;
+    }
+    async function salvarObservacao() {
+        const texto = document.getElementById('obs-texto').value.trim();
+        if (!texto) { showToast('Escreva a observação.', 'error'); return; }
+        try {
+            const o = await api('POST', `${API}/observacoes`, { ...OBS_ALVO.ref, texto, link: document.getElementById('obs-link').value.trim() || null });
+            OBS_ALVO.lista.push(o);
+            desenharObservacoes();
+            showToast('Observação adicionada.', 'success');
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function excluirObservacao(id) {
+        try {
+            await api('DELETE', `${API}/observacoes/${id}`);
+            OBS_ALVO.lista = OBS_ALVO.lista.filter(o => o.id !== id);
+            desenharObservacoes();
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function cancelarAula() {
+        try {
+            await api('POST', `${API}/aulas/cancelar`, {
+                data: AGENDA.data, grade_id: aulaAtual.grade_id,
+                motivo: document.getElementById('aula-motivo').value.trim() || null,
+                chamado: document.getElementById('aula-chamado').value.trim() || null,
+                chamado_link: document.getElementById('aula-link').value.trim() || null,
+            });
+            showToast('Aula marcada como cancelada neste dia.', 'success');
+            fecharDrawers();
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function remanejarAula(confirmar = false) {
+        try {
+            const corpo = {
+                data: AGENDA.data, grade_id: aulaAtual.grade_id,
+                estudio_destino_id: Number(document.getElementById('rem-estudio').value),
+                canal_iptv_id: document.getElementById('rem-canal').value ? Number(document.getElementById('rem-canal').value) : null,
+                motivo: document.getElementById('rem-motivo').value.trim() || null,
+                confirmar_avisos: confirmar,
+            };
+            if (aulaAtual.gravacao) {
+                // Gravação da grade: manda o horário do dia (igual ao da grade = só troca de estúdio)
+                corpo.horario_inicio = document.getElementById('rem-inicio').value;
+                corpo.horario_fim = document.getElementById('rem-fim').value;
+            }
+            await api('POST', `${API}/aulas/remanejar`, corpo);
+            showToast(aulaAtual.gravacao ? 'Gravação ajustada neste dia (a grade não muda).' : 'Aula remanejada neste dia (a grade não muda).', 'success');
+            fecharDrawers();
+            carregarDia();
+        } catch (e) {
+            if (e.status === 409 && e.detail && e.detail.tipo === 'confirmar') {
+                document.getElementById('rem-conflito').innerHTML = `<div class="ag-conflito"><b>ℹ️ Atenção:</b>
+                    <ul>${(e.detail.avisos || []).map(a => `<li>${esc(a)}</li>`).join('')}</ul>
+                    <button type="button" class="btn btn-danger btn-sm" onclick="remanejarAula(true)">Remanejar mesmo assim</button></div>`;
+            } else { showToast(e.message, 'error'); }
+        }
+    }
+
+    async function restaurarAula() {
+        try {
+            await api('POST', `${API}/aulas/restaurar`, { data: AGENDA.data, grade_id: aulaAtual.grade_id });
+            showToast('Aula restaurada.', 'success');
+            fecharDrawers();
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // Diretor do estúdio no dia
+    function abrirDiretor(turno, estudioId) {
+        const col = acharColuna(turno, estudioId);
+        const t = AGENDA.turnos.find(x => x.turno === turno);
+        const d = col.diretor || {};
+        diretorAtual = { turno, estudio_id: estudioId };
+        document.getElementById('dir-detalhe').innerHTML = `
+            <dt>Data</dt><dd>${esc(AGENDA.dia_semana_label)}, ${isoParaBr(AGENDA.data)}</dd>
+            <dt>Turno</dt><dd>${esc(t.label)}</dd>
+            <dt>Estúdio</dt><dd>${esc(col.estudio_nome)}</dd>
+            <dt>Escalado</dt><dd><b>${esc(d.nome || 'Sem diretor')}</b></dd>
+            ${(d.trocas || []).map((x, i) => `<dt>${i + 2}º diretor</dt><dd><b>${esc(x.nome || '')}</b>${x.a_partir ? ' a partir das ' + x.a_partir : ''}</dd>`).join('')}`;
+        document.getElementById('dir-select').innerHTML =
+            '<option value="">— sem diretor —</option>' +
+            OPCOES.diretores.map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('');
+        document.getElementById('dir-select').value = d.diretor_id || '';
+        document.getElementById('dir-trocas').innerHTML = '';
+        (d.trocas || []).forEach(x => adicionarTrocaDiretor(x.diretor_id, x.a_partir));
+        document.getElementById('dir-obs').value = d.observacao || '';
+        const tx = col.transmissao || {};
+        document.getElementById('dir-youtube').value = tx.youtube_link || '';
+        document.getElementById('dir-chave').value = tx.chave_transmissao || '';
+        abrirDrawer('dir-drawer');
+    }
+
+    function adicionarTrocaDiretor(diretorId, aPartir) {
+        const box = document.getElementById('dir-trocas');
+        if (box.children.length >= 6) { showToast('No máximo 6 trocas por estúdio e turno.', 'error'); return; }
+        const linha = document.createElement('div');
+        linha.className = 'ag-linha2 dir-troca';
+        linha.innerHTML = `
+            <div class="form-group"><label class="form-label">${box.children.length + 2}º diretor</label>
+                <select class="form-select troca-dir"><option value="">— escolha —</option>${OPCOES.diretores.map(x => `<option value="${x.id}">${esc(x.nome)}</option>`).join('')}</select></div>
+            <div class="form-group"><label class="form-label">A partir de</label>
+                <div style="display:flex; gap:0.25rem;"><input type="time" class="form-input troca-hora" step="300">
+                <button type="button" class="btn btn-secondary btn-sm" title="Remover" onclick="this.closest('.dir-troca').remove(); renumerarTrocas()">✕</button></div></div>`;
+        box.appendChild(linha);
+        linha.querySelector('.troca-dir').value = diretorId || '';
+        linha.querySelector('.troca-hora').value = aPartir || '';
+    }
+
+    function renumerarTrocas() {
+        document.querySelectorAll('#dir-trocas .dir-troca').forEach((l, i) => {
+            l.querySelector('.form-label').textContent = `${i + 2}º diretor`;
+        });
+    }
+
+    function lerTrocasDiretor() {
+        return [...document.querySelectorAll('#dir-trocas .dir-troca')]
+            .map(l => ({ diretor_imagem_id: l.querySelector('.troca-dir').value, a_partir: l.querySelector('.troca-hora').value || null }))
+            .filter(x => x.diretor_imagem_id);
+    }
+
+    async function salvarDiretorDia() {
+        const v = document.getElementById('dir-select').value;
+        const trocas = lerTrocasDiretor();
+        if (trocas.length && !v) { showToast('Escolha o primeiro diretor antes dos que assumem depois.', 'error'); return; }
+        if (trocas.some(x => !x.a_partir)) { showToast('Informe a partir de que horas cada diretor assume.', 'error'); return; }
+        try {
+            await api('PUT', `${API}/escala-dia`, {
+                data: AGENDA.data, turno: diretorAtual.turno, estudio_id: diretorAtual.estudio_id,
+                diretor_imagem_id: v || null,
+                trocas: v ? trocas : [],
+                observacao: document.getElementById('dir-obs').value.trim() || null,
+                youtube_link: document.getElementById('dir-youtube').value.trim(),
+                chave_transmissao: document.getElementById('dir-chave').value.trim(),
+            });
+            showToast(v ? 'Escala do dia salva.' : 'Estúdio sem diretor neste turno.', 'success');
+            fecharDrawers();
+            carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Aba Agendamentos ──────────────────────────────────────────
+
+    async function carregarLista() {
+        const p = new URLSearchParams();
+        [['data_inicio', 'l-inicio'], ['data_fim', 'l-fim'], ['estudio_id', 'l-estudio'], ['tipo', 'l-tipo'],
+         ['status', 'l-status'], ['busca', 'l-busca']].forEach(([k, id]) => {
+            const v = document.getElementById(id).value.trim();
+            if (v) p.set(k, v);
+        });
+        const alvo = document.getElementById('lista-tabela');
+        alvo.innerHTML = '<div class="spinner"></div>';
+        try {
+            const r = await api('GET', `${API}/agendamentos?${p}`);
+            document.getElementById('lista-total').textContent =
+                `${r.total} registro(s) de ${isoParaBr(r.data_inicio)} a ${isoParaBr(r.data_fim)}`;
+            if (!r.items.length) { alvo.innerHTML = '<div class="empty-state"><p>Nenhum agendamento no período.</p></div>'; return; }
+            window._LISTA = r.items;
+            alvo.innerHTML = `<div class="table-container"><table>
+                <thead><tr><th>Data</th><th>Horário</th><th>Estúdio</th><th>Tipo</th><th>Título</th><th>Chamado</th><th>Status</th><th></th></tr></thead>
+                <tbody>${r.items.map((a, i) => `
+                    <tr style="${a.status === 'CANCELADO' ? 'opacity:0.6;' : ''}">
+                        <td style="white-space:nowrap;">${diaCurto(a.data)} ${isoParaBr(a.data)}</td>
+                        <td style="white-space:nowrap;">${a.horario_inicio}–${a.horario_fim}</td>
+                        <td style="white-space:nowrap;">${esc(a.estudio_nome)}</td>
+                        <td><span class="ag-tipo-badge" style="--c:${a.cor}">${esc(a.tipo_label)}</span></td>
+                        <td><b>${esc(a.titulo)}</b>${a.professor || a.turma ? `<div style="font-size:0.75rem; color:var(--text-muted);">${esc([a.professor, a.turma].filter(Boolean).join(' · '))}</div>` : ''}</td>
+                        <td>${a.chamado ? (a.chamado_link ? `<a href="${esc(a.chamado_link)}" target="_blank" rel="noopener">#${esc(a.chamado)}</a>` : '#' + esc(a.chamado)) : '—'}</td>
+                        <td>${a.tipo === 'AULA_REMANEJADA' ? `<span class="badge badge-yellow">→ ${esc(a.estudio_nome)}</span>` : (a.tipo === 'AULA_CANCELADA' || a.status === 'CANCELADO' ? '<span class="badge badge-red">Cancelado</span>' : '<span class="badge badge-green">Agendado</span>')}</td>
+                        <td style="white-space:nowrap;">
+                            ${!['AULA_CANCELADA', 'AULA_REMANEJADA'].includes(a.tipo)
+                                ? `<button class="btn btn-secondary btn-sm" onclick="abrirAgendamento(window._LISTA[${i}])" title="${PODE_EDITAR ? 'Editar' : 'Ver'}">${PODE_EDITAR ? '✏️' : '👁️'}</button>`
+                                : `<button class="btn btn-secondary btn-sm so-edita" onclick="restaurarDaLista(window._LISTA[${i}])" title="${a.grade_id ? 'Restaurar a aula' : 'Remover (a aula não existe mais na grade)'}">↩️</button>`}
+                            <button class="btn btn-secondary btn-sm" onclick="verNoDia('${a.data}')" title="Ver na agenda do dia">📅</button>
+                        </td>
+                    </tr>`).join('')}</tbody></table></div>`;
+        } catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; }
+    }
+
+    async function restaurarDaLista(a) {
+        try {
+            if (a.grade_id) await api('POST', `${API}/aulas/restaurar`, { data: a.data, grade_id: a.grade_id });
+            else await api('DELETE', `${API}/agendamentos/${a.id}`);
+            showToast(a.tipo === 'AULA_REMANEJADA' ? 'Aula voltou para o estúdio da grade.' : 'Aula restaurada.', 'success');
+            carregarLista();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    function verNoDia(data) {
+        document.getElementById('dia-data').value = data;
+        trocarAba('dia');
+    }
+
+    // ─── Aba Escala de Diretores ───────────────────────────────────
+
+    function dataEscala() { return document.getElementById('escala-data').value || dataAtual(); }
+    function mudarDiaEscala(n) { document.getElementById('escala-data').value = somarDias(dataEscala(), n); carregarEscala(); }
+
+    let ESCALA_DIA = { data: null, linhas: [], agenda: null };
+    async function carregarEscala() {
+        const inp = document.getElementById('escala-data');
+        if (!inp.value) inp.value = dataAtual();
+        const data = dataEscala();
+        document.getElementById('escala-label').textContent = `${diaCurto(data)}, ${isoParaBr(data)}`;
+        document.getElementById('escala-copiar').classList.remove('open');
+        const alvo = document.getElementById('escala-tabela');
+        try {
+            const [linhas, agenda] = await Promise.all([
+                api('GET', `${API}/escala-dia?data=${data}`),
+                api('GET', `${API}/dia?data=${data}`),
+            ]);
+            if (data !== dataEscala()) return;
+            ESCALA_DIA = { data, linhas, agenda };
+        } catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; return; }
+        const { linhas, agenda } = ESCALA_DIA;
+        if (agenda.feriado) {
+            document.getElementById('escala-status').textContent = '';
+            alvo.innerHTML = `<div class="ag-feriado"><span>🎉 Feriado: ${esc(agenda.feriado.nome)} — sem escala neste dia.</span></div>`;
+            return;
+        }
+        const linha = (turno, est) => linhas.find(e => e.turno === turno && e.estudio_id === est) || null;
+        const emUso = (turno, est) => {
+            const t = agenda.turnos.find(x => x.turno === turno);
+            const c = t && t.estudios.find(x => x.estudio_id === est);
+            return !!(c && c.em_uso);
+        };
+        const nomeDir = id => (OPCOES.diretores.find(d => d.id === id) || {}).nome || '';
+        const opcoesDir = '<option value="">— sem diretor —</option>' + OPCOES.diretores.map(d => `<option value="${d.id}">${esc(d.nome)}</option>`).join('');
+        let faltam = 0, escalados = 0;
+        alvo.innerHTML = `<div class="table-container"><table class="ag-escala">
+            <thead><tr><th>Estúdio</th>${OPCOES.turnos.map(t => `<th>${TURNO_ICONE[t.valor]} ${esc(t.label)}</th>`).join('')}</tr></thead>
+            <tbody>${OPCOES.estudios.map(e => `<tr><td><b>${esc(e.nome)}</b></td>${OPCOES.turnos.map(t => {
+                const l = linha(t.valor, e.id), uso = emUso(t.valor, e.id);
+                const falta = uso && !(l && l.diretor_imagem_id);
+                if (falta) faltam++;
+                if (l && l.diretor_imagem_id) escalados++;
+                let extra = ((l && l.trocas) || []).map(x => `<small>→ ${esc(nomeDir(x.diretor_imagem_id))}${x.a_partir ? ' a partir das ' + x.a_partir : ''}</small>`).join('');
+                if (PODE_EDITAR) {
+                    extra += `<small><a href="#" onclick="event.preventDefault(); abrirLinkTransmissao('${t.valor}', ${e.id}, ESCALA_DIA.data)">${(l && (l.youtube_link || l.chave_transmissao)) ? '📺 link e chave ✓' : '📺 informar link e chave'}</a></small>`;
+                }
+                return `<td><select class="form-select ${falta ? 'falta' : ''}" data-turno="${t.valor}" data-estudio="${e.id}" onchange="salvarEscalaDoDia(this)" ${PODE_EDITAR ? '' : 'disabled'}
+                    title="${uso ? 'Estúdio com aula neste turno' : 'Sem aula da grade neste turno'}">${opcoesDir}</select>${extra}</td>`;
+            }).join('')}</tr>`).join('')}
+            </tbody></table></div>`;
+        document.querySelectorAll('#escala-tabela select').forEach(sel => {
+            const l = linha(sel.dataset.turno, Number(sel.dataset.estudio));
+            sel.value = (l && l.diretor_imagem_id) || '';
+        });
+        document.getElementById('escala-status').innerHTML = faltam
+            ? `<b style="color:var(--status-red);">${faltam} estúdio(s) com aula sem diretor</b> · ${escalados} escalado(s)`
+            : `✅ ${escalados} escalado(s)${escalados ? '' : ' — nenhuma aula precisando de diretor'}`;
+    }
+
+    function manterTrocas(principal, trocas) {
+        const lista = [];
+        let anterior = principal;
+        trocas.forEach(x => {
+            if (x.diretor_imagem_id && x.diretor_imagem_id !== anterior) { lista.push(x); anterior = x.diretor_imagem_id; }
+        });
+        return lista;
+    }
+
+    async function salvarEscalaDoDia(sel) {
+        const turno = sel.dataset.turno, est = Number(sel.dataset.estudio);
+        const l = ESCALA_DIA.linhas.find(e => e.turno === turno && e.estudio_id === est) || {};
+        try {
+            await api('PUT', `${API}/escala-dia`, {
+                data: ESCALA_DIA.data, turno, estudio_id: est,
+                diretor_imagem_id: sel.value || null,
+                // mantém os diretores que assumem depois e a observação (se o principal continuar)
+                trocas: sel.value ? manterTrocas(sel.value, l.trocas || []) : [],
+                observacao: sel.value ? (l.observacao || null) : null,
+            });
+            showToast(sel.value ? 'Diretor escalado.' : 'Estúdio sem diretor neste turno.', 'success');
+            carregarEscala();
+        } catch (e) { showToast(e.message, 'error'); carregarEscala(); }
+    }
+
+    // ─── Link do YouTube e chave: por estúdio e turno, em cada dia ───
+    let LINK_ATUAL = null;
+    async function abrirLinkTransmissao(turno, estudioId, data) {
+        let atual = {};
+        try {
+            const lista = await api('GET', `${API}/transmissao-dia?data=${data}`);
+            atual = lista.find(x => x.turno === turno && x.estudio_id === estudioId) || {};
+        } catch (e) { showToast(e.message, 'error'); return; }
+        LINK_ATUAL = { turno, estudio_id: estudioId, data };
+        const est = (OPCOES.estudios.find(e => e.id === estudioId) || {}).nome || '';
+        const tl = (OPCOES.turnos.find(t => t.valor === turno) || {}).label || turno;
+        document.getElementById('link-titulo').textContent = `${est} · ${tl} · ${isoParaBr(data)}`;
+        document.getElementById('link-youtube').value = atual.youtube_link || '';
+        document.getElementById('link-chave').value = atual.chave_transmissao || '';
+        abrirDrawer('link-drawer');
+    }
+    async function salvarLinkTransmissao() {
+        const l = LINK_ATUAL;
+        if (!l) return;
+        try {
+            await api('PUT', `${API}/transmissao-dia`, { data: l.data, itens: [{
+                turno: l.turno, estudio_id: l.estudio_id,
+                youtube_link: document.getElementById('link-youtube').value.trim(),
+                chave_transmissao: document.getElementById('link-chave').value.trim(),
+            }] });
+            showToast('Link e chave salvos para todas as aulas do estúdio neste turno.', 'success');
+            fecharDrawers();
+            if (document.getElementById('aba-escala').style.display !== 'none') carregarEscala();
+            else if (document.getElementById('aba-transmissao').style.display !== 'none') carregarTransmissao();
+            else carregarDia();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // Aba "Link e chave do dia": todos os estúdios × turnos de uma vez
+    function dataTransmissao() { return document.getElementById('tx-data').value || dataAtual(); }
+    function mudarDiaTransmissao(n) { document.getElementById('tx-data').value = somarDias(dataTransmissao(), n); carregarTransmissao(); }
+    async function carregarTransmissao() {
+        const data = dataTransmissao();
+        document.getElementById('tx-label').textContent = `${diaCurto(data)}, ${isoParaBr(data)}`;
+        const alvo = document.getElementById('tx-tabela');
+        let lista, agenda;
+        try {
+            [lista, agenda] = await Promise.all([
+                api('GET', `${API}/transmissao-dia?data=${data}`),
+                api('GET', `${API}/dia?data=${data}`),
+            ]);
+        } catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; return; }
+        if (data !== dataTransmissao()) return;
+        if (agenda.feriado) {
+            document.getElementById('tx-status').textContent = '';
+            alvo.innerHTML = `<div class="ag-feriado"><span>🎉 Feriado: ${esc(agenda.feriado.nome)}</span></div>`;
+            return;
+        }
+        const valor = (turno, est) => lista.find(x => x.turno === turno && x.estudio_id === est) || {};
+        const coluna = (turno, est) => {
+            const t = agenda.turnos.find(x => x.turno === turno);
+            return (t && t.estudios.find(x => x.estudio_id === est)) || {};
+        };
+        let comAula = 0, preenchidos = 0;
+        alvo.innerHTML = `<div class="table-container"><table class="ag-escala tx-tabela">
+            <thead><tr><th>Estúdio</th>${OPCOES.turnos.map(t => `<th>${TURNO_ICONE[t.valor]} ${esc(t.label)}</th>`).join('')}</tr></thead>
+            <tbody>${OPCOES.estudios.map(e => `<tr><td><b>${esc(e.nome)}</b></td>${OPCOES.turnos.map(t => {
+                const v = valor(t.valor, e.id), c = coluna(t.valor, e.id);
+                const d = c.diretor || {};
+                if (c.em_uso) { comAula++; if (v.youtube_link) preenchidos++; }
+                return `<td>
+                    <input type="url" class="form-input" data-turno="${t.valor}" data-estudio="${e.id}" data-campo="youtube_link" maxlength="500" placeholder="Link do YouTube" value="${esc(v.youtube_link || '')}">
+                    <input type="text" class="form-input" data-turno="${t.valor}" data-estudio="${e.id}" data-campo="chave_transmissao" maxlength="255" autocomplete="off" placeholder="Chave" value="${esc(v.chave_transmissao || '')}">
+                    <div class="tx-sem">${c.em_uso ? (d.nome ? '🎥 ' + esc(d.nome) : '⚠️ com aula, sem diretor') : 'sem aula neste turno'}</div>
+                </td>`;
+            }).join('')}</tr>`).join('')}</tbody></table></div>`;
+        document.getElementById('tx-status').innerHTML = comAula
+            ? `${preenchidos} de ${comAula} estúdio(s) com aula já têm link`
+            : 'Nenhum estúdio com aula neste dia';
+    }
+    async function salvarTransmissao() {
+        const data = dataTransmissao();
+        const itens = {};
+        document.querySelectorAll('#tx-tabela input[data-campo]').forEach(inp => {
+            const k = `${inp.dataset.turno}|${inp.dataset.estudio}`;
+            itens[k] = itens[k] || { turno: inp.dataset.turno, estudio_id: Number(inp.dataset.estudio) };
+            itens[k][inp.dataset.campo] = inp.value.trim();
+        });
+        try {
+            const r = await api('PUT', `${API}/transmissao-dia`, { data, itens: Object.values(itens) });
+            showToast(`Link e chave do dia salvos (${r.gravados} estúdio/turno).`, 'success');
+            carregarTransmissao();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    function abrirCopiarEscala() {
+        const box = document.getElementById('escala-copiar');
+        if (box.classList.contains('open')) { box.classList.remove('open'); return; }
+        const base = dataEscala();
+        const dias = [];
+        for (let n = 1; dias.length < 12; n++) {
+            const d = somarDias(base, n);
+            const [a, m, dd] = d.split('-').map(Number);
+            const ds = (new Date(a, m - 1, dd).getDay() + 6) % 7;
+            if (ds < 6) dias.push({ d, ds });   // seg a sáb, próximos 12 dias
+        }
+        document.getElementById('escala-copiar-dias').innerHTML = dias.map((x, i) =>
+            `<label><input type="checkbox" value="${x.d}" ${i === 0 ? 'checked' : ''}> ${diaCurto(x.d)} ${isoParaBr(x.d).slice(0, 5)}</label>`).join('');
+        box.classList.add('open');
+    }
+
+    // ─── Intervalos ────────────────────────────────────────────────
+
+    function prepararIntervalos() {
+        const sel = document.getElementById('iv-estudio');
+        if (!sel.options.length) {
+            sel.innerHTML = '<option value="">Padrão (todos os estúdios)</option>'
+                + OPCOES.estudios.map(e => `<option value="${e.id}">${esc(e.nome)}</option>`).join('');
+        }
+        const hoje = isoHoje();
+        if (!document.getElementById('iv-ver-data').value) document.getElementById('iv-ver-data').value = hoje;
+        const d = document.getElementById('iv-data');
+        d.min = hoje;
+        if (!d.value || d.value < hoje) d.value = hoje;
+        ajustarFormIntervalo();
+        carregarIntervalos();
+    }
+    function ajustarFormIntervalo() {
+        const estudio = document.getElementById('iv-estudio').value;
+        const sem = document.getElementById('iv-sem').checked;
+        document.getElementById('iv-sem-rotulo').textContent = estudio ? 'Seguir o intervalo padrão (tirar o horário próprio deste estúdio)' : 'Sem intervalo';
+        ['iv-inicio', 'iv-fim'].forEach(id => { const el = document.getElementById(id); el.disabled = sem; el.required = !sem; });
+    }
+    async function carregarIntervalos() {
+        const data = document.getElementById('iv-ver-data').value || isoHoje();
+        let r;
+        try { r = await api('GET', `${API}/intervalos?data=${data}`); }
+        catch (e) { document.getElementById('iv-quadro').innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; return; }
+        desenharIntervalos(r);
+    }
+    function desenharIntervalos(r) {
+        const txt = iv => iv ? `${iv.inicio}–${iv.fim}` : '<span style="color:var(--text-muted)">sem intervalo</span>';
+        document.getElementById('iv-quadro').innerHTML = r.turnos.map(t => `<div class="iv-turno">
+            <h4>${t.turno === 'manha' ? '☀️' : '🌤️'} ${esc(t.label)} — padrão ${txt(t.padrao)}</h4>
+            <div class="table-container"><table><tbody>${t.estudios.map(e => `<tr>
+                <td><b>${esc(e.estudio_nome)}</b></td>
+                <td class="${e.intervalo && e.intervalo.origem === 'estudio' ? 'iv-proprio' : ''}">${txt(e.intervalo)}${e.intervalo && e.intervalo.origem === 'estudio' ? ' · próprio' : ''}${e.intervalo && e.intervalo.so_neste_dia ? ' · só neste dia' : ''}</td>
+                <td class="so-edita"><button class="btn btn-secondary btn-sm" onclick="editarIntervalo('${t.turno}', ${e.estudio_id}, '${e.intervalo ? e.intervalo.inicio : ''}', '${e.intervalo ? e.intervalo.fim : ''}')" title="Mudar o intervalo deste estúdio">✏️</button></td>
+            </tr>`).join('')}</tbody></table></div></div>`).join('');
+        const hoje = isoHoje();
+        const h = r.historico || [];
+        document.getElementById('iv-historico').innerHTML = !h.length ? '<div class="empty-state"><p>Nenhuma mudança ainda.</p></div>'
+            : `<div class="table-container"><table>
+            <thead><tr><th>Vale</th><th>Turno</th><th>Estúdio</th><th>Intervalo</th><th>Motivo</th><th>Quem</th><th></th></tr></thead>
+            <tbody>${h.map(x => `<tr>
+                <td style="white-space:nowrap;">${x.vigente_ate ? 'só em ' + isoParaBr(x.vigente_desde) : 'de ' + isoParaBr(x.vigente_desde) + ' em diante'}</td>
+                <td>${esc(x.turno_label)}</td><td>${x.estudio_nome ? esc(x.estudio_nome) : 'Padrão'}</td>
+                <td style="white-space:nowrap;">${x.inicio ? x.inicio + '–' + x.fim : (x.estudio_id ? 'segue o padrão' : 'sem intervalo')}</td>
+                <td>${esc(x.motivo || '—')}</td><td>${esc(x.criado_por || '—')}</td>
+                <td class="so-edita">${x.vigente_desde >= hoje && x.criado_por !== 'Sistema' ? `<button class="btn btn-danger btn-sm" onclick="excluirIntervalo(${x.id})" title="Desfazer esta mudança">🗑️</button>` : ''}</td>
+            </tr>`).join('')}</tbody></table></div>`;
+    }
+    function editarIntervalo(turno, estudioId, inicio, fim) {
+        document.getElementById('iv-turno').value = turno;
+        document.getElementById('iv-estudio').value = String(estudioId);
+        document.getElementById('iv-inicio').value = inicio;
+        document.getElementById('iv-fim').value = fim;
+        document.getElementById('iv-sem').checked = false;
+        const ver = document.getElementById('iv-ver-data').value;
+        if (ver && ver >= isoHoje()) document.getElementById('iv-data').value = ver;
+        ajustarFormIntervalo();
+        document.getElementById('iv-inicio').focus();
+    }
+    async function salvarIntervalo(ev) {
+        ev.preventDefault();
+        const sem = document.getElementById('iv-sem').checked;
+        const estudio = document.getElementById('iv-estudio').value;
+        const corpo = {
+            turno: document.getElementById('iv-turno').value,
+            estudio_id: estudio ? Number(estudio) : null,
+            horario_inicio: sem ? null : document.getElementById('iv-inicio').value,
+            horario_fim: sem ? null : document.getElementById('iv-fim').value,
+            a_partir_de: document.getElementById('iv-data').value,
+            so_neste_dia: document.getElementById('iv-alcance').value === 'dia',
+            motivo: document.getElementById('iv-motivo').value.trim() || null,
+        };
+        try {
+            await api('POST', `${API}/intervalos`, corpo);
+            showToast('Intervalo salvo.', 'success');
+            document.getElementById('iv-ver-data').value = corpo.a_partir_de;
+            document.getElementById('iv-motivo').value = '';
+            carregarIntervalos();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function excluirIntervalo(id) {
+        try { await api('DELETE', `${API}/intervalos/${id}`); showToast('Mudança desfeita.', 'success'); carregarIntervalos(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Aba Horários trancados ────────────────────────────────────
+
+    let BLOQUEIOS = [];
+    async function carregarBloqueios() {
+        const alvo = document.getElementById('bq-tabela');
+        try { BLOQUEIOS = await api('GET', `${API}/bloqueios`); }
+        catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; return; }
+        if (!BLOQUEIOS.length) { alvo.innerHTML = '<div class="empty-state"><p>Nenhum horário trancado.</p></div>'; return; }
+        const dias = ds => ds.map(d => DIAS_CURTOS[d]).join(', ');
+        alvo.innerHTML = `<div class="table-container"><table>
+            <thead><tr><th>Estúdio</th><th>Dias</th><th>Horário</th><th>Tipo</th><th>Motivo</th><th>Situação</th><th></th></tr></thead>
+            <tbody>${BLOQUEIOS.map((b, i) => `<tr style="${b.ativo ? '' : 'opacity:0.55;'}">
+                <td style="white-space:nowrap;"><b>${esc(b.estudio_nome)}</b></td><td>${dias(b.dias_semana)}</td>
+                <td style="white-space:nowrap;">${b.horario_inicio}–${b.horario_fim}</td>
+                <td style="white-space:nowrap;">${b.tipo === 'SOB_DEMANDA' ? `⏳ Sob demanda (mín. ${b.minimo_aulas || OPCOES.minimo_sob_demanda || 3})` : '🔒 Trancado'}</td><td>${esc(b.motivo || '—')}</td>
+                <td>${b.ativo ? '<span class="badge badge-yellow">Ativo</span>' : '<span class="badge badge-gray">Desligado</span>'}</td>
+                <td style="white-space:nowrap;" class="so-edita">
+                    <button class="btn btn-secondary btn-sm" onclick="editarBloqueio(${i})" title="Editar">✏️</button>
+                    <button class="btn btn-secondary btn-sm" onclick="alternarBloqueio(${i})" title="${b.ativo ? 'Desligar' : 'Ligar'}">${b.ativo ? '⏸️' : '▶️'}</button>
+                    <button class="btn btn-danger btn-sm" onclick="excluirBloqueio(${b.id})" title="Excluir">🗑️</button>
+                </td></tr>`).join('')}</tbody></table></div>`;
+    }
+    function dadosBloqueio(ativo = true) {
+        return {
+            estudio_id: Number(document.getElementById('bq-estudio').value),
+            dias_semana: Array.from(document.querySelectorAll('#bq-dias input:checked')).map(i => Number(i.value)),
+            horario_inicio: document.getElementById('bq-inicio').value,
+            horario_fim: document.getElementById('bq-fim').value,
+            motivo: document.getElementById('bq-motivo').value.trim() || null,
+            ativo,
+            tipo: document.getElementById('bq-tipo').value,
+            minimo_aulas: document.getElementById('bq-tipo').value === 'SOB_DEMANDA'
+                ? (Number(document.getElementById('bq-minimo').value) || null) : null,
+        };
+    }
+    async function salvarBloqueio(ev) {
+        ev.preventDefault();
+        const id = document.getElementById('bq-id').value;
+        const atual = BLOQUEIOS.find(b => String(b.id) === id);
+        try {
+            if (id) await api('PUT', `${API}/bloqueios/${id}`, dadosBloqueio(atual ? atual.ativo : true));
+            else await api('POST', `${API}/bloqueios`, dadosBloqueio());
+            showToast('Horário trancado salvo.', 'success');
+            limparBloqueio();
+            carregarBloqueios();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    function editarBloqueio(i) {
+        const b = BLOQUEIOS[i];
+        document.getElementById('bq-id').value = b.id;
+        document.getElementById('bq-estudio').value = b.estudio_id;
+        document.getElementById('bq-inicio').value = b.horario_inicio;
+        document.getElementById('bq-fim').value = b.horario_fim;
+        document.getElementById('bq-motivo').value = b.motivo || '';
+        document.getElementById('bq-tipo').value = b.tipo || 'TRANCADO';
+        document.getElementById('bq-minimo').value = b.minimo_aulas || '';
+        document.getElementById('bq-grupo-minimo').style.display = b.tipo === 'SOB_DEMANDA' ? '' : 'none';
+        document.querySelectorAll('#bq-dias input').forEach(c => { c.checked = b.dias_semana.includes(Number(c.value)); });
+        document.getElementById('bq-salvar').textContent = 'Salvar alteração';
+    }
+    function limparBloqueio() {
+        document.getElementById('bq-id').value = '';
+        ['bq-inicio', 'bq-fim', 'bq-motivo', 'bq-minimo'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('bq-tipo').value = 'TRANCADO';
+        document.getElementById('bq-grupo-minimo').style.display = 'none';
+        document.querySelectorAll('#bq-dias input').forEach(c => { c.checked = Number(c.value) < 5; });
+        document.getElementById('bq-salvar').textContent = 'Adicionar';
+    }
+    async function alternarBloqueio(i) {
+        const b = BLOQUEIOS[i];
+        try {
+            await api('PUT', `${API}/bloqueios/${b.id}`, { estudio_id: b.estudio_id, dias_semana: b.dias_semana,
+                horario_inicio: b.horario_inicio, horario_fim: b.horario_fim, motivo: b.motivo, ativo: !b.ativo,
+                tipo: b.tipo || 'TRANCADO', minimo_aulas: b.minimo_aulas });
+            carregarBloqueios();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function excluirBloqueio(id) {
+        try { await api('DELETE', `${API}/bloqueios/${id}`); showToast('Horário trancado excluído.', 'success'); carregarBloqueios(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Arrastar e soltar ─────────────────────────────────────────
+    // Aula da grade: só para o lado (outro estúdio, mesmo horário) — remaneja neste dia.
+    // Evento/agendamento: para o lado e para cima/baixo (muda estúdio e horário).
+    let ARRASTE = null;
+    function iniciarArraste(ev, turno, estudioId, tipo, ref) {
+        const col = acharColuna(turno, estudioId);
+        const it = col && (tipo === 'aula' ? col.itens.find(i => i.grade_id === ref) : col.itens.find(i => i.agendamento_id === ref && i.tipo !== 'AULA'));
+        if (!it) { ev.preventDefault(); return; }
+        const caixa = ev.currentTarget.getBoundingClientRect();
+        ARRASTE = { turno, estudioId, tipo, ref, it, dy: ev.clientY - caixa.top };
+        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', ref);
+        ev.currentTarget.classList.add('arrastando');
+        fecharCtx();
+    }
+    function fimArraste(ev) {
+        ev.currentTarget.classList.remove('arrastando');
+        limparPrevia();
+        ARRASTE = null;
+    }
+    function limparPrevia() {
+        document.querySelectorAll('.ag-previa').forEach(p => p.remove());
+        document.querySelectorAll('.ag-col.alvo, .ag-col.alvo-nao').forEach(c => c.classList.remove('alvo', 'alvo-nao'));
+    }
+    function destinoPermitido(colEl) {
+        if (!ARRASTE) return false;
+        const estudio = Number(colEl.dataset.estudio);
+        if (ARRASTE.tipo === 'aula' && ARRASTE.it.gravacao) return true;  // gravação: qualquer estúdio e horário
+        if (ARRASTE.tipo === 'aula') return colEl.dataset.turno === ARRASTE.turno && estudio !== ARRASTE.estudioId;
+        return true;
+    }
+
+    /** O que já ocupa a coluna (sem o próprio bloco arrastado). */
+    function ocupacaoDaColuna(colEl, comMargem = false) {
+        const col = acharColuna(colEl.dataset.turno, Number(colEl.dataset.estudio));
+        if (!col) return [];
+        const a = ARRASTE;
+        const occ = col.itens
+            .filter(i => !i.cancelada && !i.fantasma)
+            .filter(i => !(a && a.tipo === 'ag' && i.agendamento_id === a.ref && i.tipo !== 'AULA'))
+            .filter(i => !(a && a.tipo === 'aula' && i.grade_id === a.ref))
+            .map(i => ({ ini: paraMin(i.inicio), fim: paraMin(i.fim), nome: `${i.titulo} (${i.inicio}–${i.fim})` }));
+        (col.bloqueios || []).filter(b => b.tipo !== 'SOB_DEMANDA')
+            .forEach(b => occ.push({ ini: paraMin(b.inicio), fim: paraMin(b.fim), nome: `horário trancado ${b.inicio}–${b.fim}` }));
+        // Intervalo: evento e gravação desviam dele; aula da grade segue o horário da grade
+        if (col.intervalo && !(a && a.tipo === 'aula' && !(a.it && a.it.gravacao)))
+            occ.push({ ini: paraMin(col.intervalo.inicio), fim: paraMin(col.intervalo.fim), nome: `intervalo ${col.intervalo.inicio}–${col.intervalo.fim}` });
+        return occ.sort((x, y) => x.ini - y.ini);
+    }
+
+    /**
+     * Onde o bloco cai ao soltar. Aula: mesmo horário, em outro estúdio.
+     * Evento: segue o mouse e, se encostar em algo, encaixa no espaço livre
+     * em que o mouse está; se não couber, avisa em vez de tentar agendar.
+     */
+    function posicaoNaColuna(colEl, clientY) {
+        const a = ARRASTE;
+        const occ = ocupacaoDaColuna(colEl, false);
+        const col = acharColuna(colEl.dataset.turno, Number(colEl.dataset.estudio));
+        const choca = (x, y) => occ.find(o => x < o.fim && o.ini < y);
+
+        if (a.tipo === 'aula' && !a.it.gravacao) {
+            const ini = paraMin(a.it.inicio), fim = paraMin(a.it.fim);
+            const c = choca(ini, fim);
+            return { ini, fim, ok: !c, motivo: c ? `Estúdio ocupado nesse horário: ${c.nome}.` : '' };
+        }
+
+        const reg = a.it.registro || {};
+        const dur = Math.max(15, (paraMin(reg.horario_fim || a.it.fim) - paraMin(reg.horario_inicio || a.it.inicio)) || 45);
+        const topo = colEl.getBoundingClientRect().top;
+        const colIni = Number(colEl.dataset.ini), colFim = Number(colEl.dataset.fim) || 24 * 60;
+        const mouseMin = colIni + (clientY - topo) / PX_MIN;
+
+        // Se o mouse estiver sobre um espaço livre demarcado, encaixa com prioridade suave
+        if (col && col.livres && col.livres.length) {
+            const livreOndeCaiu = col.livres.find(l => {
+                const lIni = paraMin(l.inicio), lFim = paraMin(l.fim);
+                return mouseMin >= lIni && mouseMin <= lFim;
+            });
+            if (livreOndeCaiu) {
+                const lIni = paraMin(livreOndeCaiu.inicio), lFim = paraMin(livreOndeCaiu.fim);
+                const espaco = lFim - lIni;
+                if (dur <= espaco) {
+                    let idealIni = Math.round((mouseMin - dur / 2) / 5) * 5;
+                    idealIni = Math.max(lIni, Math.min(idealIni, lFim - dur));
+                    if (!choca(idealIni, idealIni + dur)) {
+                        return { ini: idealIni, fim: idealIni + dur, ok: true, encaixou: true };
+                    }
+                }
+            }
+        }
+
+        let ini = colIni + Math.round((clientY - topo - (a.dy || 0)) / PX_MIN / 5) * 5;
+        ini = Math.max(colIni, Math.min(ini, colFim - dur));
+        if (!choca(ini, ini + dur)) return { ini, fim: ini + dur, ok: true };
+
+        // encaixa no espaço livre onde está o mouse
+        const dentro = occ.find(o => mouseMin >= o.ini && mouseMin < o.fim);
+        if (dentro) return { ini, fim: ini + dur, ok: false, motivo: `Já ocupado: ${dentro.nome}.` };
+        const antes = occ.filter(o => o.fim <= mouseMin).reduce((m, o) => Math.max(m, o.fim), colIni);
+        const depois = occ.filter(o => o.ini >= mouseMin).reduce((m, o) => Math.min(m, o.ini), colFim);
+        const livreIni = Math.ceil(antes / 5) * 5, livreFim = Math.floor(depois / 5) * 5;
+        if (livreFim - livreIni >= dur) {
+            const enc = Math.max(livreIni, Math.min(ini, livreFim - dur));
+            return { ini: enc, fim: enc + dur, ok: true, encaixou: enc !== ini };
+        }
+        return { ini, fim: ini + dur, ok: false,
+                 motivo: `O agendamento tem ${dur} min e o espaço livre aqui tem ${Math.max(0, livreFim - livreIni)} min.` };
+    }
+
+    function mostrarPrevia(colEl, pos) {
+        let p = colEl.querySelector('.ag-previa');
+        if (!p) { p = document.createElement('div'); p.className = 'ag-previa'; colEl.appendChild(p); }
+        const colIni = Number(colEl.dataset.ini);
+        p.style.top = `${Math.round((pos.ini - colIni) * PX_MIN)}px`;
+        p.style.height = `${Math.max(22, Math.round((pos.fim - pos.ini) * PX_MIN) - 2)}px`;
+        p.classList.toggle('nao', !pos.ok);
+        p.innerHTML = `${paraHora(pos.ini)}–${paraHora(pos.fim)}${pos.ok ? '' : `<small>${esc(pos.motivo)}</small>`}`;
+    }
+
+    function sobreColuna(ev) {
+        if (!ARRASTE) return;
+        const colEl = ev.currentTarget;
+        const ok = destinoPermitido(colEl);
+        document.querySelectorAll('.ag-previa').forEach(p => { if (p.parentElement !== colEl) p.remove(); });
+        colEl.classList.toggle('alvo', ok);
+        colEl.classList.toggle('alvo-nao', !ok);
+        if (!ok) return;
+        ev.preventDefault();
+        ev.dataTransfer.dropEffect = 'move';
+        mostrarPrevia(colEl, posicaoNaColuna(colEl, ev.clientY));
+    }
+    function saindoColuna(ev) {
+        const colEl = ev.currentTarget;
+        if (ev.relatedTarget && colEl.contains(ev.relatedTarget)) return;  // só passou por cima de um bloco da coluna
+        colEl.classList.remove('alvo', 'alvo-nao');
+        const p = colEl.querySelector('.ag-previa');
+        if (p) p.remove();
+    }
+
+    async function soltarNaColuna(ev) {
+        ev.preventDefault();
+        const colEl = ev.currentTarget;
+        const a = ARRASTE;
+        const permitido = destinoPermitido(colEl);
+        const pos = permitido ? posicaoNaColuna(colEl, ev.clientY) : null;
+        limparPrevia();
+        ARRASTE = null;
+        if (!a || !permitido) return;
+        if (!pos.ok) {
+            showToast(pos.motivo || 'Horário ocupado.', 'warning');
+            return;
+        }
+        const destino = Number(colEl.dataset.estudio);
+        if (a.tipo === 'aula' && a.it.gravacao) {
+            // Gravação da grade (MP): outro estúdio e/ou outro horário só neste dia
+            const it = a.it;
+            const ini = paraHora(pos.ini), fim = paraHora(pos.fim);
+            const igualGrade = destino === it.estudio_grade_id && ini === (it.inicio_grade || it.inicio) && fim === (it.fim_grade || it.fim);
+            try {
+                if (igualGrade) {
+                    if (it.remanejada) await api('POST', `${API}/aulas/restaurar`, { data: AGENDA.data, grade_id: it.grade_id });
+                    showToast('Gravação de volta ao estúdio e horário da grade.', 'success');
+                } else {
+                    const corpo = { data: AGENDA.data, grade_id: it.grade_id, estudio_destino_id: destino, horario_inicio: ini, horario_fim: fim };
+                    try {
+                        await api('POST', `${API}/aulas/remanejar`, corpo);
+                    } catch (e) {
+                        if (!(e.status === 409 && e.detail && e.detail.tipo === 'confirmar')) throw e;
+                        if (!confirm((e.detail.avisos || []).join('\n') + '\n\nMover mesmo assim?')) return;
+                        await api('POST', `${API}/aulas/remanejar`, { ...corpo, confirmar_avisos: true });
+                    }
+                    showToast(`Gravação movida para ${ini}–${fim} neste dia (a grade não muda).`, 'success');
+                }
+                carregarDia();
+            } catch (e) { showToast(e.message, 'error'); }
+            return;
+        }
+        if (a.tipo === 'aula') {
+            const it = a.it;
+            aulaAtual = { ...it, estudio_id: a.estudioId };
+            try {
+                if (destino === it.estudio_grade_id) {
+                    await api('POST', `${API}/aulas/restaurar`, { data: AGENDA.data, grade_id: it.grade_id });
+                    showToast('Aula voltou para o estúdio da grade.', 'success');
+                } else {
+                    await api('POST', `${API}/aulas/remanejar`, { data: AGENDA.data, grade_id: it.grade_id, estudio_destino_id: destino });
+                    showToast('Aula remanejada neste dia (a grade não muda).', 'success');
+                }
+                carregarDia();
+            } catch (e) {
+                if (e.status === 409 && e.detail && e.detail.tipo === 'confirmar') {
+                    // Abre a aula com o destino escolhido e mostra o aviso para confirmar
+                    abrirAula(a.turno, a.estudioId, it.grade_id);
+                    setTimeout(() => {
+                        const sel = document.getElementById('rem-estudio');
+                        if (sel) sel.value = destino;
+                        remanejarAula();
+                    }, 300);
+                } else showToast(e.message, 'error');
+            }
+            return;
+        }
+        // Agendamento: novo estúdio e horário já encaixado no espaço livre, mesma duração
+        const reg = a.it.registro;
+        if (!reg) return;
+        abrirAgendamento({ ...reg, estudio_id: destino, horario_inicio: paraHora(pos.ini), horario_fim: paraHora(pos.fim) });
+        salvarAgendamento(null);
+    }
+
+    // ─── Menu do botão direito ─────────────────────────────────────
+    function abrirCtx(ev, turno, estudioId, tipo, ref) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const col = acharColuna(turno, estudioId);
+        const it = col && (tipo === 'aula' ? col.itens.find(i => i.grade_id === ref) : col.itens.find(i => i.agendamento_id === ref && i.tipo !== 'AULA'));
+        if (!it) return;
+        const abrir = tipo === 'aula' ? `abrirAula('${turno}', ${estudioId}, '${ref}')` : `abrirAgendamentoDoDia('${turno}', ${estudioId}, '${ref}')`;
+        const foco = id => `${abrir}; setTimeout(() => { const el = document.getElementById('${id}'); if (el) { el.scrollIntoView({ block: 'center' }); el.focus(); } }, 250)`;
+        const ed = PODE_EDITAR && !AGENDA.feriado;
+        const opcoes = [
+            `<button onclick="${abrir}">🔎 Ver detalhes</button>`,
+            ed ? `<button onclick="${foco('obs-texto')}">💬 Adicionar observação</button>` : '',
+            ed && tipo === 'aula' && !it.cancelada && !it.fantasma ? `<button onclick="${foco('rem-estudio')}">${it.gravacao ? '🎥 Mudar estúdio / horário neste dia' : '🔀 Remanejar neste dia'}</button>` : '',
+            ed && tipo === 'aula' && !it.cancelada && !it.remanejada ? `<button onclick="${foco('aula-motivo')}">🚫 Cancelar neste dia</button>` : '',
+            ed && tipo === 'aula' && (it.cancelada || it.remanejada) ? `<button onclick="aulaAtual = { grade_id: '${ref}' }; restaurarAula()">↩️ ${it.cancelada ? 'Restaurar aula' : (it.estudio_grade_id ? 'Voltar para o estúdio e horário da grade' : 'Tirar do estúdio (volta para a faixa)')}</button>` : '',
+            ed && tipo === 'aula' ? `<button onclick="${foco('fixo-estudio')}">📌 Definir estúdio fixo</button>` : '',
+            ed && tipo !== 'aula' ? `<button onclick="${foco('ag-estudio')}">✏️ Mudar estúdio / horário</button>` : '',
+        ].filter(Boolean).join('');
+        const m = document.getElementById('ag-ctx');
+        m.innerHTML = `<div class="ctx-titulo">${esc(it.titulo)} · ${it.inicio}–${it.fim}</div>${opcoes}`;
+        m.classList.add('open');
+        const w = m.offsetWidth, h = m.offsetHeight;
+        m.style.left = Math.min(ev.clientX, window.innerWidth - w - 8) + 'px';
+        m.style.top = Math.min(ev.clientY, window.innerHeight - h - 8) + 'px';
+    }
+    function fecharCtx() { const m = document.getElementById('ag-ctx'); if (m) m.classList.remove('open'); }
+
+    // ─── Aba Estúdios e feriados ───────────────────────────────────
+    async function carregarEstudiosConfig() {
+        const alvo = document.getElementById('cfg-tabela');
+        try {
+            const cfg = await api('GET', `${API}/estudios-config`);
+            const dis = PODE_EDITAR ? '' : 'disabled';
+            alvo.innerHTML = `<div class="table-container"><table class="ag-config">
+                <thead><tr><th>Estúdio</th><th>Preparado para Libras</th><th>Prioridade para evento</th></tr></thead>
+                <tbody>${cfg.map(c => `<tr>
+                    <td><b>${esc(c.nome)}</b></td>
+                    <td><label><input type="checkbox" data-cfg="${c.estudio_id}" data-campo="libras" ${c.libras ? 'checked' : ''} ${dis} onchange="salvarConfigEstudio(${c.estudio_id})"> Libras</label></td>
+                    <td><input type="number" class="form-input" style="width:90px;" min="1" max="99" placeholder="—" data-cfg="${c.estudio_id}" data-campo="prioridade"
+                        value="${c.prioridade_evento || ''}" ${dis} onchange="salvarConfigEstudio(${c.estudio_id})"></td></tr>`).join('')}
+                </tbody></table></div>`;
+        } catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; }
+        carregarFeriados();
+    }
+    async function salvarConfigEstudio(id) {
+        const libras = document.querySelector(`[data-cfg="${id}"][data-campo="libras"]`).checked;
+        const prio = Number(document.querySelector(`[data-cfg="${id}"][data-campo="prioridade"]`).value) || null;
+        try {
+            await api('PUT', `${API}/estudios-config/${id}`, { libras, prioridade_evento: prio });
+            const e = OPCOES.estudios.find(x => x.id === id);
+            if (e) { e.libras = libras; e.prioridade_evento = prio; }
+            showToast('Estúdio atualizado.', 'success');
+        } catch (e) { showToast(e.message, 'error'); carregarEstudiosConfig(); }
+    }
+    async function carregarFeriados() {
+        const alvo = document.getElementById('fer-tabela');
+        try {
+            const ano = new Date().getFullYear();
+            const lista = await api('GET', `${API}/feriados?data_inicio=${ano - 1}-01-01`);
+            alvo.innerHTML = lista.length ? `<div class="table-container"><table>
+                <thead><tr><th>Data</th><th>Feriado</th><th></th></tr></thead>
+                <tbody>${lista.map(f => `<tr><td style="white-space:nowrap;">${diaCurto(f.data)} ${isoParaBr(f.data)}</td><td>${esc(f.nome)}</td>
+                    <td style="white-space:nowrap;"><button class="btn btn-secondary btn-sm" onclick="verNoDia('${f.data}')" title="Ver na agenda">📅</button>
+                    <button class="btn btn-danger btn-sm so-edita" onclick="excluirFeriado(${f.id})" title="Desmarcar">🗑️</button></td></tr>`).join('')}</tbody></table></div>`
+                : '<div class="empty-state"><p>Nenhum feriado marcado.</p></div>';
+        } catch (e) { alvo.innerHTML = `<div class="empty-state"><p>${esc(e.message)}</p></div>`; }
+    }
+    async function salvarFeriado(ev) {
+        ev.preventDefault();
+        try {
+            await api('POST', `${API}/feriados`, { data: document.getElementById('fer-data').value, nome: document.getElementById('fer-nome').value.trim() });
+            document.getElementById('fer-nome').value = '';
+            showToast('Feriado marcado.', 'success');
+            carregarFeriados();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+    async function excluirFeriado(id) {
+        try { await api('DELETE', `${API}/feriados/${id}`); showToast('Feriado desmarcado.', 'success'); carregarFeriados(); }
+        catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function copiarEscala() {
+        const datas = Array.from(document.querySelectorAll('#escala-copiar-dias input:checked')).map(i => i.value);
+        if (!datas.length) { showToast('Marque pelo menos um dia.', 'error'); return; }
+        try {
+            const r = await api('POST', `${API}/escala-dia/copiar`, { de_data: dataEscala(), para_datas: datas });
+            showToast(`Escala copiada para ${r.dias.length} dia(s)${r.feriados_ignorados.length ? ` (${r.feriados_ignorados.length} feriado(s) ignorado(s))` : ''}.`, 'success');
+            document.getElementById('escala-copiar').classList.remove('open');
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+</script>
+{% endblock %}

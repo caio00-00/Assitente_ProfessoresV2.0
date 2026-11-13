@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual & Tutorial Completo de Uso — Canal Educação v3.5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --bg-body: #0B111E;
+      --bg-surface: #121A2B;
+      --bg-surface-elevated: #18233A;
+      --bg-surface-subtle: #1F2D4A;
+      --border-subtle: #243555;
+      --border-focus: #3B82F6;
+
+      --text-primary: #F1F5F9;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+
+      --primary: #3B82F6;
+      --primary-hover: #2563EB;
+      --primary-light: rgba(59, 130, 246, 0.15);
+
+      --success: #10B981;
+      --success-light: rgba(16, 185, 129, 0.12);
+      --warning: #F59E0B;
+      --warning-light: rgba(245, 158, 11, 0.12);
+      --danger: #EF4444;
+      --danger-light: rgba(239, 68, 68, 0.12);
+      --purple: #8B5CF6;
+      --purple-light: rgba(139, 92, 246, 0.12);
+
+      --sidebar-width: 290px;
+      --header-height: 72px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+    }
+
+    [data-theme="light"] {
+      --bg-body: #F8FAFC;
+      --bg-surface: #FFFFFF;
+      --bg-surface-elevated: #F1F5F9;
+      --bg-surface-subtle: #E2E8F0;
+      --border-subtle: #CBD5E1;
+      --border-focus: #2563EB;
+
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+
+      --primary: #2563EB;
+      --primary-hover: #1D4ED8;
+      --primary-light: rgba(37, 99, 235, 0.1);
+
+      --success: #059669;
+      --success-light: rgba(5, 150, 105, 0.1);
+      --warning: #D97706;
+      --warning-light: rgba(217, 119, 6, 0.1);
+      --danger: #DC2626;
+      --danger-light: rgba(220, 38, 38, 0.1);
+      --purple: #7C3AED;
+      --purple-light: rgba(124, 58, 237, 0.1);
+
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08);
+      --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ─── SIDEBAR / NAVEGAÇÃO LATERAL ─── */
+    aside.sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      position: fixed;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+    }
+
+    .sidebar-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.35);
+    }
+
+    .brand-title {
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .brand-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+    }
+
+    .search-box {
+      padding: 16px 20px 10px;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 38px;
+      border-radius: 8px;
+      border: 1px solid var(--border-subtle);
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    nav.nav-menu {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 14px;
+    }
+
+    .nav-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--text-muted);
+      padding: 12px 10px 6px;
+    }
+
+    .nav-link {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 500;
+      border-radius: 6px;
+      margin-bottom: 2px;
+      cursor: pointer;
+    }
+
+    .nav-link:hover {
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-primary);
+    }
+
+    .nav-link.active {
+      background-color: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .role-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 12px;
+      margin-left: auto;
+      text-transform: uppercase;
+    }
+
+    .badge-admin { background-color: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .badge-coord { background-color: var(--purple-light); color: var(--purple); border: 1px solid rgba(139, 92, 246, 0.2); }
+    .badge-assist { background-color: var(--primary-light); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.2); }
+    .badge-chefe { background-color: var(--warning-light); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .badge-oper { background-color: var(--success-light); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* ─── MAIN CONTENT ─── */
+    main.content {
+      margin-left: var(--sidebar-width);
+      flex: 1;
+      padding: 36px 48px 80px;
+      max-width: 1200px;
+    }
+
+    /* ─── TOPBAR ACTIONS ─── */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 32px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .top-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+
+    .btn-secondary {
+      background-color: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--bg-surface-subtle);
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background-color: var(--primary-hover);
+    }
+
+    /* ─── TYPOGRAPHY & SECTIONS ─── */
+    h1.hero-title {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin-bottom: 12px;
+      background: linear-gradient(120deg, #60A5FA, #A78BFA);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    p.hero-desc {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 32px;
+      max-width: 850px;
+    }
+
+    section.tutorial-section {
+      margin-bottom: 56px;
+      scroll-margin-top: 40px;
+    }
+
+    h2.section-heading {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    h3.subheading {
+      font-size: 17px;
+      font-weight: 600;
+      margin: 24px 0 12px;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ─── CARDS & CALLOUTS ─── */
+    .card {
+      background-color: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .callout {
+      border-left: 4px solid var(--primary);
+      background-color: var(--bg-surface-elevated);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 14px;
+    }
+
+    .callout.callout-info { border-left-color: var(--primary); background: var(--primary-light); }
+    .callout.callout-success { border-left-color: var(--success); background: var(--success-light); }
+    .callout.callout-warning { border-left-color: var(--warning); background: var(--warning-light); }
+    .callout.callout-danger { border-left-color: var(--danger); background: var(--danger-light); }
+
+    .callout-title {
+      font-weight: 700;
+      font-size: 14.5px;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* ─── TABLES ─── */
+    .table-container {
+      overflow-x: auto;
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      margin: 20px 0;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13.5px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      background-color: var(--bg-surface-elevated);
+      padding: 12px 16px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      font-size: 11.5px;
+      letter-spacing: 0.5px;
+    }
+
+    table.data-table td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-primary);
+      vertical-align: middle;
+    }
+
+    table.data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    table.data-table tr:hover td {
+      background-color: var(--bg-surface-elevated);
+    }
+
+    code.code-inline {
+      font-family: var(--font-mono);
+      background-color: var(--bg-surface-subtle);
+      color: #93C5FD;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 12.5px;
+    }
+
+    .copyable-code {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      background-color: var(--bg-surface-subtle);
+      border: 1px solid var(--border-subtle);
+      padding: 3px 8px;
+      border-radius: 5px;
+      font-size: 12.5px;
+      cursor: pointer;
+    }
+
+    .copyable-code:hover {
+      border-color: var(--border-focus);
+    }
+
+    /* ─── STEP BY STEP TIMELINE ─── */
+    .steps-timeline {
+      position: relative;
+      padding-left: 36px;
+      margin: 24px 0;
+    }
+
+    .steps-timeline::before {
+      content: "";
+      position: absolute;
+      left: 14px;
+      top: 10px;
+      bottom: 20px;
+      width: 2px;
+      background-color: var(--border-subtle);
+    }
+
+    .step-item {
+      position: relative;
+      margin-bottom: 28px;
+    }
+
+    .step-number {
+      position: absolute;
+      left: -36px;
+      top: 0;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: var(--bg-surface-elevated);
+      border: 2px solid var(--primary);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 4px var(--bg-body);
+    }
+
+    .step-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .step-desc {
+      font-size: 14px;
+      color: var(--text-secondary);
+    }
+
+    /* ─── UI MOCKUP HIGHLIGHT ─── */
+    .ui-mockup {
+      background-color: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 14px 0;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .ui-mockup-badge {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: var(--primary);
+      color: white;
+    }
+
+    /* ─── FAQ ACCORDION ─── */
+    .faq-item {
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      background-color: var(--bg-surface);
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 16px 20px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg-surface);
+    }
+
+    .faq-question:hover {
+      background-color: var(--bg-surface-elevated);
+    }
+
+    .faq-answer {
+      padding: 0 20px 16px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: none;
+      border-top: 1px solid var(--border-subtle);
+      padding-top: 14px;
+    }
+
+    .faq-item.open .faq-answer {
+      display: block;
+    }
+
+    .faq-item.open .faq-question {
+      color: var(--primary);
+    }
+
+    /* Highlight match */
+    .search-highlight {
+      background-color: rgba(245, 158, 11, 0.35);
+      color: inherit;
+      padding: 1px 3px;
+      border-radius: 3px;
+    }
+
+    @media print {
+      aside.sidebar, .topbar { display: none; }
+      main.content { margin: 0; padding: 0; max-width: 100%; }
+      body { background: white; color: black; }
+      .card, .table-container, .faq-item { border-color: #ddd; }
+    }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-icon">CE</div>
+      <div>
+        <div class="brand-title">Canal Educação</div>
+        <div class="brand-sub">Manual Operacional v3.5</div>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar no manual...">
+      </div>
+    </div>
+
+    <nav class="nav-menu" id="navMenu">
+      <div class="nav-section-title">Início</div>
+      <a class="nav-link active" onclick="scrollToSection('visao-geral')">
+        <span>🌐</span> Visão Geral do Sistema
+      </a>
+      <a class="nav-link" onclick="scrollToSection('matriz-acessos')">
+        <span>🔑</span> Credenciais & Logins
+      </a>
+
+      <div class="nav-section-title">Manuais por Perfil</div>
+      <a class="nav-link" onclick="scrollToSection('perfil-assistente')">
+        <span>📝</span> Assistente de Estúdio
+        <span class="role-badge badge-assist">Operador</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('perfil-diretor-operador')">
+        <span>🎬</span> Diretor de Imagem
+        <span class="role-badge badge-oper">Técnico</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('perfil-diretor-chefe')">
+        <span>🎙️</span> Diretor-Chefe
+        <span class="role-badge badge-chefe">Agenda</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('perfil-coordenador')">
+        <span>🎓</span> Coordenador Pedagógico
+        <span class="role-badge badge-coord">Auditoria</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('perfil-admin')">
+        <span>⚡</span> Administrador Geral
+        <span class="role-badge badge-admin">Gestão</span>
+      </a>
+
+      <div class="nav-section-title">Faturamento & Suporte</div>
+      <a class="nav-link" onclick="scrollToSection('faturamento-seduc')">
+        <span>📊</span> Faturamento SEDUC (.xlsm)
+      </a>
+      <a class="nav-link" onclick="scrollToSection('faq-solucoes')">
+        <span>❓</span> FAQs & Resolução de Erros
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span style="font-size: 12px; color: var(--text-muted);">Canal Educação © 2026</span>
+      <button class="btn btn-secondary" onclick="toggleTheme()" title="Alternar tema">🌓</button>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <main class="content">
+
+    <div class="topbar">
+      <div class="top-meta">
+        Ambiente Oficial de Homologação & Produção • Atualizado com Demandas Outubro/2026
+      </div>
+      <div class="top-actions">
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        <a href="http://localhost:8000" target="_blank" class="btn btn-primary">Acessar Sistema ↗</a>
+      </div>
+    </div>
+
+    <!-- ─── SEÇÃO 1: VISÃO GERAL ─── -->
+    <section id="visao-geral" class="tutorial-section">
+      <h1 class="hero-title">Manual de Uso do Canal Educação v3.5</h1>
+      <p class="hero-desc">
+        Guia passo a passo completo com fluxos de operação, regras de negócio institucionais, conciliação de faturamento SEDUC e controle de perfis de acesso (RBAC).
+      </p>
+
+      <div class="card">
+        <h3 class="subheading" style="margin-top:0;">🎯 Propósito da Plataforma</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          O sistema <strong>Canal Educação v3.5</strong> realiza a orquestração completa das transmissões e gravações de aulas realizadas nos estúdios da emissora. Ele assegura a integridade pedagógica, o cumprimento rigoroso da grade horária, o controle de pessoal técnico (Diretores de Imagem e Assistentes de Estúdio) e a <strong>conciliação financeira oficial</strong> exigida pela Secretaria de Educação (SEDUC).
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+          <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
+            <strong style="color: var(--primary);">1. Agendamento & Grade</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Alocação de estúdios (01 a 09 + Externo), controle de turmas, eventos institucionais e chaves de transmissão (Stream Keys).</p>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border-left: 3px solid var(--success);">
+            <strong style="color: var(--success);">2. Relatórios de Dupla Checagem</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Pareamento automático entre o relatório do Assistente de Sala e o do Diretor de Imagem, garantindo congruência técnica.</p>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border-left: 3px solid var(--purple);">
+            <strong style="color: var(--purple);">3. Faturamento & Auditoria</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Geração executiva em planilha `.xlsm` com controle estrito de antecipações, meses de referência e chamados autorizadores.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 2: MATRIZ DE ACESSOS ─── -->
+    <section id="matriz-acessos" class="tutorial-section">
+      <h2 class="section-heading">🔑 Credenciais de Teste e Perfis de Acesso</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        Use as credenciais abaixo para testar o sistema no perfil correspondente à função desejada:
+      </p>
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Perfil</th>
+              <th>E-mail de Login</th>
+              <th>Senha</th>
+              <th>Permissões Principais</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role-badge badge-admin">Admin</span></td>
+              <td><span class="copyable-code" onclick="copyText('admin@canaleducacao.com')">admin@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('admin123')">admin123 📋</span></td>
+              <td>Acesso total irrestrito: gestão de usuários, cadastros, auditoria executiva e exportação SEDUC (.xlsm).</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-coord">Coordenador</span></td>
+              <td><span class="copyable-code" onclick="copyText('coordenador@canaleducacao.com')">coordenador@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('coord123')">coord123 📋</span></td>
+              <td>Auditoria pedagógica, grade horária e relatórios. <strong>Dados de Diretores de Imagem são ocultados por segurança.</strong></td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-assist">Assistente</span></td>
+              <td><span class="copyable-code" onclick="copyText('assistente@canaleducacao.com')">assistente@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('assistente123')">assistente123 📋</span></td>
+              <td>Preenchimento do Relatório de Aula, registro de conteúdo, atividades, reposições e justificativas SEDUC.</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-chefe">Diretor-Chefe</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor.chefe@canaleducacao.com')">diretor.chefe@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('chefe123')">chefe123 📋</span></td>
+              <td>Gestão da <strong>Agenda de Estúdios</strong>, alocação de equipes, criação de eventos institucionais e chaves de transmissão.</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-oper">Diretor Operador</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor.imagem@canaleducacao.com')">diretor.imagem@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor123')">diretor123 📋</span></td>
+              <td>Formulário operacional técnico simplificado com cópia rápida de link/chave e checklist de estúdio.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 3: PERFIL ASSISTENTE ─── -->
+    <section id="perfil-assistente" class="tutorial-section">
+      <h2 class="section-heading">📝 Manual do Assistente de Estúdio</h2>
+      <p style="color: var(--text-secondary);">
+        O Assistente é o profissional responsável por acompanhar a aula ao vivo ou a gravação em estúdio, registrando tudo o que ocorre pedagogicamente.
+      </p>
+
+      <div class="steps-timeline">
+        <div class="step-item">
+          <div class="step-number">1</div>
+          <div class="step-title">Acessar o Formulário de Relatório</div>
+          <div class="step-desc">
+            No menu superior ou lateral, clique em <strong>"Novo Relatório"</strong> (URL: <code class="code-inline">/reports/new</code>).
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">2</div>
+          <div class="step-title">Selecionar Contexto Operacional</div>
+          <div class="step-desc">
+            Selecione a <strong>Data da Aula</strong>, <strong>Turno</strong> (Manhã, Tarde ou Noite) e o <strong>Estúdio</strong> (Estúdio 01 a 09 ou Externo).
+            O sistema preencherá as opções de Turmas e Disciplinas correspondentes à grade horária cadastrada.
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">3</div>
+          <div class="step-title">Definir o Tipo de Execução da Aula</div>
+          <div class="step-desc">
+            Escolha o <strong>Tipo de Aula</strong>:
+            <ul style="margin: 8px 0 8px 20px;">
+              <li><strong>Transmissão ao vivo:</strong> Aula regular da grade horária acontecendo em tempo real.</li>
+              <li><strong>Gravação de aula:</strong> Gravação antecipada ou reposição de aula perdida.</li>
+              <li><strong>Evento Institucional:</strong> Transmissão ou gravação de programa especial ou reunião de secretaria.</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">4</div>
+          <div class="step-title">Regra Especial: Mês de Execução × Mês de Referência (Gravação / Reposição)</div>
+          <div class="step-desc">
+            Sempre que selecionar <strong>Gravação de Aula</strong>, a seção especial de conciliação será aberta automaticamente:
+            <div class="callout callout-info" style="margin-top: 10px;">
+              <div class="callout-title">📌 Como funciona a regra de dois meses:</div>
+              • <strong>Data de Execução Real:</strong> A data exata em que o professor entrou no estúdio e gravou (define em qual fatura mensal da SEDUC a aula será cobrada).<br>
+              • <strong>Data de Referência da Aula:</strong> A data em que essa aula deveria ter ocorrido na grade ou quando será exibida aos alunos (define o pagamento do professor e o registro acadêmico).<br>
+              • <strong>Texto Justificativo Automático:</strong> O sistema gera o texto oficial exigido pela SEDUC: <code class="code-inline">"Gravação por reposição/falta, referente à aula do dia DD/MM/AAAA"</code>.
+            </div>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">5</div>
+          <div class="step-title">Regra Especial: Antecipação com Chamado SEDUC</div>
+          <div class="step-desc">
+            Se a aula for uma <strong>Antecipação</strong>, o sistema perguntará quem foi o solicitante:
+            <div class="callout callout-warning">
+              <div class="callout-title">⚠️ Solicitação SEDUC Exige Chamado:</div>
+              • Se selecionado <strong>Solicitante: SEDUC</strong>, o campo <strong>Nº de Chamado / Ticket SEDUC</strong> torna-se <strong>obrigatório</strong>. Sem o chamado, o salvamento será bloqueado, pois a SEDUC só autoriza cobrança de gravação se houver ordem de serviço documentada.<br>
+              • Se selecionado <strong>Solicitante: PROFESSOR</strong>, o chamado é opcional.
+            </div>
+          </div>
+        </div>
+
+        <div class="step-item">
+          <div class="step-number">6</div>
+          <div class="step-title">Finalizar o Relatório</div>
+          <div class="step-desc">
+            Preencha os conteúdos ministrados, atividades práticas e recursos pedagógicos. Ao término, clique em <strong>"Finalizar Relatório"</strong>.
+            <div class="callout callout-danger" style="margin-top: 10px;">
+              <div class="callout-title">🔒 Trava de Consistência Automática:</div>
+              Se você registrar a aula como <em>"Gravação"</em> mas o Diretor de Imagem tiver registrado como <em>"Transmissão"</em> (ou vice-versa), o sistema <strong>bloqueará a finalização</strong> com um alerta explicativo para evitar conflito contábil na SEDUC.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 4: PERFIL DIRETOR DE IMAGEM OPERADOR ─── -->
+    <section id="perfil-diretor-operador" class="tutorial-section">
+      <h2 class="section-heading">🎬 Manual do Diretor de Imagem Operador</h2>
+      <p style="color: var(--text-secondary);">
+        O Diretor de Imagem atua na mesa de corte técnica do estúdio. Sua interface foi simplificada para velocidade e facilidade operacional.
+      </p>
+
+      <div class="card">
+        <h3 class="subheading" style="margin-top:0;">⚡ Interface Simplificada sem Turma</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Na versão 3.5, <strong>o campo "Turma" foi removido</strong> do formulário do Diretor de Imagem (<code class="code-inline">/image-director/reports/new</code>).
+          O Diretor só precisa informar a <strong>Data</strong>, o <strong>Turno</strong> e o <strong>Estúdio</strong>. O sistema busca automaticamente na agenda em tempo real e preenche as informações necessárias.
+        </p>
+
+        <div class="ui-mockup">
+          <div class="ui-mockup-badge">NOVIDADE v3.5</div>
+          <div style="font-size: 13.5px; color: var(--text-primary);">
+            <strong>Botões de Cópia com 1 Clique:</strong><br>
+            Ao lado do campo <em>Link do YouTube</em> e do campo <em>Chave de Transmissão</em>, clique no botão <code class="code-inline">📋 Copiar</code> para enviar instantaneamente a URL ou a Stream Key para a área de transferência do computador, pronta para colar no OBS Studio ou encoder vMix.
+          </div>
+        </div>
+
+        <h3 class="subheading">Passo a Passo da Operação</h3>
+        <ol style="margin-left: 20px; color: var(--text-secondary); font-size: 14px; line-height: 1.8;">
+          <li>Acesse <code class="code-inline">/image-director/reports/new</code> e selecione o estúdio em que você está escalado.</li>
+          <li>Confira se o nome do evento, disciplina e professor puxados automaticamente conferem com a transmissão.</li>
+          <li>Copie a Chave de Transmissão com 1 clique e inicie o streaming no software de vídeo.</li>
+          <li>Marque o checklist técnico inicial (áudio, iluminação, cenário, retorno do professor).</li>
+          <li>Ao final do turno, preencha o horário de encerramento e clique em <strong>"Finalizar Relatório"</strong>.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 5: PERFIL DIRETOR-CHEFE ─── -->
+    <section id="perfil-diretor-chefe" class="tutorial-section">
+      <h2 class="section-heading">🎙️ Manual do Diretor-Chefe de Imagem</h2>
+      <p style="color: var(--text-secondary);">
+        O Diretor-Chefe é responsável pelo planejamento da operação, alocação de estúdios e cadastro prévio na <strong>Agenda de Estúdios</strong>.
+      </p>
+
+      <div class="card">
+        <h3 class="subheading" style="margin-top:0;">📅 Uso da Agenda de Estúdios (`/agenda-estudios`)</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 16px;">
+          A Agenda de Estúdios exibe a grade diária dividida por <strong>Estúdio 01 até Estúdio 09 e Externo</strong>, organizados pelos turnos Manhã, Tarde e Noite.
+        </p>
+
+        <div class="steps-timeline">
+          <div class="step-item">
+            <div class="step-number">1</div>
+            <div class="step-title">Cadastrar Novo Agendamento ou Evento</div>
+            <div class="step-desc">
+              Clique em qualquer horário vago da grade ou no botão <strong>"+ Novo Agendamento"</strong>.
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">2</div>
+            <div class="step-title">Configurar Tipo de Agendamento</div>
+            <div class="step-desc">
+              Escolha entre <strong>AULA</strong> (vinculada à grade curricular regular) ou <strong>EVENTO</strong> (programações especiais, palestras SEDUC, reuniões).
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">3</div>
+            <div class="step-title">Preenchimento de Eventos Especiais</div>
+            <div class="step-desc">
+              Ao selecionar <strong>EVENTO</strong>, novos campos obrigatórios são exibidos no painel:
+              <ul style="margin: 6px 0 6px 20px;">
+                <li><strong>Nome do Evento:</strong> Título oficial da transmissão (ex: <em>"Encontro Pedagógico 2026"</em>).</li>
+                <li><strong>Departamento Solicitante:</strong> Superintendência ou coordenação demandante (ex: <em>"SUPED"</em>).</li>
+                <li><strong>Responsável pelo Evento:</strong> Nome da autoridade ou professor condutor.</li>
+                <li><strong>Chave de Transmissão (Stream Key):</strong> Chave gerada no YouTube Studio para envio ao operador.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="step-item">
+            <div class="step-number">4</div>
+            <div class="step-title">Salvar e Exportar a Grade Diária</div>
+            <div class="step-desc">
+              Clique em <strong>Salvar</strong>. A grade é atualizada instantaneamente para todos os estúdios. O Diretor-Chefe pode exportar o arquivo diário em Excel clicando em <strong>"Exportar Dia"</strong> ou <strong>"Exportar Período"</strong>.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 6: PERFIL COORDENADOR ─── -->
+    <section id="perfil-coordenador" class="tutorial-section">
+      <h2 class="section-heading">🎓 Manual do Coordenador Pedagógico</h2>
+      <p style="color: var(--text-secondary);">
+        O Coordenador Pedagógico acompanha a entrega dos conteúdos pelos professores, valida a conformidade das turmas e audita a execução das aulas.
+      </p>
+
+      <div class="card">
+        <h3 class="subheading" style="margin-top:0;">🛡️ Restrição de Visualização (RBAC Seguro)</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          Por definição de governança da emissora, <strong>o perfil Coordenador não gerencia equipes técnicas de vídeo</strong>. Por essa razão:
+        </p>
+
+        <div class="callout callout-purple" style="border-left-color: var(--purple); background: var(--purple-light);">
+          <div class="callout-title" style="color: var(--purple);">🔒 O que está oculto para Coordenadores:</div>
+          • A aba <strong>"Diretor Imagem"</strong> não aparece na tela de Auditoria nem nos arquivos Excel exportados.<br>
+          • A coluna <strong>"Diretor de Imagem"</strong> é omitida das tabelas e do modal de detalhes das aulas.<br>
+          • A linha de Diretor de Imagem é suprimida na exportação da agenda diária.<br>
+          <em>O coordenador foca exclusivamente na disciplina, professor, conteúdo ministrado, turma e validação pedagógica.</em>
+        </div>
+
+        <h3 class="subheading">Visualização da Grade por Estúdio</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 10px;">
+          Na tela de <strong>Grade Horária</strong> (<code class="code-inline">/grade</code>), o coordenador pode alternar entre duas abas no topo:
+        </p>
+        <ul style="margin-left: 20px; font-size: 14px; color: var(--text-secondary);">
+          <li><strong>📅 Grade por Turma:</strong> Exibe as aulas do 1º ao 3º Ano do Ensino Médio, Pré-Enem e cursos técnicos.</li>
+          <li><strong>🎙️ Grade por Estúdio:</strong> Exibe a alocação física de onde cada professor e turma estão gravando no momento.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 7: PERFIL ADMIN ─── -->
+    <section id="perfil-admin" class="tutorial-section">
+      <h2 class="section-heading">⚡ Manual do Administrador Geral</h2>
+      <p style="color: var(--text-secondary);">
+        O Administrador tem visão panorâmica e controle sobre todas as engrenagens técnicas, pedagógicas e financeiras da plataforma.
+      </p>
+
+      <div class="card">
+        <h3 class="subheading" style="margin-top:0;">🔍 Tela de Auditoria Executiva (`/reports/audit`)</h3>
+        <p style="color: var(--text-secondary); margin-bottom: 14px;">
+          A tela de auditoria reúne e cruza automaticamente os relatórios de aula dos Assistentes com os relatórios dos Diretores de Imagem através do algoritmo de pareamento inteligente.
+        </p>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 20px;">
+          <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px;">
+            <strong style="color: var(--success);">🟢 Pareamento Vinculado:</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Relatório do Assistente e do Diretor conferem 100% em estúdio, data, turno e modalidade.</p>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px;">
+            <strong style="color: var(--warning);">🟡 Pareamento Parcial:</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Existe relatório de uma das partes aguardando a finalização da outra parte do turno.</p>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 14px; border-radius: 8px;">
+            <strong style="color: var(--danger);">🔴 Divergência de Faturamento:</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Identificada discrepância entre gravação e transmissão, sinalizada para correção imediata.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 8: FATURAMENTO SEDUC (.XLSM) ─── -->
+    <section id="faturamento-seduc" class="tutorial-section">
+      <h2 class="section-heading">📊 Exportação Oficial de Faturamento SEDUC (.xlsm)</h2>
+      <p style="color: var(--text-secondary);">
+        A versão 3.5 introduziu o motor oficial de exportação de planilhas com suporte nativo a macros Excel (<code class="code-inline">.xlsm</code>), estruturado especificamente para a prestação de contas mensal à SEDUC.
+      </p>
+
+      <div class="card">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+          <h3 class="subheading" style="margin: 0;">Como emitir o relatório oficial</h3>
+          <span class="role-badge badge-admin" style="font-size: 11px;">MIME: application/vnd.ms-excel.sheet.macroEnabled.12</span>
+        </div>
+
+        <p style="font-size: 14px; color: var(--text-secondary); margin-bottom: 16px;">
+          Na tela de Auditoria (<code class="code-inline">/reports/audit</code>), clique no botão verde destacado no topo: <strong>"📊 Exportar SEDUC (.xlsm)"</strong>.
+          O arquivo será gerado instantaneamente no formato macro-enabled com a aba executiva <strong>"Faturamento SEDUC"</strong> como primeira aba.
+        </p>
+
+        <h3 class="subheading">Dicionário das 20 Colunas Oficiais da Aba SEDUC</h3>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nome da Coluna</th>
+                <th>Origem / Regra</th>
+                <th>Finalidade Contábil SEDUC</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>1</td><td><code class="code-inline">DATA_EXECUÇÃO_REAL</code></td><td>Data em que o estúdio foi operado</td><td>Define a competência da fatura da emissora</td></tr>
+              <tr><td>2</td><td><code class="code-inline">MÊS_EXECUÇÃO</code></td><td>Calculado automaticamente (ex: <code class="code-inline">10/2026</code>)</td><td>Agrupador financeiro da nota fiscal</td></tr>
+              <tr><td>3</td><td><code class="code-inline">DATA_REFERÊNCIA</code></td><td>Data da aula na grade curricular</td><td>Base para cálculo do pagamento docente</td></tr>
+              <tr><td>4</td><td><code class="code-inline">MÊS_REFERÊNCIA</code></td><td>Calculado automaticamente (ex: <code class="code-inline">09/2026</code>)</td><td>Competência contábil de pagamento docente</td></tr>
+              <tr><td>5</td><td><code class="code-inline">INDICATIVO_REPOSIÇÃO</code></td><td>Texto padronizado de reposição</td><td>Justificativa formal perante os auditores</td></tr>
+              <tr><td>6</td><td><code class="code-inline">MODALIDADE</code></td><td>GRAVACAO ou TRANSMISSAO</td><td>Item contratual de precificação da hora de estúdio</td></tr>
+              <tr><td>7</td><td><code class="code-inline">ESTÚDIO</code></td><td>Estúdio 01 a 09 ou Externo</td><td>Rastreabilidade física do espaço utilizado</td></tr>
+              <tr><td>8</td><td><code class="code-inline">TURNO</code></td><td>Manhã, Tarde ou Noite</td><td>Conciliação de jornada de equipe</td></tr>
+              <tr><td>9</td><td><code class="code-inline">CURSO_TURMA</code></td><td>Nome da turma vinculada</td><td>Centro de custo / programa educacional</td></tr>
+              <tr><td>10</td><td><code class="code-inline">DISCIPLINA</code></td><td>Disciplina ministrada</td><td>Matriz curricular oficial</td></tr>
+              <tr><td>11</td><td><code class="code-inline">PROFESSOR</code></td><td>Nome do professor</td><td>Folha de pagamento / prestação docente</td></tr>
+              <tr><td>12</td><td><code class="code-inline">DIRETOR_IMAGEM</code></td><td>Diretor técnico alocado</td><td>Oculto automaticamente para coordenadores</td></tr>
+              <tr><td>13</td><td><code class="code-inline">É_ANTECIPAÇÃO</code></td><td>SIM ou NÃO</td><td>Indicador de adiantamento de cronograma</td></tr>
+              <tr><td>14</td><td><code class="code-inline">SOLICITANTE_ANTECIPAÇÃO</code></td><td>SEDUC ou PROFESSOR</td><td>Classificação da responsabilidade do custo</td></tr>
+              <tr><td>15</td><td><code class="code-inline">Nº_CHAMADO_SEDUC</code></td><td>Número do chamado / OS</td><td>Comprovante fiscal obrigatório para antecipação SEDUC</td></tr>
+              <tr><td>16</td><td><code class="code-inline">COBRANÇA_SEDUC</code></td><td>DUPLA, ÚNICA ou EVENTO</td><td>Cobrança dupla (gravação + transmissão) ou simples</td></tr>
+              <tr><td>17</td><td><code class="code-inline">VALOR_FATURÁVEL</code></td><td>FATURÁVEL ou NÃO_FATURÁVEL</td><td>Filtro de faturamento contábil líquido</td></tr>
+              <tr><td>18</td><td><code class="code-inline">STATUS_ASSISTENTE</code></td><td>VALIDADO, AGUARDANDO, etc.</td><td>Situação do relatório da coordenação</td></tr>
+              <tr><td>19</td><td><code class="code-inline">STATUS_DIR_IMAGEM</code></td><td>VALIDADO, AGUARDANDO, etc.</td><td>Situação do relatório técnico de imagem</td></tr>
+              <tr><td>20</td><td><code class="code-inline">CONGRUÊNCIA_MODALIDADE</code></td><td>CONGRUENTE ou DIVERGENTE</td><td>Trava de conformidade entre os dois relatórios</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 9: FAQS & RESOLUÇÃO DE ERROS ─── -->
+    <section id="faq-solucoes" class="tutorial-section">
+      <h2 class="section-heading">❓ Perguntas Frequentes & Resolução de Erros</h2>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          1. O sistema exibiu: "Inconsistência de faturamento: o tipo de aula deve ser idêntico...". O que fazer?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Esse bloqueio ocorre porque um dos relatórios (Assistente ou Diretor) foi marcado como <strong>Gravação de Aula</strong> e o outro foi marcado como <strong>Transmissão ao Vivo</strong> para o mesmo estúdio e horário. Alinhe com o Diretor de Imagem qual foi a real execução e ajuste o campo antes de finalizar.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          2. Por que o formulário está exigindo o "Nº de Chamado SEDUC" obrigatoriamente?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Você marcou a aula como uma <strong>Antecipação solicitada pela SEDUC</strong>. A regra de negócio da SEDUC determina que qualquer antecipação por ordem da secretaria gera faturamento de gravação e só pode ser cobrada mediante apresentação do chamado/ordem de serviço oficial.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          3. O Coordenador não está vendo os nomes dos Diretores de Imagem. Isso é um erro?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Não, é o comportamento planejado do sistema. Coordenadores pedagógicos têm restrição de segurança institucional e visualizam apenas dados acadêmicos e pedagógicos das aulas. Para visualizar a equipe técnica de vídeo, faça login com o perfil <strong>Admin</strong> ou <strong>Diretor-Chefe</strong>.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          4. Qual a diferença entre baixar em `.xlsx` e baixar em `.xlsm`?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          O formato <strong>.xlsx</strong> é a planilha convencional de auditoria contendo as abas Consolidado, Assistente e Diretor Imagem. O formato <strong>.xlsm</strong> é o arquivo oficial macro-enabled configurado para a auditoria financeira da SEDUC, trazendo como primeira aba a planilha oficial de <strong>Faturamento SEDUC</strong> com formatação executiva.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          5. Como o Diretor de Imagem obtém o Link do YouTube e a Chave de Transmissão?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          O Diretor-Chefe cadastra previamente a Chave e o Link na <strong>Agenda de Estúdios</strong>. Ao abrir o formulário do Diretor de Imagem e selecionar Data, Turno e Estúdio, esses dados são carregados em tempo real na tela, prontos para serem copiados com o botão de 1 clique.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Navegação suave entre seções
+    function scrollToSection(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+      }
+    }
+
+    // Alternar tema Claro / Escuro
+    function toggleTheme() {
+      const body = document.body;
+      const current = body.getAttribute('data-theme');
+      body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+
+    // Copiar código ou texto com feedback
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copiado para a área de transferência: ' + text);
+      });
+    }
+
+    // Accordion de FAQ
+    function toggleFaq(btn) {
+      const item = btn.parentElement;
+      item.classList.toggle('open');
+      const arrow = btn.querySelector('span');
+      arrow.textContent = item.classList.contains('open') ? '▲' : '▼';
+    }
+
+    // Busca rápida em tempo real com realce
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const query = e.target.value.toLowerCase().trim();
+      const sections = document.querySelectorAll('.tutorial-section');
+
+      if (!query) {
+        sections.forEach(s => s.style.display = '');
+        return;
+      }
+
+      sections.forEach(sec => {
+        const text = sec.innerText.toLowerCase();
+        if (text.includes(query)) {
+          sec.style.display = '';
+        } else {
+          sec.style.display = 'none';
+        }
+      });
+    });
+  </script>
+</body>
+</html>

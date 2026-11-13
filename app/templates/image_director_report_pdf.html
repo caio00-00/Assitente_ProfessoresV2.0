@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório do Diretor de Imagem</title>
+{% include 'includes/idp_pdf_styles.html' %}
+</head>
+<body>
+
+<h1>RELATÓRIO DO DIRETOR DE IMAGEM</h1>
+
+<table class="header-table">
+    <tr>
+        <td class="label">DATA DA AULA:</td><td>{{ report.data_relatorio.strftime('%d/%m/%Y') }}</td>
+        <td class="label">TURNO:</td><td>{{ report.turno }}</td>
+    </tr>
+    <tr>
+        <td class="label">ESTÚDIO:</td><td>{{ report.estudio }}</td>
+        <td class="label">TURMA:</td><td>{{ report.turma_nome }}</td>
+    </tr>
+    <tr>
+        <td class="label">DISCIPLINA:</td><td>{{ report.disciplina_nome or '—' }}</td>
+        <td class="label">PROFESSOR(A):</td><td>{{ report.professor_nome }}</td>
+    </tr>
+    <tr>
+        <td class="label">HORÁRIO:</td><td>{{ horario_exato or report.horario_aula or '—' }}</td>
+        <td class="label">REGULAR:</td><td>{{ report.regular or 'Sim' }}</td>
+    </tr>
+    {% if report.regular == 'Não' %}
+    <tr>
+        <td class="label">TICKET:</td><td>{{ report.ticket_number or '—' }}</td>
+        <td class="label">HORÁRIO AVULSO:</td>
+        <td>
+            {% if report.start_time %}{{ report.start_time.strftime('%H:%M') }}{% else %}—{% endif %}
+            até
+            {% if report.end_time %}{{ report.end_time.strftime('%H:%M') }}{% else %}—{% endif %}
+        </td>
+    </tr>
+    {% endif %}
+    <tr>
+        <td class="label">DIRETOR:</td><td colspan="3">{{ report.diretor_imagem_nome }}</td>
+    </tr>
+    <tr>
+        <td class="label">LINK YOUTUBE:</td><td colspan="3" class="link-cell">{{ report.youtube_link or '—' }}</td>
+    </tr>
+</table>
+
+{% if perguntas_relatorio %}
+<div class="extra-title">PERGUNTAS ADICIONAIS DO RELATÓRIO</div>
+<table class="detail-table">
+    {% for p in perguntas_relatorio %}
+    <tr><td class="q">{{ p.texto }}</td><td class="a wrap">{{ p.resposta or '—' }}</td></tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% for item in lessons %}
+<div class="divider"></div>
+<div class="aula-title">AULA {{ '%02d' % item.lesson.numero_aula }}</div>
+<table class="detail-table">
+    {% if item.lesson.canal_utilizado %}
+    <tr><td class="q">CANAL IPTV:</td><td class="a">{{ item.lesson.canal_utilizado }}</td></tr>
+    {% endif %}
+</table>
+<table class="detail-table" style="margin-top: 8px;">
+    <tr><td class="q">Foi transmissão ou aula gravada?</td><td class="a">{{ item.lesson.transmissao_ou_gravada }}</td></tr>
+    {% if item.lesson.numero_chamado %}
+    <tr><td class="q">Nº chamado</td><td class="a">{{ item.lesson.numero_chamado }}</td></tr>
+    {% endif %}
+    <tr><td class="q">Vídeo corrompido?</td><td class="a">{{ item.lesson.video_corrompido }}</td></tr>
+    {% if item.lesson.video_corrompido_obs %}
+    <tr><td class="q">Descrição do vídeo corrompido</td><td class="a wrap">{{ item.lesson.video_corrompido_obs }}</td></tr>
+    {% endif %}
+    <tr><td class="q">Interrupções antes ou durante a aula?</td><td class="a">{{ item.lesson.interrupcoes }}</td></tr>
+    <tr><td class="q">Houve problema de áudio?</td><td class="a">{{ item.lesson.problema_audio }}</td></tr>
+    {% if item.lesson.problema_audio_obs %}
+    <tr><td class="q">Descrição do problema de áudio</td><td class="a wrap">{{ item.lesson.problema_audio_obs }}</td></tr>
+    {% endif %}
+    <tr><td class="q">Foram colocadas as vinhetas corretamente?</td><td class="a">{{ item.lesson.vinhetas_corretas }}</td></tr>
+    {% if item.lesson.vinhetas_corretas_obs %}
+    <tr><td class="q">Descrição do problema com as vinhetas</td><td class="a wrap">{{ item.lesson.vinhetas_corretas_obs }}</td></tr>
+    {% endif %}
+    <tr><td class="q">Foram colocados os créditos corretos?</td><td class="a">{{ item.lesson.creditos_corretos }}</td></tr>
+    {% for p in item.perguntas_extras %}
+    <tr><td class="q">{{ p.texto }}</td><td class="a wrap">{{ p.resposta or '—' }}</td></tr>
+    {% endfor %}
+</table>
+{% if item.lesson.observacoes %}
+<div class="obs-box"><strong>OBS:</strong> {{ item.lesson.observacoes }}</div>
+{% endif %}
+{% endfor %}
+
+<div class="divider"></div>
+
+{% if checklist %}
+<div class="checklist-title">FECHAMENTO DE ESTÚDIO</div>
+<ul class="checklist">
+    {% for c in checklist %}
+    <li>{{ c.nome }}: <strong>{{ c.resposta }}</strong></li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if report.observacoes_gerais %}
+<div class="extra-title">OBSERVAÇÕES GERAIS</div>
+<div class="obs-box">{{ report.observacoes_gerais }}</div>
+{% endif %}
+
+<div class="footer-note">
+    Relatório gerado por {{ report.creator_name }} — Canal Educação
+    {% if report.finalized_at %} — Finalizado em {{ report.finalized_at.strftime('%d/%m/%Y %H:%M') }}{% endif %}
+</div>
+
+</body>
+</html>

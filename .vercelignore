@@ -1,0 +1,39 @@
+# O que NÃO vai para a Vercel (deixa o pacote menor e não sobe dados/segredos).
+# Caminhos com "/" no começo valem só para a raiz do projeto
+# (sem a barra, "tasks" também apagaria app/tasks, que a API usa).
+.env
+.env.*
+!.env.example
+/credentials.json
+*.dump
+*.sql.gz
+.git
+.venv
+/venv
+__pycache__
+*.pyc
+/tests
+/docs
+/scratch
+/tmp
+/tasks
+/a fazer
+/testes e utilizaveis
+/data/analises
+/data/arquiv email
+/celerybeat-schedule
+/test.db
+/Dockerfile
+/docker-compose*.yml
+/entrypoint.sh
+# scripts de análise soltos na raiz
+/check_*.py
+/count_*.py
+/db_*.py
+/grade_*.py
+/run_*.py
+/test_*.py
+# scripts/: só o db_bootstrap.py vai (é ele que a rota /api/v1/sistema/migrar usa)
+/scripts/*
+!/scripts/__init__.py
+!/scripts/db_bootstrap.py

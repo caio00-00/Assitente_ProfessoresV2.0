@@ -1,0 +1,997 @@
+{% extends "base.html" %}
+{% block title %}Relatórios de imagem — Canal Educação{% endblock %}
+
+{% block head %}
+<style>
+    /* ===== Badges de Status (padronizado com o fluxo de validação do Relatório de Aula) ===== */
+    .badge-status {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        color: #fff; white-space: nowrap;
+    }
+    .badge-status-rascunho { background: linear-gradient(135deg, #94a3b8, #64748b); }
+    .badge-status-aguardando { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35); }
+    .badge-status-validado { background: linear-gradient(135deg, #34d399, #059669); }
+    .badge-status-cancelado { background: linear-gradient(135deg, #fca5a5, #ef4444); }
+    .badge-status-correcao {
+        background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f2937;
+        animation: pulse-correcao 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-correcao {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
+        50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+    }
+    .btn-validar { background: linear-gradient(135deg, #34d399, #059669); color: #fff; border: none; }
+    .btn-validar:hover { filter: brightness(1.05); }
+    .btn-corrigir { background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f2937; border: none; }
+    .btn-corrigir:hover { filter: brightness(1.05); }
+    .filters-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 0.75rem;
+        align-items: flex-end;
+    }
+    .filters-row .form-group {
+        flex: 1;
+        min-width: 0;
+        margin-bottom: 0;
+    }
+    .filters-row .filters-action {
+        flex: 0 0 auto;
+    }
+    .filters-row .filters-action .btn {
+        width: auto;
+        white-space: nowrap;
+    }
+    .badge-origem-grade { background: #6366f1; color: #fff; font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 10px; }
+    .badge-origem-gravacao { background: #8b5cf6; color: #fff; font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 10px; }
+    .badge-origem-nova { background: #0ea5e9; color: #fff; font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 10px; }
+    .badge-origem-evento { background: #e11d48; color: #fff; font-size: 0.65rem; padding: 0.15rem 0.45rem; border-radius: 10px; }
+    .turno-group-header td {
+        background: var(--bg-secondary, rgba(99,102,241,0.08));
+        font-weight: 600;
+        border-top: 2px solid rgba(99,102,241,0.25);
+    }
+    .turno-slot-row td:first-child { padding-left: 1.5rem; }
+    .idr-row-clickable { cursor: pointer; }
+    .idr-row-clickable:hover td { background: rgba(99, 102, 241, 0.06); }
+    .idr-pdf-turno-cell { text-align: right; white-space: nowrap; }
+    .idr-pdf-turno-cell .btn { width: auto; }
+    .drawer-btn-disabled {
+        opacity: 0.55;
+        cursor: not-allowed !important;
+        pointer-events: none;
+    }
+    #idr-drawer {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        padding: 0;
+    }
+    #idr-drawer .drawer-header {
+        flex-shrink: 0;
+        padding: 2rem 2rem 0;
+        margin-bottom: 0;
+    }
+    #idr-drawer-content {
+        flex: 1;
+        min-height: 0;
+        padding: 1rem 2rem 2rem;
+        overflow-y: auto;
+    }
+    @media (max-width: 768px) {
+        .filters-row { flex-wrap: wrap; }
+        .filters-row .form-group { flex: 1 1 calc(50% - 0.375rem); min-width: 140px; }
+        .filters-row .filters-action { flex: 1 1 100%; }
+        .filters-row .filters-action .btn { width: 100%; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-claquete"/></svg> Relatórios de imagem</h1>
+        <p class="page-subtitle">Um relatório por turno de estúdio. Clique numa linha para ver os detalhes, a linha do tempo e validar</p>
+    </div>
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+        <a href="/diretor-imagem?tipo=gravacao_estudio" class="btn btn-secondary btn-sm">+ Gravação de Estúdio</a>
+        <a href="/diretor-imagem?tipo=evento" class="btn btn-secondary btn-sm">+ Evento</a>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 1rem;">
+    <div class="card-header" style="margin-bottom: 0.75rem;">
+        <h3 class="card-title">🔍 Filtros</h3>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Limpar</button>
+    </div>
+    <div class="filters-row">
+        <div class="form-group"><label class="form-label">Data início</label><input type="date" id="f-data-inicio" class="form-input" onchange="applyFilters()"></div>
+        <div class="form-group"><label class="form-label">Data fim</label><input type="date" id="f-data-fim" class="form-input" onchange="applyFilters()"></div>
+        <div class="form-group"><label class="form-label">Diretor</label>
+            <select id="f-diretor" class="form-select" onchange="applyFilters()"><option value="">Todos</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Turno</label>
+            <select id="f-turno" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+                <option value="Manhã">Manhã</option>
+                <option value="Tarde">Tarde</option>
+                <option value="Noite">Noite</option>
+                <option value="FDS manhã">FDS manhã</option>
+                <option value="FDS tarde">FDS tarde</option>
+                <option value="FDS noite">FDS noite</option>
+                <option value="Outro">Outro</option>
+            </select>
+        </div>
+        <div class="form-group"><label class="form-label">Status</label>
+            <select id="f-status" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+                <option value="RASCUNHO">Rascunho</option>
+                <option value="AGUARDANDO_VALIDACAO">Aguardando Validação</option>
+                <option value="VALIDADO">Validado</option>
+                <option value="CANCELADO">Cancelado</option>
+            </select>
+        </div>
+        <div class="form-group"><label class="form-label">Tipo de Aula</label>
+            <select id="f-tipo-transmissao" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+                <option value="Transmissão">Transmissão</option>
+                <option value="Aula gravada">Gravação</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title" id="reports-count">Carregando...</h3>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">Ordenar:</label>
+            <select id="sort-by" class="form-select" style="width: auto; min-width: 150px;" onchange="applyFilters()">
+                <option value="data_relatorio">Data da Aula ↓</option>
+                <option value="created_at">Criado Em ↓</option>
+                <option value="finalized_at">Finalizado Em ↓</option>
+            </select>
+        </div>
+    </div>
+    <div id="reports-table"><div class="spinner"></div></div>
+    <div style="display:flex; justify-content: center; gap: 0.5rem; margin-top: 1rem;" id="pagination"></div>
+</div>
+
+<div class="drawer-overlay" id="idr-overlay" onclick="closeReportDrawer()"></div>
+<div class="drawer" id="idr-drawer">
+    <div class="drawer-header">
+        <h3>🎬 Relatório do Diretor de Imagem</h3>
+        <button type="button" class="drawer-close" onclick="closeReportDrawer()">✕</button>
+    </div>
+    <div id="idr-drawer-content"><div class="spinner"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let offset = 0;
+    const limit = 50;
+    let currentUserRole = null;
+
+    const PAPEIS_DIRETOR_CHEFE = ['admin', 'gestor', 'diretor_chefe'];
+
+    const STATUS_CONFIG = {
+        RASCUNHO:             { label: 'Rascunho',              icon: icone('lapis', 'ico-sm'), cls: 'badge-status-rascunho' },
+        AGUARDANDO_VALIDACAO: { label: 'Aguardando validação',  icon: icone('relogio', 'ico-sm'), cls: 'badge-status-aguardando' },
+        VALIDADO:             { label: 'Validado',              icon: icone('check', 'ico-sm'), cls: 'badge-status-validado' },
+        CANCELADO:            { label: 'Cancelado',             icon: icone('bloqueado', 'ico-sm'), cls: 'badge-status-cancelado' },
+        // legado
+        FINALIZADO:           { label: 'Finalizado',            icon: icone('check', 'ico-sm'), cls: 'badge-status-validado' },
+    };
+
+    function statusBadgeHtml(status, precisaCorrecao) {
+        const cfg = STATUS_CONFIG[status] || { label: status || 'N/A', icon: icone('vazio', 'ico-sm'), cls: 'badge-status-rascunho' };
+        const cls = precisaCorrecao ? 'badge-status-correcao' : cfg.cls;
+        const label = precisaCorrecao ? 'Correção Pendente' : cfg.label;
+        const icon = precisaCorrecao ? icone('devolvido', 'ico-sm') : cfg.icon;
+        return `<span class="badge-status ${cls}">${icon} ${label}</span>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserProfile();
+        currentUserRole = (getUser() || {}).role;
+        await carregarDiretoresFiltro();
+        await loadReports();
+    });
+
+    function podeValidar() {
+        return PAPEIS_DIRETOR_CHEFE.includes(currentUserRole);
+    }
+
+    function isDiretorImagem() {
+        return currentUserRole === 'diretor_imagem';
+    }
+
+    function podeAbrirFormularioIdr(idr) {
+        return idr && (podeValidar() || isDiretorImagem());
+    }
+
+    async function carregarDiretoresFiltro() {
+        if (!podeValidar()) {
+            document.getElementById('f-diretor').closest('.form-group').style.display = 'none';
+            return;
+        }
+        try {
+            const data = await apiGet('/api/v1/image-director/lookup/diretores');
+            const sel = document.getElementById('f-diretor');
+            sel.innerHTML = '<option value="">Todos</option>' + data.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+        } catch (e) { /* opcional */ }
+    }
+
+    function isLegacyManualReport(r) {
+        // Aulas REGULARES da grade sem ClassReport vinculado continuam sendo da grade
+        // (pertence_grade vem do backend: slot existe na grade horária da turma).
+        return r.origem === 'grade'
+            && !r.pertence_grade
+            && !r.class_report_id
+            && !(r.lesson_class_report_ids || []).length;
+    }
+
+    function effectiveOrigem(r) {
+        if (r.origem === 'nova_aula' || r.origem === 'gravacao_estudio' || r.origem === 'evento') return r.origem;
+        if (isLegacyManualReport(r)) return 'nova_aula';
+        return r.origem || 'grade';
+    }
+
+    function isStandaloneReport(r) {
+        return r.origem === 'nova_aula' || r.origem === 'gravacao_estudio' || r.origem === 'evento' || isLegacyManualReport(r);
+    }
+
+    function origemBadge(origem) {
+        if (origem === 'evento') {
+            return '<span class="badge-origem-evento">🎪 Evento</span>';
+        }
+        if (origem === 'gravacao_estudio') {
+            return '<span class="badge-origem-gravacao">🎬 Gravação</span>';
+        }
+        if (origem === 'nova_aula') {
+            return '<span class="badge-origem-nova">📝 Nova Aula</span>';
+        }
+        return '<span class="badge-origem-grade">📅 Grade</span>';
+    }
+
+    function origemLabel(origem) {
+        if (origem === 'evento') return '🎪 Evento';
+        if (origem === 'gravacao_estudio') return '🎬 Gravação';
+        if (origem === 'nova_aula') return '📝 Nova Aula';
+        return '📅 Grade';
+    }
+
+    function isTurmaTI(r) {
+        if (r.turma_ti) return true;
+        const nome = String(r.turma_nome || '').toUpperCase();
+        return nome.endsWith(' TI') || nome.includes(' TI ') || nome.endsWith('-TI');
+    }
+
+    function normTurnoKey(turno) {
+        return String(turno || '')
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase().replace(/\s+/g, ' ').trim();
+    }
+
+    function normEstudioKey(estudio) {
+        const m = String(estudio || '').match(/(\d+)/);
+        return m ? `ESTUDIO ${parseInt(m[1], 10)}` : normTurnoKey(estudio);
+    }
+
+    function turnoGroupKey(r) {
+        // Turno/estúdio normalizados ("Manhã" = "MANHÃ") para não quebrar o grupo do turno
+        return `${r.data_relatorio}|${normTurnoKey(r.turno)}|${normEstudioKey(r.estudio)}|${r.diretor_imagem_id}|${r.turma_id || r.turma_nome || ''}`;
+    }
+
+    function tiDayGroupKey(r) {
+        return `${r.data_relatorio}|${r.estudio}|${r.diretor_imagem_id}|${r.turma_id || r.turma_nome || ''}`;
+    }
+
+    function historyGroupKey(r) {
+        if (isStandaloneReport(r)) return `solo:${r.id}`;
+        // Tempo Integral também é por turno (manhã e tarde separados, cada um com seu PDF);
+        // a numeração das aulas continua (a tarde começa no 5º/6º horário).
+        return `grade:${turnoGroupKey(r)}`;
+    }
+
+    function horarioSortKey(r) {
+        const slot = horarioSlotFromReport(r);
+        const hora = slot.inicio || r.horario_aula || '';
+        const ord = r.horario_ordinal ? String(r.horario_ordinal).padStart(2, '0') : '99';
+        return `${ord}|${hora}`;
+    }
+
+    function sortReportsByHorario(items) {
+        return items.slice().sort((a, b) => {
+            const ha = horarioSortKey(a);
+            const hb = horarioSortKey(b);
+            return ha.localeCompare(hb) || String(a.id).localeCompare(String(b.id));
+        });
+    }
+
+    function turnoContextFromReport(r, opts = {}) {
+        const { canPdfTurno = false, canPdfDia = false, isTiDay = false, pdfReportId = '' } = opts;
+        return {
+            data: r.data_relatorio,
+            turno: r.turno,
+            estudio: r.estudio,
+            diretor_imagem_id: r.diretor_imagem_id || '',
+            turma_id: r.turma_id || '',
+            canPdfTurno: !!canPdfTurno,
+            canPdfDia: !!canPdfDia,
+            isTiDay: !!isTiDay,
+            pdfReportId: pdfReportId || '',
+        };
+    }
+
+    function encodeTurnoCtx(ctx) {
+        return encodeURIComponent(JSON.stringify(ctx));
+    }
+
+    function relatorioFinalizado(r) {
+        return r.status !== 'RASCUNHO' && r.status !== 'CANCELADO';
+    }
+
+    function pdfTurnoDisponivel(r) {
+        return relatorioFinalizado(r) && effectiveOrigem(r) === 'grade';
+    }
+
+    function groupPdfTurnoDisponivel(group) {
+        return group.items.some(r => pdfTurnoDisponivel(r));
+    }
+
+    function pdfTurnoBtnHtml(data, turno, estudio, diretorId, turmaId, title, reportId) {
+        const t = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
+        return `<button type="button" class="btn btn-secondary btn-sm"${t} onclick="event.stopPropagation(); baixarPdfTurno('${data}', '${encodeURIComponent(turno)}', '${encodeURIComponent(estudio)}', '${diretorId || ''}', '${turmaId || ''}', '${reportId || ''}')">⬇️ PDF Turno</button>`;
+    }
+
+    function pdfDiaCompletoBtnHtml(data, estudio, diretorId, turmaId, title) {
+        const t = title ? ` title="${title.replace(/"/g, '&quot;')}"` : '';
+        return `<button type="button" class="btn btn-secondary btn-sm"${t} onclick="event.stopPropagation(); baixarPdfDiaCompleto('${data}', '${encodeURIComponent(estudio)}', '${diretorId || ''}', '${turmaId || ''}')">⬇️ PDF Dia Completo</button>`;
+    }
+
+    function pdfBatchHint(group) {
+        const total = group.items.length;
+        const done = group.items.filter(r => pdfTurnoDisponivel(r)).length;
+        if (total > done && done > 0) {
+            return `${done} de ${total} aula(s) finalizada(s) incluídas no PDF`;
+        }
+        return '';
+    }
+
+    function pdfBatchCellHtml(canShow, mode, data, turno, estudio, diretorId, turmaId, hint, reportId) {
+        let btn = '';
+        if (canShow) {
+            if (mode === 'dia') btn = pdfDiaCompletoBtnHtml(data, estudio, diretorId, turmaId, hint);
+            else btn = pdfTurnoBtnHtml(data, turno, estudio, diretorId, turmaId, hint, reportId);
+        }
+        return `<td class="idr-pdf-turno-cell" onclick="event.stopPropagation()">${btn}</td>`;
+    }
+
+    function btnDrawerDisabled(label, hint) {
+        return `<button type="button" class="btn btn-secondary btn-sm btn-full drawer-btn-disabled" title="${hint}">${label}</button>`;
+    }
+
+    function horarioSlotFromReport(r) {
+        return resolveHorarioSlotTimes(
+            r.horario_aula,
+            r.turno,
+            r.turma_nome,
+            r.start_time,
+            r.end_time,
+        );
+    }
+
+    function horarioExatoLabel(r) {
+        // Sempre HH:MM às HH:MM quando o slot é resolvido (grade / turno / modalidade)
+        if (r.horario_faixa) return r.horario_faixa;
+        const slot = horarioSlotFromReport(r);
+        if (slot.faixa && slot.faixa !== '—') return slot.faixa;
+        return r.horario_aula || '—';
+    }
+
+    function horarioOrdinalLabel(r) {
+        if (r.horario_ordinal) return `${r.horario_ordinal}º Horário`;
+        const m = String(r.horario_aula || '').match(/^\s*(\d{1,2})\s*[ºo°ª]?\s*hor/i);
+        return m ? `${parseInt(m[1], 10)}º Horário` : '';
+    }
+
+    function slotDisplayLabel(r) {
+        // "6º Horário · 13:50 às 14:50 · Disciplina" — nº da aula conforme a grade/modalidade
+        const horarioPart = horarioExatoLabel(r);
+        const ordinal = horarioOrdinalLabel(r);
+        return [ordinal, horarioPart !== ordinal ? horarioPart : '', r.disciplina_nome].filter(Boolean).join(' · ') || '—';
+    }
+
+    function renderReportRow(r, opts = {}) {
+        const { isSlotRow = false, isTiDay = false, groupCanPdf = false, standalone = false } = opts;
+        const slotLabel = slotDisplayLabel(r);
+        const turmaCol = isSlotRow ? origemBadge(effectiveOrigem(r)) : `${origemBadge(effectiveOrigem(r))} ${r.turma_nome || ''}`.trim();
+        // O PDF do turno vale para o grupo inteiro (inclusive quando há só 1 aula);
+        // relatórios avulsos geram o PDF no formato do turno apenas com eles.
+        const canPdfDia = isTiDay && groupCanPdf;
+        const canPdfTurno = !isTiDay && groupCanPdf;
+        const ctx = encodeTurnoCtx(turnoContextFromReport(r, {
+            canPdfTurno, canPdfDia, isTiDay, pdfReportId: standalone ? r.id : '',
+        }));
+        const showPdf = false; // o botão fica no cabeçalho do grupo
+        const pdfMode = isTiDay ? 'dia' : 'turno';
+        return `
+        <tr class="idr-row-clickable ${isSlotRow ? 'turno-slot-row' : ''}" onclick="openReportDrawer('${r.id}', '${ctx}')">
+            <td>${isSlotRow ? '' : formatDateBr(r.data_relatorio)}</td>
+            <td>${isSlotRow ? slotLabel : ((r.aulas_count != null && r.aulas_count > 0) ? r.aulas_count + ' aula(s)' : '—')}</td>
+            <td>${isSlotRow ? '' : r.turno}</td>
+            <td>${isSlotRow ? '' : r.estudio}</td>
+            <td>${isSlotRow ? '' : (r.diretor_imagem_nome || '—')}</td>
+            <td>${turmaCol || '—'}</td>
+            <td>${statusBadgeHtml(r.status, r.precisa_correcao)}</td>
+            ${pdfBatchCellHtml(showPdf, pdfMode, r.data_relatorio, r.turno, r.estudio, r.diretor_imagem_id, r.turma_id, '')}
+        </tr>`;
+    }
+
+    function renderTurnoGroupHeader(group) {
+        const canPdfTurno = group.canPdf;
+        const pdfReportId = group.standalone ? group.items[0].id : '';
+        const ctx = encodeTurnoCtx({
+            pdfReportId,
+            data: group.data_relatorio,
+            turno: group.turno,
+            estudio: group.estudio,
+            diretor_imagem_id: group.diretor_imagem_id || '',
+            turma_id: group.turma_id || '',
+            canPdfTurno,
+            turnoOnly: true,
+            slots: group.items.length,
+        });
+        return `
+        <tr class="idr-row-clickable turno-group-header" onclick="openReportDrawer('', '${ctx}')">
+            <td>${formatDateBr(group.data_relatorio)}</td>
+            <td>${group.items.length} slot(s)</td>
+            <td>${group.turno}${!group.standalone && isTurmaTI(group.items[0]) ? ' <span style="font-size:0.7rem;color:var(--text-muted);">(Integral)</span>' : ''}</td>
+            <td>${group.estudio}</td>
+            <td>${group.diretor_nome || '—'}</td>
+            <td>${group.turma_nome || '—'}</td>
+            <td><span style="font-size:0.72rem;color:var(--text-muted);">${group.standalone ? 'Aula avulsa' : 'Turno completo'}</span></td>
+            ${pdfBatchCellHtml(canPdfTurno, 'turno', group.data_relatorio, group.turno, group.estudio, group.diretor_imagem_id, group.turma_id, pdfBatchHint(group), pdfReportId)}
+        </tr>`;
+    }
+
+    function renderTiDayGroupHeader(group) {
+        const canPdfDia = group.canPdf;
+        const ctx = encodeTurnoCtx({
+            data: group.data_relatorio,
+            turno: group.turno || 'Integral',
+            estudio: group.estudio,
+            diretor_imagem_id: group.diretor_imagem_id || '',
+            turma_id: group.turma_id || '',
+            canPdfDia,
+            isTiDay: true,
+            tiDayOnly: true,
+            slots: group.items.length,
+        });
+        return `
+        <tr class="idr-row-clickable turno-group-header" onclick="openReportDrawer('', '${ctx}')">
+            <td>${formatDateBr(group.data_relatorio)}</td>
+            <td>${group.items.length} slot(s)</td>
+            <td>Integral</td>
+            <td>${group.estudio}</td>
+            <td>${group.diretor_nome || '—'}</td>
+            <td>${group.turma_nome || '—'}</td>
+            <td><span style="font-size:0.72rem;color:var(--text-muted);">Dia completo (TI)</span></td>
+            ${pdfBatchCellHtml(canPdfDia, 'dia', group.data_relatorio, '', group.estudio, group.diretor_imagem_id, group.turma_id, pdfBatchHint(group))}
+        </tr>`;
+    }
+
+    function buildGroupedRows(items) {
+        const groupMap = new Map();
+        items.forEach((r) => {
+            const key = historyGroupKey(r);
+            if (!groupMap.has(key)) groupMap.set(key, []);
+            groupMap.get(key).push(r);
+        });
+
+        const emitted = new Set();
+        let html = '';
+
+        items.forEach((r) => {
+            const key = historyGroupKey(r);
+            if (emitted.has(key)) return;
+            emitted.add(key);
+
+            const group = sortReportsByHorario(groupMap.get(key) || [r]);
+            const first = group[0];
+            const isTiDay = key.startsWith('ti:');
+            const standalone = key.startsWith('solo:');
+            // PDF por turno também quando o grupo tem só 1 aula:
+            // grade → PDF do turno; avulso (Nova Aula/Gravação) → PDF do turno só com ele.
+            const canPdf = standalone
+                ? group.some(x => relatorioFinalizado(x))
+                : groupPdfTurnoDisponivel({ items: group });
+
+            const headerPayload = {
+                data_relatorio: first.data_relatorio,
+                turno: first.turno,
+                estudio: first.estudio,
+                diretor_imagem_id: first.diretor_imagem_id,
+                diretor_nome: first.diretor_imagem_nome,
+                turma_nome: first.turma_nome,
+                turma_id: first.turma_id,
+                items: group,
+                standalone,
+                canPdf,
+            };
+
+            html += isTiDay ? renderTiDayGroupHeader(headerPayload) : renderTurnoGroupHeader(headerPayload);
+            group.forEach(item => {
+                html += renderReportRow(item, {
+                    isSlotRow: true,
+                    groupSize: group.length,
+                    isTiDay,
+                    groupCanPdf: canPdf,
+                    standalone,
+                });
+            });
+        });
+        return html;
+    }
+
+    function applyFilters() {
+        offset = 0;
+        loadReports();
+    }
+
+    function clearFilters() {
+        document.getElementById('f-data-inicio').value = '';
+        document.getElementById('f-data-fim').value = '';
+        document.getElementById('f-status').value = '';
+        document.getElementById('f-turno').value = '';
+        document.getElementById('f-diretor').value = '';
+        document.getElementById('f-tipo-transmissao').value = '';
+        document.getElementById('sort-by').value = 'data_relatorio';
+        offset = 0;
+        loadReports();
+    }
+
+    let loadSeq = 0;
+
+    async function loadReports() {
+        const params = new URLSearchParams();
+        const dataInicio = document.getElementById('f-data-inicio').value;
+        const dataFim = document.getElementById('f-data-fim').value;
+        const periodoInvalido = dataInicio && dataFim && dataInicio > dataFim;
+        ['f-data-inicio', 'f-data-fim'].forEach(id => {
+            document.getElementById(id).style.borderColor = periodoInvalido ? 'var(--status-red, #ef4444)' : '';
+        });
+        if (periodoInvalido) {
+            showToast('A data de início não pode ser maior que a data de fim.', 'error');
+            return;
+        }
+        const seq = ++loadSeq;
+        const statusF = document.getElementById('f-status').value;
+        const diretorF = document.getElementById('f-diretor').value;
+        const turnoF = document.getElementById('f-turno').value;
+        const tipoTransmissaoF = document.getElementById('f-tipo-transmissao').value;
+        const sortBy = document.getElementById('sort-by').value;
+        if (dataInicio) params.set('data_inicio', dataInicio);
+        if (dataFim) params.set('data_fim', dataFim);
+        if (statusF) params.set('status', statusF);
+        if (diretorF) params.set('diretor_imagem_id', diretorF);
+        if (turnoF) params.set('turno', turnoF);
+        if (tipoTransmissaoF) params.set('transmissao_ou_gravada', tipoTransmissaoF);
+        params.set('sort_by', sortBy);
+        params.set('sort_order', 'desc');
+        params.set('limit', limit);
+        params.set('offset', offset);
+
+        try {
+            const data = await apiGet(`/api/v1/image-director/?${params.toString()}`);
+            if (seq !== loadSeq) return; // resposta de um filtro antigo — descarta
+            const countEl = document.getElementById('reports-count');
+            if (!data || !data.items || data.items.length === 0) {
+                if (countEl) countEl.textContent = '0 relatórios encontrados';
+                document.getElementById('reports-table').innerHTML = '<div class="empty-state"><div class="icon">🎬</div><p>Nenhum relatório encontrado.</p></div>';
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+            if (countEl) {
+                countEl.textContent = `${data.total} relatório${data.total === 1 ? '' : 's'} encontrado${data.total === 1 ? '' : 's'}`;
+            }
+            const rows = buildGroupedRows(data.items);
+
+            document.getElementById('reports-table').innerHTML = `
+                <div class="table-container"><table>
+                    <thead><tr><th>Data</th><th>Aulas</th><th>Turno</th><th>Estúdio</th><th>Diretor</th><th>Turma / Origem</th><th>Status</th><th>PDF Turno</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+
+            const totalPages = Math.ceil(data.total / limit);
+            const currentPage = Math.floor(offset / limit) + 1;
+            let pag = '';
+            if (offset > 0) pag += `<button class="btn btn-secondary btn-sm" onclick="prevPage()">← Anterior</button>`;
+            pag += `<span style="align-self:center; font-size:0.8rem; color: var(--text-muted);">Página ${currentPage} de ${totalPages || 1}</span>`;
+            if (offset + limit < data.total) pag += `<button class="btn btn-secondary btn-sm" onclick="nextPage()">Próxima →</button>`;
+            document.getElementById('pagination').innerHTML = pag;
+        } catch (e) {
+            console.error(e);
+            showToast('Erro ao carregar relatórios.', 'error');
+        }
+    }
+
+    function nextPage() { offset += limit; loadReports(); }
+    function prevPage() { offset = Math.max(0, offset - limit); loadReports(); }
+
+    function closeReportDrawer() {
+        document.getElementById('idr-overlay').classList.remove('open');
+        document.getElementById('idr-drawer').classList.remove('open');
+    }
+
+    function formatTime(t) {
+        if (!t) return '—';
+        return String(t).substring(0, 5);
+    }
+
+    function formatDateBr(isoDate) {
+        if (!isoDate) return '—';
+        try {
+            return new Date(isoDate + 'T00:00:00').toLocaleDateString('pt-BR');
+        } catch (e) {
+            return isoDate;
+        }
+    }
+
+    function escapeHtml(str) {
+        if (str == null || str === '') return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function renderLessonBlock(l) {
+        const canalChamado = l.transmissao_ou_gravada === 'Transmissão'
+            ? `<div class="detail-item"><span class="detail-label">Canal IPTV</span><span>${escapeHtml(l.canal_utilizado || '—')}</span></div>`
+            : `<div class="detail-item"><span class="detail-label">Nº chamado</span><span>${escapeHtml(l.numero_chamado || '—')}</span></div>`;
+        const obsCondicionais = [
+            l.video_corrompido === 'Sim' && l.video_corrompido_obs
+                ? `<div class="detail-item"><span class="detail-label">Obs. vídeo corrompido</span><span>${escapeHtml(l.video_corrompido_obs)}</span></div>` : '',
+            l.problema_audio === 'Sim' && l.problema_audio_obs
+                ? `<div class="detail-item"><span class="detail-label">Obs. problema áudio</span><span>${escapeHtml(l.problema_audio_obs)}</span></div>` : '',
+            l.vinhetas_corretas === 'Não' && l.vinhetas_corretas_obs
+                ? `<div class="detail-item"><span class="detail-label">Obs. vinhetas</span><span>${escapeHtml(l.vinhetas_corretas_obs)}</span></div>` : '',
+        ].filter(Boolean).join('');
+        return `
+        <div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius-sm);">
+            <strong>AULA ${String(l.numero_aula).padStart(2, '0')}</strong>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">${escapeHtml(l.disciplina_nome)} · ${escapeHtml(l.professor_nome)}</div>
+            <div class="detail-grid" style="margin-top:0.5rem;">
+                <div class="detail-item"><span class="detail-label">Tipo</span><span>${escapeHtml(l.transmissao_ou_gravada)}</span></div>
+                ${canalChamado}
+                <div class="detail-item"><span class="detail-label">Vídeo corrompido</span><span>${escapeHtml(l.video_corrompido)}</span></div>
+                <div class="detail-item"><span class="detail-label">Problema áudio</span><span>${escapeHtml(l.problema_audio)}</span></div>
+                <div class="detail-item"><span class="detail-label">Vinhetas corretas</span><span>${escapeHtml(l.vinhetas_corretas)}</span></div>
+                <div class="detail-item"><span class="detail-label">Créditos</span><span>${escapeHtml(l.creditos_corretos)}</span></div>
+                <div class="detail-item"><span class="detail-label">Interrupções</span><span>${escapeHtml(l.interrupcoes)}</span></div>
+            </div>
+            ${obsCondicionais}
+            <div style="margin-top:0.5rem;">
+                <div class="detail-label">Observações da aula</div>
+                <p style="margin-top:0.25rem;font-size:0.85rem;color:var(--text-secondary);white-space:pre-wrap;">${l.observacoes ? escapeHtml(l.observacoes) : '—'}</p>
+            </div>
+        </div>`;
+    }
+
+    let lastDrawerReportId = null;
+    let lastDrawerCtxEnc = null;
+
+    function renderDrawerActions(idr, ctx) {
+        const pdfIndividual = ctx.turnoOnly ? '' : (
+            idr && idr.status !== 'RASCUNHO'
+                ? `<button type="button" class="btn btn-secondary btn-sm btn-full" onclick="baixarPdf('${idr.id}')">⬇️ PDF Individual</button>`
+                : btnDrawerDisabled('⬇️ PDF Individual', 'Disponível após finalizar o relatório')
+        );
+        const pdfTurno = ctx.canPdfDia
+            ? `<button type="button" class="btn btn-secondary btn-sm btn-full" onclick="baixarPdfDiaCompleto('${ctx.data}', '${encodeURIComponent(ctx.estudio)}', '${ctx.diretor_imagem_id || ''}', '${ctx.turma_id || ''}')">⬇️ PDF Dia Completo</button>`
+            : (ctx.canPdfTurno
+                ? `<button type="button" class="btn btn-secondary btn-sm btn-full" onclick="baixarPdfTurno('${ctx.data}', '${encodeURIComponent(ctx.turno)}', '${encodeURIComponent(ctx.estudio)}', '${ctx.diretor_imagem_id || ''}', '${ctx.turma_id || ''}', '${ctx.pdfReportId || ''}')">⬇️ PDF do Turno</button>`
+                : btnDrawerDisabled(
+                    ctx.isTiDay ? '⬇️ PDF Dia Completo' : '⬇️ PDF do Turno',
+                    ctx.tiDayOnly || ctx.turnoOnly ? 'Finalize ao menos um relatório' : 'Disponível após finalizar o relatório'
+                ));
+        const youtubeBtn = idr && idr.youtube_link
+            ? btnDrawerDisabled('📺 YouTube', 'Abra o formulário para acessar o link')
+            : btnDrawerDisabled('📺 YouTube', 'Link não informado');
+        const editarLabel = isDiretorImagem() && !podeValidar()
+            ? '✏️ Editar Relatório'
+            : '✏️ Abrir formulário';
+        const editarBtn = podeAbrirFormularioIdr(idr)
+            ? `<a href="/diretor-imagem?id=${idr.id}" class="btn btn-primary btn-sm btn-full" style="text-align:center;text-decoration:none;">${editarLabel}</a>`
+            : '';
+        const linhaTempoBtn = idr
+            ? `<a href="/aula?idr=${idr.id}" class="btn btn-secondary btn-sm btn-full" style="text-align:center;text-decoration:none;">${icone('linha-tempo')} Linha do tempo da aula</a>`
+            : '';
+
+        let validarBtn = '';
+        let corrigirBtn = '';
+        let apagarBtn = '';
+        if (podeValidar() && idr) {
+            if (idr.status === 'AGUARDANDO_VALIDACAO') {
+                // Reunião (out/2026): vídeo corrompido trava a validação até o diretor desmarcar e salvar
+                const corrompido = (idr.lessons || []).some(l => l.video_corrompido === 'Sim');
+                validarBtn = corrompido
+                    ? `<button type="button" class="btn btn-validar btn-sm btn-full" disabled title="Vídeo marcado como corrompido: o diretor precisa recuperar o vídeo, desmarcar e salvar">✅ Validar (vídeo corrompido)</button>`
+                    : `<button type="button" class="btn btn-validar btn-sm btn-full" onclick="validarRelatorio('${idr.id}')">✅ Validar</button>`;
+                corrigirBtn = `<button type="button" class="btn btn-corrigir btn-sm btn-full" onclick="solicitarCorrecao('${idr.id}')">🔁 Enviar para Correção</button>`
+                    + (corrompido ? `<button type="button" class="btn btn-corrigir btn-sm btn-full" onclick="solicitarCorrecao('${idr.id}', TEXTO_VIDEO_CORROMPIDO)">📼 Vídeo corrompido — revisar</button>` : '');
+            } else if (idr.status === 'VALIDADO') {
+                corrigirBtn = `<button type="button" class="btn btn-corrigir btn-sm btn-full" onclick="solicitarCorrecao('${idr.id}')">🔁 Enviar para Correção</button>`;
+            }
+            apagarBtn = `<button type="button" class="btn btn-danger btn-sm btn-full" onclick="apagarRelatorio('${idr.id}')">🗑️ Apagar</button>`;
+        }
+
+        return `
+        <div style="margin-top:1.25rem;display:grid;gap:0.5rem;">
+            <div class="form-section-title">📄 Documentos</div>
+            ${pdfIndividual}
+            ${pdfTurno}
+            <div class="form-section-title" style="margin-top:0.5rem;">🔗 Ações</div>
+            ${youtubeBtn}
+            ${editarBtn}
+            ${linhaTempoBtn}
+            ${validarBtn}
+            ${corrigirBtn}
+            ${apagarBtn}
+        </div>`;
+    }
+
+    function renderReportDrawerContent(idr, ctx) {
+        const slotHorario = horarioSlotFromReport(idr);
+        const container = document.getElementById('idr-drawer-content');
+        const validadoInfo = (idr.status === 'VALIDADO' && idr.validado_por_nome) ? `
+            <div style="font-size:0.78rem;color:var(--text-muted);text-align:center;">
+                Validado por <strong>${idr.validado_por_nome}</strong>${idr.validado_em ? ` em ${new Date(idr.validado_em).toLocaleString('pt-BR')}` : ''}
+            </div>` : '';
+        const avisoCorrecao = idr.precisa_correcao ? `
+            <div style="background:#fffbeb;border:1px solid #fdba74;border-radius:var(--radius-sm);padding:0.85rem 1rem;">
+                <strong style="color:#92400e;">🔁 Devolvido para correção</strong>
+                <p style="margin-top:0.35rem;font-size:0.85rem;color:#7c2d12;">${idr.observacao_coordenacao || 'Sem observação detalhada.'}</p>
+            </div>` : '';
+        const avulsaHtml = idr.regular === 'Não' ? `
+            <div class="detail-item"><span class="detail-label">Ticket</span><span>${idr.ticket_number || '—'}</span></div>
+            <div class="detail-item"><span class="detail-label">Horário avulso</span><span>${formatTime(idr.start_time)} – ${formatTime(idr.end_time)}</span></div>` : '';
+        const lessonsHtml = (idr.lessons || []).length
+            ? `<div><div class="form-section-title">🎬 Aulas / Detalhes Técnicos</div>${(idr.lessons || []).map(renderLessonBlock).join('')}</div>`
+            : '';
+
+        container.innerHTML = `
+            <div style="display:grid;gap:1rem;">
+                <div style="text-align:center;padding:0.75rem;background:var(--bg-glass);border-radius:var(--radius-sm);">
+                    ${statusBadgeHtml(idr.status, idr.precisa_correcao)}
+                    ${validadoInfo}
+                </div>
+                ${avisoCorrecao}
+                <div>
+                    <div class="form-section-title">📌 Contexto</div>
+                    <div class="detail-grid">
+                        <div class="detail-item"><span class="detail-label">Data</span><span>${formatDateBr(idr.data_relatorio)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Turno</span><span>${idr.turno}</span></div>
+                        <div class="detail-item"><span class="detail-label">Estúdio</span><span>${idr.estudio}</span></div>
+                        <div class="detail-item"><span class="detail-label">Turma</span><span>${idr.turma_nome || '—'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Diretor</span><span>${idr.diretor_imagem_nome || '—'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Disciplina</span><span>${idr.disciplina_nome || '—'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Professor</span><span>${idr.professor_nome || '—'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Horário</span><span>${escapeHtml(horarioExatoLabel(idr))}${horarioOrdinalLabel(idr) ? ` <span style="color:var(--text-muted);font-size:0.75rem;">(${escapeHtml(horarioOrdinalLabel(idr))})</span>` : ''}</span></div>
+                        <div class="detail-item"><span class="detail-label">Origem</span><span>${origemLabel(effectiveOrigem(idr))}</span></div>
+                        <div class="detail-item"><span class="detail-label">Entrada / Saída</span><span>${slotHorario.inicio || '—'} / ${slotHorario.fim || '—'}</span></div>
+                        ${avulsaHtml}
+                    </div>
+                </div>
+                ${lessonsHtml}
+                <div>
+                    <div class="form-section-title">📝 Observações Gerais</div>
+                    <p style="font-size:0.85rem;color:var(--text-secondary);white-space:pre-wrap;">${idr.observacoes_gerais ? escapeHtml(idr.observacoes_gerais) : '—'}</p>
+                </div>
+                ${renderDrawerActions(idr, ctx)}
+            </div>`;
+    }
+
+    function renderTurnoDrawerContent(ctx) {
+        const container = document.getElementById('idr-drawer-content');
+        const titulo = ctx.isTiDay ? 'Dia completo (TI)' : (ctx.pdfReportId ? 'Aula avulsa' : 'Turno completo');
+        const subtitulo = ctx.isTiDay
+            ? `${ctx.slots || 0} slot(s) — Manhã e Tarde`
+            : `${ctx.slots || 0} slot(s) neste turno`;
+        container.innerHTML = `
+            <div style="display:grid;gap:1rem;">
+                <div style="text-align:center;padding:0.75rem;background:var(--bg-glass);border-radius:var(--radius-sm);">
+                    <span style="font-size:0.85rem;font-weight:600;">${titulo}</span>
+                    <p style="font-size:0.78rem;color:var(--text-muted);margin-top:0.35rem;">${subtitulo}</p>
+                </div>
+                <div>
+                    <div class="form-section-title">📌 Contexto</div>
+                    <div class="detail-grid">
+                        <div class="detail-item"><span class="detail-label">Data</span><span>${formatDateBr(ctx.data)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Turno</span><span>${ctx.isTiDay ? 'Integral' : ctx.turno}</span></div>
+                        <div class="detail-item"><span class="detail-label">Estúdio</span><span>${ctx.estudio}</span></div>
+                    </div>
+                </div>
+                <p style="font-size:0.82rem;color:var(--text-muted);">Clique em um slot abaixo na tabela para ver o relatório individual.</p>
+                ${renderDrawerActions(null, ctx)}
+            </div>`;
+    }
+
+    async function openReportDrawer(reportId, ctxEnc) {
+        let ctx;
+        try {
+            ctx = JSON.parse(decodeURIComponent(ctxEnc));
+        } catch (e) {
+            showToast('Erro ao abrir detalhes.', 'error');
+            return;
+        }
+        lastDrawerReportId = reportId || null;
+        lastDrawerCtxEnc = ctxEnc;
+        document.getElementById('idr-overlay').classList.add('open');
+        document.getElementById('idr-drawer').classList.add('open');
+        const container = document.getElementById('idr-drawer-content');
+        container.innerHTML = '<div class="spinner"></div>';
+
+        if (ctx.turnoOnly || ctx.tiDayOnly || !reportId) {
+            renderTurnoDrawerContent(ctx);
+            return;
+        }
+
+        try {
+            const idr = await apiGet(`/api/v1/image-director/${reportId}`);
+            renderReportDrawerContent(idr, ctx);
+        } catch (e) {
+            container.innerHTML = '<p style="color:var(--status-red);text-align:center;padding:1rem;">Erro ao carregar relatório.</p>';
+        }
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeReportDrawer();
+    });
+
+    async function refreshOpenDrawer(reportId) {
+        if (!lastDrawerCtxEnc) return;
+        if (lastDrawerReportId && reportId && lastDrawerReportId !== reportId) return;
+        await openReportDrawer(lastDrawerReportId || reportId, lastDrawerCtxEnc);
+    }
+
+
+    /** Antes de validar: o que não bate com o relatório do outro lado (assistente x diretor de imagem). */
+    async function textoConferenciaPar(url) {
+        try {
+            const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+            const r = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!r.ok) return '';
+            const c = await r.json();
+            if (!c.divergencias || !c.divergencias.length) return '';
+            return '\n\n⚠️ O relatório ligado a esta aula não bate:\n- ' + c.divergencias.join('\n- ') + '\n\nValidar mesmo assim?';
+        } catch (e) { return ''; }
+    }
+
+    async function validarRelatorio(reportId) {
+        const aviso = await textoConferenciaPar(`/api/v1/image-director/${reportId}/conferencia-par`);
+        if (!confirm('Confirmar validação deste relatório de imagem? Ele será marcado como Validado.' + aviso)) return;
+        try {
+            await apiPatch(`/api/v1/image-director/${reportId}/validar`, {});
+            showToast('Relatório validado com sucesso! ✅', 'success');
+            await loadReports();
+            await refreshOpenDrawer(reportId);
+        } catch (e) {
+            showToast(e.message || 'Erro ao validar relatório.', 'error');
+        }
+    }
+
+    const TEXTO_VIDEO_CORROMPIDO = 'Vídeo corrompido: recupere o vídeo (ou baixe do YouTube, corte e coloque na pasta), desmarque "vídeo corrompido" e salve o relatório.';
+    async function solicitarCorrecao(reportId, textoPadrao = '') {
+        const observacao = prompt('Descreva o que precisa ser corrigido (o diretor de imagem verá esta mensagem):', textoPadrao);
+        if (observacao === null) return; // cancelou
+        if (!observacao.trim()) {
+            showToast('É necessário descrever o motivo da correção.', 'error');
+            return;
+        }
+        try {
+            await apiPatch(`/api/v1/image-director/${reportId}/solicitar-correcao`, { observacao_coordenacao: observacao.trim() });
+            showToast('Relatório enviado para correção. O diretor será notificado. 🔁', 'success');
+            await loadReports();
+            await refreshOpenDrawer(reportId);
+        } catch (e) {
+            showToast(e.message || 'Erro ao enviar para correção.', 'error');
+        }
+    }
+
+    async function apagarRelatorio(reportId) {
+        if (!confirm('Apagar este relatório? Esta ação não pode ser desfeita.')) return;
+        try {
+            const token = getToken();
+            const res = await fetch(`/api/v1/image-director/${reportId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || 'Erro ao apagar relatório.');
+            }
+            showToast('Relatório apagado.', 'success');
+            closeReportDrawer();
+            await loadReports();
+        } catch (e) {
+            showToast(e.message || 'Erro ao apagar relatório.', 'error');
+        }
+    }
+
+    function filenameFromContentDisposition(res) {
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="([^"]+)"/);
+        return match ? match[1] : null;
+    }
+
+    async function baixarPdf(id) {
+        const token = getToken();
+        const res = await fetch(`/api/v1/image-director/${id}/pdf`, { headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok) { showToast('Erro ao gerar PDF.', 'error'); return; }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filenameFromContentDisposition(res) || `AULAS_${id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    async function baixarPdfTurno(data, turnoEnc, estudioEnc, diretorId, turmaId, reportId) {
+        const token = getToken();
+        const turno = decodeURIComponent(turnoEnc);
+        const estudio = decodeURIComponent(estudioEnc);
+        const params = new URLSearchParams({ data, turno, estudio });
+        if (diretorId) params.set('diretor_imagem_id', diretorId);
+        if (turmaId) params.set('turma_id', turmaId);
+        if (reportId) params.set('report_id', reportId);
+        const res = await fetch(`/api/v1/image-director/pdf-turno?${params.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.detail || 'Erro ao gerar PDF do turno.', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filenameFromContentDisposition(res) || `TURNO_${data}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    async function baixarPdfDiaCompleto(data, estudioEnc, diretorId, turmaId) {
+        const token = getToken();
+        const estudio = decodeURIComponent(estudioEnc);
+        const params = new URLSearchParams({ data, estudio, dia_completo: 'true' });
+        if (diretorId) params.set('diretor_imagem_id', diretorId);
+        if (turmaId) params.set('turma_id', turmaId);
+        const res = await fetch(`/api/v1/image-director/pdf-turno?${params.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            showToast(err.detail || 'Erro ao gerar PDF dia completo.', 'error');
+            return;
+        }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filenameFromContentDisposition(res) || `DIA_${data}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,24 @@
+DIAGNÓSTICO DO FRONTEND - FORMULÁRIO DE AULAS
+=============================================
+
+📁 Arquivo analisado: `app/templates/report_form.html`
+
+1. GERENCIAMENTO DE ESTADO DO FORMULÁRIO
+----------------------------------------
+O sistema **NÃO** utiliza React State, Formik, React Hook Form ou qualquer framework moderno de Virtual DOM.
+A estrutura é fundamentada em **Vanilla Javascript (DOM API nativa)** anexada a um template Jinja2. Todo o estado é efêmero e existe diretamente dentro das tags HTML. No momento do clique nos botões de "Salvar/Finalizar", a função JavaScript `buildReportBody()` lê instantaneamente os elementos pelo ID (ex: `document.getElementById('campo').value`) e serializa em JSON.
+
+2. A CAUSA DO ENVIO DE `professor_id` VAZIO ("") 
+------------------------------------------------
+A falha ocorre dentro da própria função `buildReportBody()`. 
+Na linha 819, o código faz o rastreio da seguinte forma:
+`professor_id: isAvulsa ? null : document.getElementById('professor_id').value`
+
+Isso faz com que, caso a aula não seja avulsa e o usuário tente submeter o formulário ignorando a seleção do professor, a propriedade `.value` do componente `<select>` capture o valor do `<option>` padrão por inércia: `<option value="">Selecione o professor...</option>`.
+Como a variável extraída é literalmente um caracter de string vazio `"“`, ela viaja na rede dentro do JSON até chegar no Backend, que tenta converter a string em um objeto UUID e resulta no crash de comprimento nulo. Isto ocorre com todos os Selects independentes (Turma e Disciplina) se não preenchidos.
+
+3. VALIDAÇÃO DA POPULAÇÃO DO COMPONENTE SELECT DOS PROFESSORES
+--------------------------------------------------------------
+* **A Coleta de Dados**: A população do dropdown de professores está **CORRETA** e respeitando a regra de negócio. Ao invés de invocar todos os professores, o front-end possui um gatilho de cascata `onDisciplinaChange()`. Ele engatilha a requisição para a rota específica `/api/v1/reports/lookup/professores-por-disciplina/${discId}`, retornando apenas professores gabaritados àquela matéria.
+* **O Mapeamento do UUID**: Sim, o ID também está **CORRETO**. O script converte elegantemente a resposta fazendo `sel.innerHTML += '<option value="${p.id}">${p.nome}</option>'`.
+* **A Captura Inicial (onChange)**: O Javascript puro dispensa de ter um manipulador engessado (como no React `onChange={(e) => setProfId(e.target.value)}`). O HTML armazena statefully a escolha do `<option>` no momento em que ele é clicado na interface gráfica pelo usuário, retendo o UUID perfeitamente para quando `buildReportBody()` buscar a informação. Portanto, o fluxo de população Frontend-API-Frontend está plenamente saudável!

@@ -1,0 +1,2050 @@
+{% extends "base.html" %}
+{% block title %}Relatórios de aula — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-relatorio"/></svg> Relatórios de aula</h1>
+        <p class="page-subtitle">Busque, confira vídeo e PDF no Drive, valide e exporte a planilha de faturamento</p>
+    </div>
+    <div class="audit-acoes">
+        <button class="btn btn-secondary" onclick="syncAllDrives()" title="Procura agora o vídeo e o PDF dos relatórios que ainda estão esperando o Drive">
+            <svg class="ico"><use href="#i-atualizar"/></svg> Buscar no Drive
+        </button>
+        <button class="btn btn-primary btn-exportar" onclick="exportExcel('xlsx')" title="Planilha única: uma linha por hora de estúdio usada (só relatórios finalizados)">
+            <svg class="ico"><use href="#i-baixar"/></svg> Uso de estúdio
+        </button>
+        <button class="btn btn-secondary btn-exportar" onclick="exportExcel('xlsx', 'detalhado')" title="Abas antigas: Consolidado, Assistente e Diretor de Imagem">
+            <svg class="ico"><use href="#i-baixar"/></svg> Detalhada
+        </button>
+        <button class="btn btn-secondary btn-exportar" onclick="exportExcel('xlsm')" title="Exportar planilha oficial para faturamento SEDUC em formato .xlsm">
+            <svg class="ico"><use href="#i-baixar"/></svg> SEDUC (.xlsm)
+        </button>
+    </div>
+</div>
+
+<!-- Notificação de Correção Pendente (relatórios do próprio usuário devolvidos pela coordenação) -->
+<div class="notif-correcao-banner" id="notif-correcao-banner" style="display: none;">
+    <div style="display: flex; align-items: flex-start; gap: 0.85rem;">
+        <div style="font-size: 1.6rem; line-height: 1;">🔁</div>
+        <div style="flex: 1;">
+            <strong id="notif-correcao-title" style="color: #92400e;">Você tem relatórios para corrigir</strong>
+            <div id="notif-correcao-list" style="margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('notif-correcao-banner').style.display='none'">Dispensar</button>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <div class="card-header">
+        <h3 class="card-title"><svg class="ico"><use href="#i-busca"/></svg> Filtros</h3>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Limpar</button>
+    </div>
+    <div class="form-row" style="gap: 0.75rem;">
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Data Início</label>
+            <input type="date" id="f-data-inicio" class="form-input" onchange="applyFilters()">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Data Fim</label>
+            <input type="date" id="f-data-fim" class="form-input" onchange="applyFilters()">
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Status Assistente</label>
+            <select id="f-status" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+                <option value="RASCUNHO">Rascunho</option>
+                <option value="AGUARDANDO_VALIDACAO">Aguardando Validação</option>
+                <option value="VALIDADO">Validado</option>
+                <option value="FINALIZADO">Finalizado (legado)</option>
+                <option value="CANCELADO">Cancelado</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Estúdio</label>
+            <select id="f-estudio" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Turma</label>
+            <select id="f-turma" class="form-select" onchange="applyFilters()">
+                <option value="">Todas</option>
+            </select>
+        </div>
+    </div>
+    <div class="form-row" style="gap: 0.75rem; margin-top: 0.25rem;">
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Professor</label>
+            <select id="f-professor" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Disciplina</label>
+            <select id="f-disciplina" class="form-select" onchange="applyFilters()">
+                <option value="">Todas</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Tipo de Aula</label>
+            <select id="f-tipo-aula" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+                {% for opt in tipo_aula_options %}
+                <option>{{ opt }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0.5rem;">
+            <label class="form-label">Usuário</label>
+            <select id="f-usuario" class="form-select" onchange="applyFilters()">
+                <option value="">Todos</option>
+            </select>
+        </div>
+    </div>
+    <!-- Filtros booleanos como pills -->
+    <div style="display: flex; gap: 0.75rem; margin-top: 0.75rem; flex-wrap: wrap;">
+        <button type="button" class="filter-pill" id="pill-atraso" onclick="togglePill('atraso')">
+            <svg class="ico"><use href="#i-relogio"/></svg> Com atraso
+        </button>
+        <button type="button" class="filter-pill" id="pill-substituicao" onclick="togglePill('substituicao')">
+            <svg class="ico"><use href="#i-usuarios"/></svg> Com substituição
+        </button>
+        <button type="button" class="filter-pill" id="pill-problema" onclick="togglePill('problema')">
+            <svg class="ico"><use href="#i-alerta"/></svg> Com problema técnico
+        </button>
+        <button type="button" class="filter-pill" id="pill-correcao" onclick="togglePill('correcao')">
+            <svg class="ico"><use href="#i-devolvido"/></svg> Devolvidos para correção
+        </button>
+    </div>
+    <style>
+        .audit-acoes { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+        .audit-acoes .btn { white-space: nowrap; }
+        .col-aula { white-space: nowrap; }
+        .col-arquivo { min-width: 220px; max-width: 340px; white-space: normal; word-break: break-word; }
+        .cel-principal { color: var(--text-color); font-weight: 500; }
+        .cel-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+        .filter-pill {
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-secondary);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .filter-pill:hover {
+            border-color: var(--accent-primary);
+            background: rgba(79, 70, 229, 0.08);
+        }
+        .filter-pill.active {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: #fff;
+            border-color: var(--accent-primary);
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+        }
+        .pendente-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 0.6rem 1rem;
+            margin-bottom: 0.5rem;
+            transition: all 0.2s ease;
+            font-size: 0.85rem;
+        }
+        .pendente-item:hover {
+            border-color: var(--accent-primary);
+            background: rgba(79, 70, 229, 0.04);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* ===== Badges de Status (fluxo de validação) ===== */
+        .badge-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            padding: 0.3rem 0.7rem;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: #fff;
+            white-space: nowrap;
+        }
+        .badge-status-rascunho {
+            background: linear-gradient(135deg, #94a3b8, #64748b);
+        }
+        .badge-status-aguardando {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+        }
+        .badge-status-validado {
+            background: linear-gradient(135deg, #34d399, #059669);
+        }
+        .badge-status-cancelado {
+            background: linear-gradient(135deg, #fca5a5, #ef4444);
+        }
+        .badge-status-correcao {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #1f2937;
+            animation: pulse-correcao 1.8s ease-in-out infinite;
+        }
+        @keyframes pulse-correcao {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
+            50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+        }
+
+        /* ===== Botões de validação ===== */
+        .btn-validar {
+            background: linear-gradient(135deg, #34d399, #059669);
+            color: #fff;
+            border: none;
+        }
+        .btn-validar:hover { filter: brightness(1.05); }
+        .btn-corrigir {
+            background: linear-gradient(135deg, #fbbf24, #d97706);
+            color: #1f2937;
+            border: none;
+        }
+        .btn-corrigir:hover { filter: brightness(1.05); }
+
+        /* ===== Banner de notificação de correção ===== */
+        .notif-correcao-banner {
+            background: linear-gradient(135deg, #fffbeb, #ffedd5);
+            border: 1px solid #fdba74;
+            border-radius: var(--radius-sm);
+            padding: 1rem 1.25rem;
+            margin-bottom: 1.5rem;
+        }
+        .notif-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid #fdba74;
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.85rem;
+            font-size: 0.8rem;
+            text-decoration: none;
+            color: #7c2d12;
+        }
+        .notif-item:hover { background: rgba(255, 255, 255, 0.9); }
+
+        /* Drawer duplo — assistente + diretor de imagem */
+        .drawer-dual { max-width: min(96vw, 1400px); width: 96vw; }
+        .drawer-dual-body { display: grid; grid-template-columns: 1fr 1fr; gap: 0; height: calc(100vh - 60px); overflow: hidden; }
+        .drawer-dual-body.single-col { grid-template-columns: 1fr; max-width: 700px; margin: 0 auto; }
+        .drawer-col { overflow-y: auto; padding: 1rem; border-right: 1px solid var(--border-subtle); }
+        .drawer-col:last-child { border-right: none; }
+        .drawer-col[hidden] { display: none; }
+        .drawer-col-title { font-size: 0.85rem; font-weight: 600; margin: 0 0 1rem 0; padding-bottom: 0.5rem; border-bottom: 2px solid var(--accent-primary); color: var(--text-primary); }
+        @media (max-width: 900px) {
+            .drawer-dual-body { grid-template-columns: 1fr; height: auto; }
+            .drawer-col { border-right: none; border-bottom: 1px solid var(--border-subtle); max-height: 50vh; }
+        }
+    </style>
+</div>
+
+<!-- Situação dos relatórios por status (aparece quando algum filtro é usado) -->
+<div class="card" id="status-resumo-box" style="margin-bottom: 1.5rem; display: none;">
+    <div class="card-header">
+        <h3 class="card-title">📌 Situação dos Relatórios</h3>
+        <span id="status-resumo-periodo" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+    </div>
+    <div class="stats-grid status-resumo-grid" id="status-resumo-grid">
+        <!-- Preenchido via JS -->
+    </div>
+    <p style="font-size: 0.75rem; color: var(--text-muted); margin: -1rem 0 0 0;">
+        Contagem com os mesmos filtros da lista (exceto o status). Clique em um card para filtrar por ele.
+    </p>
+    <style>
+        .status-resumo-grid { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin-bottom: 1.25rem; }
+        .status-resumo-grid .stat-card { cursor: pointer; transition: transform .15s, border-color .15s, box-shadow .15s; }
+        .status-resumo-grid .stat-card:hover { transform: translateY(-2px); }
+        .status-resumo-grid .stat-card.ativo { border-color: var(--sr-cor); box-shadow: 0 0 0 2px var(--sr-cor) inset; }
+        .status-resumo-grid .stat-card::before { background: var(--sr-cor); }
+        .status-resumo-grid .stat-value { background: none; -webkit-text-fill-color: var(--sr-cor); color: var(--sr-cor); }
+        .status-resumo-grid .stat-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.2rem; }
+    </style>
+</div>
+
+<!-- Audit Summary Box (Visible only for single day) -->
+<div class="card" id="audit-summary-box" style="margin-bottom: 1.5rem; display: none;">
+    <div class="card-header">
+        <h3 class="card-title">📊 Auditoria: Previstos vs Encontrados</h3>
+        <span id="audit-periodo" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+    </div>
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+        <div class="stat-card">
+            <div class="stat-value" id="audit-previstos">-</div>
+            <div class="stat-label">Registros Pendentes</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="audit-sem-professor" style="color: var(--status-yellow);">-</div>
+            <div class="stat-label">Sem Professor na Disciplina</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="audit-ok" style="color: var(--status-green);">-</div>
+            <div class="stat-label">Encontrados OK</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="audit-extras" style="color: var(--status-yellow);">-</div>
+            <div class="stat-label">Extras (Fora da Grade)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="audit-total-grade">-</div>
+            <div class="stat-label">Total Grade</div>
+        </div>
+    </div>
+    <!-- Seção de Aulas Pendentes (registro não feito, com professor vinculado) -->
+    <div id="audit-pendentes-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-subtle); padding-top: 1rem; display: none;">
+        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 0.35rem;">⚠️ Registros Pendentes <span id="audit-pendentes-badge" class="badge badge-yellow" style="font-size: 0.7rem; padding: 2px 6px;">0</span></span>
+            <button class="btn btn-secondary btn-sm" onclick="togglePendentesList()" id="btn-toggle-pendentes" style="font-size: 0.75rem; padding: 4px 10px; cursor: pointer;">
+                Mostrar Lista
+            </button>
+        </h4>
+        <div id="audit-pendentes-list" style="display: none; max-height: 250px; overflow-y: auto; gap: 0.5rem; padding-right: 0.25rem;">
+            <!-- Preenchido dinamicamente via JS -->
+        </div>
+    </div>
+    <!-- Seção de slots sem professor vinculado à disciplina -->
+    <div id="audit-sem-professor-container" style="margin-top: 1.5rem; border-top: 1px solid var(--border-subtle); padding-top: 1rem; display: none;">
+        <h4 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 0.75rem; color: var(--text-primary); display: flex; align-items: center; justify-content: space-between;">
+            <span style="display: flex; align-items: center; gap: 0.35rem;">📌 Grade sem Professor Vinculado <span id="audit-sem-professor-badge" class="badge badge-yellow" style="font-size: 0.7rem; padding: 2px 6px;">0</span></span>
+            <button class="btn btn-secondary btn-sm" onclick="toggleSemProfessorList()" id="btn-toggle-sem-professor" style="font-size: 0.75rem; padding: 4px 10px; cursor: pointer;">
+                Mostrar Lista
+            </button>
+        </h4>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0 0 0.75rem 0;">Estes slots não entram na contagem de registros pendentes — falta cadastrar professor na disciplina.</p>
+        <div id="audit-sem-professor-list" style="display: none; max-height: 250px; overflow-y: auto; gap: 0.5rem; padding-right: 0.25rem;">
+        </div>
+    </div>
+</div>
+
+<!-- Reports DataGrid -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title" id="reports-count">Carregando...</h3>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">Ordenar:</label>
+            <select id="sort-by" class="form-select" style="width: auto; min-width: 130px;" onchange="applyFilters()">
+                <option value="data_aula">Data Aula ↓</option>
+                <option value="created_at">Criado Em ↓</option>
+            </select>
+        </div>
+    </div>
+    <div id="reports-grid">
+        <div class="spinner"></div>
+    </div>
+    <!-- Pagination -->
+    <div id="pagination"
+        style="display: flex; align-items: center; justify-content: space-between; padding: 1rem 0; border-top: 1px solid var(--border-subtle); margin-top: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <label style="font-size: 0.75rem; color: var(--text-secondary);">Por página:</label>
+            <select id="page-size" class="form-select" style="width: auto; min-width: 70px;"
+                onchange="currentOffset=0; loadReports();">
+                <option value="20">20</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+            <button class="btn btn-secondary btn-sm" id="btn-prev" onclick="prevPage()" disabled>← Anterior</button>
+            <span style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center;"
+                id="page-info">—</span>
+            <button class="btn btn-secondary btn-sm" id="btn-next" onclick="nextPage()">Próxima →</button>
+        </div>
+    </div>
+</div>
+
+<!-- Report Detail Slide-over (Dual: Assistente + Diretor de Imagem) -->
+<div class="drawer-overlay" id="report-overlay" onclick="closeReportDetail()"></div>
+<div class="drawer drawer-dual" id="report-drawer">
+    <div class="drawer-header">
+        <h3>📋 Detalhe dos Relatórios</h3>
+        <button class="drawer-close" onclick="closeReportDetail()">✕</button>
+    </div>
+    <div class="drawer-dual-body" id="report-drawer-body">
+        <div class="drawer-col" id="drawer-col-assistente">
+            <h4 class="drawer-col-title">👨‍🏫 Assistente de Professores</h4>
+            <div id="report-detail-content"><div class="spinner"></div></div>
+        </div>
+        <div class="drawer-col" id="drawer-col-diretor">
+            <h4 class="drawer-col-title">🎬 Diretor de Imagem</h4>
+            <div id="image-director-detail-content"><div class="spinner"></div></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentOffset = 0;
+    let totalReports = 0;
+
+    let currentUserRole = null;
+    let currentUserId = null;
+
+    // Papéis com permissão de validar/corrigir relatórios (ajuste conforme os papéis reais do sistema)
+    const PAPEIS_COORDENACAO = ['admin', 'gestor', 'coordenador', 'coordenadora'];
+    const PAPEIS_DIRETOR_CHEFE = ['admin', 'gestor', 'diretor_chefe'];
+    const PAPEIS_AUDITORIA_DUAL = ['admin', 'gestor', 'diretor_chefe'];
+    const PAPEIS_YOUTUBE_DIRETOR = ['diretor_imagem', 'diretor_chefe', 'gestor', 'auditor', 'admin'];
+    const STATUS_COM_NOME_GERADO = ['AGUARDANDO_VALIDACAO', 'VALIDADO', 'FINALIZADO'];
+
+    function escapeHtml(str) {
+        if (str == null || str === '') return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function formatTime(t) {
+        if (!t) return '—';
+        return String(t).substring(0, 5);
+    }
+
+    function renderSimNao(val) {
+        if (val === true) return 'Sim';
+        if (val === false) return 'Não';
+        return '—';
+    }
+
+    function resolveProfessorNameById(id) {
+        if (!id) return null;
+        const sel = document.getElementById('f-professor');
+        if (!sel) return null;
+        const opt = sel.querySelector(`option[value="${id}"]`);
+        return opt ? opt.textContent.trim() : null;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        if (!token) { window.location.href = '/'; return; }
+        loadUserProfile();
+        loadFilterData();
+        // A lista depende do perfil (visão dupla assistente + diretor): só carrega depois de saber o papel
+        loadCurrentUserRole().then(() => {
+            // Exportação só para quem fecha a cobrança (admin, gestor, coordenação, diretor-chefe)
+            const podeExportar = ['admin', 'gestor', 'coordenador', 'coordenadora', 'diretor_chefe'].includes(currentUserRole);
+            document.querySelectorAll('.btn-exportar').forEach(b => { b.style.display = podeExportar ? '' : 'none'; });
+            loadNotificacoesPendencias();
+            loadReports();
+        });
+    });
+
+    async function loadCurrentUserRole() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/auth/me', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const user = await res.json();
+                currentUserRole = user.role;
+                currentUserId = user.id;
+            }
+        } catch (e) { console.warn('Could not load user role'); }
+    }
+
+    function isCoordenacao() {
+        return PAPEIS_COORDENACAO.includes(currentUserRole);
+    }
+
+    function isDiretorChefe() {
+        return PAPEIS_DIRETOR_CHEFE.includes(currentUserRole);
+    }
+
+    function isDiretorFluxo() {
+        return ['diretor_imagem', 'diretor_chefe'].includes(currentUserRole);
+    }
+
+    /**
+     * Mescla na auditoria os relatórios do Diretor de Imagem que ainda não têm
+     * Relatório de Aula (Assistente) vinculado — sem isso, quem precisa validar
+     * (Diretor-Chefe/Gestor/Admin) nunca via esses relatórios "órfãos" aparecerem
+     * em 📋 Relatórios & Auditoria, mesmo estando "Aguardando Validação".
+     */
+    function shouldMergeDirectorAuditRows() {
+        return PAPEIS_AUDITORIA_DUAL.includes(currentUserRole);
+    }
+
+    function isDualStatusAuditLayout() {
+        if (['coordenador', 'coordenadora'].includes(currentUserRole)) {
+            return false;
+        }
+        return PAPEIS_AUDITORIA_DUAL.includes(currentUserRole);
+    }
+
+    /** Fila da coordenação: pronto para validar × o que ainda falta (links do Drive). */
+    function filaValidacaoHtml(r) {
+        if (r.status !== 'AGUARDANDO_VALIDACAO' || r.pronto_para_validar == null) return '';
+        return r.pronto_para_validar
+            ? '<div style="font-size:0.65rem;color:var(--status-green,#16a34a);margin-top:2px;">✅ Pronto para validar</div>'
+            : `<div style="font-size:0.65rem;color:#c2410c;margin-top:2px;">⏳ ${escapeHtml(r.motivo_espera_validacao || 'Aguardando os links')}</div>`;
+    }
+
+    function statusAssistenteHtml(r) {
+        if (r._idr_only || !r.status) {
+            return '<span class="badge-status badge-status-rascunho">⏳ Pendente</span>';
+        }
+        let html = statusBadgeHtml(r.status) + filaValidacaoHtml(r);
+        if (r.status === 'VALIDADO' && r.validado_por_nome) {
+            html += `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">Validado por <strong>${r.validado_por_nome}</strong></div>`;
+        }
+        return html;
+    }
+
+    function statusDiretorHtml(r) {
+        const st = r.image_director_status;
+        if (!st) {
+            return '<span class="badge-status badge-status-rascunho">⏳ Pendente</span>';
+        }
+        let html = statusBadgeHtml(st);
+        if (st === 'VALIDADO' && r.image_director_validado_por_nome) {
+            html += `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">Validado por <strong>${r.image_director_validado_por_nome}</strong></div>`;
+        }
+        return html;
+    }
+
+    function statusForListRow(r) {
+        if (isDiretorFluxo()) {
+            const st = r.image_director_status;
+            if (!st) return '<span class="badge-status badge-status-rascunho">⏳ Pendente</span>';
+            let html = statusBadgeHtml(st);
+            if (st === 'VALIDADO' && r.image_director_validado_por_nome) {
+                html += `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">Validado por <strong>${r.image_director_validado_por_nome}</strong></div>`;
+            }
+            return html;
+        }
+        if (r._idr_only && r.image_director_status) {
+            let html = statusBadgeHtml(r.image_director_status);
+            html += `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">🎬 Só Diretor de Imagem</div>`;
+            if (r.image_director_status === 'VALIDADO' && r.image_director_validado_por_nome) {
+                html += `<div style="font-size:0.65rem;color:var(--text-muted);">Validado por <strong>${r.image_director_validado_por_nome}</strong></div>`;
+            }
+            return html;
+        }
+        let html = statusBadgeHtml(r.status) + filaValidacaoHtml(r);
+        if (r.status === 'VALIDADO' && r.validado_por_nome) {
+            html += `<div style="font-size:0.65rem;color:var(--text-muted);margin-top:2px;">Validado por <strong>${r.validado_por_nome}</strong></div>`;
+        }
+        return html;
+    }
+
+    // ===== Notificação: relatórios devolvidos para correção =====
+    async function loadNotificacoesPendencias() {
+        if (!currentUserId) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const banner = document.getElementById('notif-correcao-banner');
+        const title = document.getElementById('notif-correcao-title');
+        const list = document.getElementById('notif-correcao-list');
+
+        try {
+            if (isDiretorFluxo()) {
+                const params = new URLSearchParams();
+                params.set('precisa_correcao', 'true');
+                params.set('limit', '20');
+                const res = await fetch(`/api/v1/image-director/?${params.toString()}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const pendentes = data.items || [];
+                if (pendentes.length === 0) {
+                    banner.style.display = 'none';
+                    return;
+                }
+                title.textContent = `Você tem ${pendentes.length} relatório(s) de imagem devolvido(s) para correção`;
+                list.innerHTML = pendentes.map(r => {
+                    let dataFormatada = r.data_relatorio;
+                    try { dataFormatada = new Date(r.data_relatorio + 'T00:00:00').toLocaleDateString('pt-BR'); } catch (e) {}
+                    const label = [r.disciplina_nome, r.horario_aula].filter(Boolean).join(' · ') || r.turma_nome || '';
+                    return `
+                        <a href="/diretor-imagem?id=${r.id}" class="notif-item">
+                            <span><strong>${dataFormatada}</strong> — ${r.turno} · ${r.estudio}${label ? ' · ' + label : ''}</span>
+                            <span>Corrigir →</span>
+                        </a>`;
+                }).join('');
+                banner.style.display = 'block';
+                return;
+            }
+
+            const params = new URLSearchParams();
+            params.set('created_by', currentUserId);
+            params.set('precisa_correcao', 'true');
+            params.set('limit', '20');
+
+            const res = await fetch(`/api/v1/reports/?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            const pendentes = data.items || [];
+
+            if (pendentes.length === 0) {
+                banner.style.display = 'none';
+                return;
+            }
+
+            title.textContent = `Você tem ${pendentes.length} relatório(s) devolvido(s) pela coordenação para correção`;
+            list.innerHTML = pendentes.map(r => {
+                let dataFormatada = r.data_aula;
+                try { dataFormatada = new Date(r.data_aula + 'T00:00:00').toLocaleDateString('pt-BR'); } catch (e) {}
+                return `
+                    <a href="#" class="notif-item" onclick="event.preventDefault(); openDualReportDetail('${r.id}', '${r.image_director_report_id || ''}');">
+                        <span><strong>${dataFormatada}</strong> — ${r.turma_nome || ''} · ${r.disciplina_nome || ''}</span>
+                        <span>Ver detalhes →</span>
+                    </a>`;
+            }).join('');
+
+            banner.style.display = 'block';
+        } catch (e) {
+            console.warn('Erro ao carregar notificações de correção', e);
+        }
+    }
+
+    function buildDiretorImagemLockedUrl(cr) {
+        const q = new URLSearchParams({ locked: '1' });
+        if (cr.data_aula) q.set('data', cr.data_aula);
+        if (cr.turno) q.set('turno', cr.turno);
+        if (cr.estudio) q.set('estudio', cr.estudio);
+        if (cr.turma_id) q.set('turma', cr.turma_id);
+        if (cr.horario_aula) q.set('horario', cr.horario_aula);
+        if (cr.disciplina_id) q.set('disciplina_id', cr.disciplina_id);
+        if (cr.disciplina_nome) q.set('disciplina_nome', cr.disciplina_nome);
+        if (cr.professor_id) q.set('professor_id', cr.professor_id);
+        if (cr.professor_nome) q.set('professor_nome', cr.professor_nome);
+        if (cr.regular) q.set('regular', cr.regular);
+        if (cr.ticket_number) q.set('ticket_number', cr.ticket_number);
+        if (cr.start_time) q.set('start_time', cr.start_time.substring(0, 5));
+        if (cr.end_time) q.set('end_time', cr.end_time.substring(0, 5));
+        if (cr.id) q.set('class_report_id', cr.id);
+        return `/diretor-imagem?${q.toString()}`;
+    }
+
+    async function deleteReport(reportId) {
+        if (!confirm('Tem certeza que deseja EXCLUIR permanentemente este relatório? Esta ação não pode ser desfeita.')) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.detail || 'Erro ao excluir');
+            }
+            showToast('Relatório excluído com sucesso.', 'success');
+            closeReportDetail();
+            loadReports();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    // ===== Ações de Validação (Coordenação) =====
+    /** Antes de validar: o que não bate com o relatório do outro lado (assistente x diretor de imagem). */
+    async function textoConferenciaPar(url) {
+        try {
+            const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+            const r = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!r.ok) return '';
+            const c = await r.json();
+            if (!c.divergencias || !c.divergencias.length) return '';
+            return '\n\n⚠️ O relatório ligado a esta aula não bate:\n- ' + c.divergencias.join('\n- ') + '\n\nValidar mesmo assim?';
+        } catch (e) { return ''; }
+    }
+
+    async function validarRelatorio(reportId) {
+        const aviso = await textoConferenciaPar(`/api/v1/reports/${reportId}/conferencia-par`);
+        if (!confirm('Confirmar validação deste relatório? Ele será marcado como Validado.' + aviso)) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}/validar`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Erro ao validar relatório');
+            }
+            showToast('Relatório validado com sucesso! ✅', 'success');
+            closeReportDetail();
+            loadReports();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    async function solicitarCorrecao(reportId) {
+        const observacao = prompt('Descreva o que precisa ser corrigido (o assistente verá esta mensagem):');
+        if (observacao === null) return; // cancelou
+        if (!observacao.trim()) {
+            showToast('É necessário descrever o motivo da correção.', 'error');
+            return;
+        }
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}/solicitar-correcao`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ observacao_coordenacao: observacao.trim() })
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Erro ao enviar para correção');
+            }
+            showToast('Relatório enviado para correção. O assistente será notificado. 🔁', 'success');
+            closeReportDetail();
+            loadReports();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    async function loadFilterData() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const headers = { 'Authorization': `Bearer ${token}` };
+
+        try {
+            const estRes = await fetch('/api/v1/configuracoes/estudios', { headers });
+            if (estRes.ok) {
+                const estudios = await estRes.json();
+                const sel = document.getElementById('f-estudio');
+                const nomes = estudios.map(e => e.nome).filter(Boolean);
+                if (!nomes.some(n => n.toLowerCase() === 'externo')) nomes.push('Externo');
+                nomes.forEach(n => {
+                    sel.innerHTML += `<option value="${n}">${n}</option>`;
+                });
+            }
+
+            // Somente turmas ativas
+            const turmasRes = await fetch('/api/v1/turmas/', { headers });
+            if (turmasRes.ok) {
+                const turmas = await turmasRes.json();
+                const sel = document.getElementById('f-turma');
+                // Rótulo único: turmas com o mesmo nome (ex.: dois "EJA V") ganham a série
+                const ativas = turmas.filter(t => t.is_active !== false);
+                const rotulos = rotulosDeTurmas(ativas);
+                ativas
+                    .sort((a, b) => rotulos[a.id].localeCompare(rotulos[b.id], 'pt-BR', { sensitivity: 'base' }))
+                    .forEach(t => {
+                        sel.innerHTML += `<option value="${t.id}">${escapeHtml(rotulos[t.id])}</option>`;
+                    });
+            }
+
+            const profRes = await fetch('/api/v1/reports/lookup/professores', { headers });
+            if (profRes.ok) {
+                const profs = await profRes.json();
+                const sel = document.getElementById('f-professor');
+                profs.forEach(p => {
+                    sel.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
+                });
+            }
+
+            const discRes = await fetch('/api/v1/reports/lookup/disciplinas', { headers });
+            if (discRes.ok) {
+                const discs = await discRes.json();
+                const sel = document.getElementById('f-disciplina');
+                discs.forEach(d => {
+                    sel.innerHTML += `<option value="${d.id}">${d.nome}</option>`;
+                });
+            }
+
+            const usersRes = await fetch('/api/v1/reports/lookup/users', { headers });
+            if (usersRes.ok) {
+                const users = await usersRes.json();
+                const sel = document.getElementById('f-usuario');
+                users.forEach(u => {
+                    sel.innerHTML += `<option value="${u.id}">${u.nome}</option>`;
+                });
+            }
+        } catch (e) { console.error('Filter data error:', e); }
+    }
+
+    function buildFilterParams() {
+        const params = new URLSearchParams();
+        const limit = document.getElementById('page-size').value;
+        params.set('limit', limit);
+        params.set('offset', currentOffset);
+        params.set('sort_by', document.getElementById('sort-by').value);
+        params.set('sort_order', 'desc');
+
+        const di = document.getElementById('f-data-inicio').value;
+        const df = document.getElementById('f-data-fim').value;
+        const st = document.getElementById('f-status').value;
+        const es = document.getElementById('f-estudio').value;
+        const tu = document.getElementById('f-turma').value;
+        const pr = document.getElementById('f-professor').value;
+        const ds = document.getElementById('f-disciplina').value;
+        const ta = document.getElementById('f-tipo-aula').value;
+        const us = document.getElementById('f-usuario').value;
+
+        if (di) params.set('data_inicio', di);
+        if (df) params.set('data_fim', df);
+        if (st) params.set('status', st);
+        if (es) params.set('estudio', es);
+        if (tu) params.set('turma_id', tu);
+        if (pr) params.set('professor_id', pr);
+        if (ds) params.set('disciplina_id', ds);
+        if (ta) params.set('tipo_aula', ta);
+        if (us) params.set('created_by', us);
+        if (FILA_VALIDACAO && st === 'AGUARDANDO_VALIDACAO') params.set('fila_validacao', FILA_VALIDACAO);
+        else FILA_VALIDACAO = '';
+
+        if (document.getElementById('pill-atraso').classList.contains('active')) params.set('com_atraso', 'true');
+        if (document.getElementById('pill-substituicao').classList.contains('active')) params.set('com_substituicao', 'true');
+        if (document.getElementById('pill-problema').classList.contains('active')) params.set('com_problema', 'true');
+        if (document.getElementById('pill-correcao').classList.contains('active')) params.set('precisa_correcao', 'true');
+
+        return params;
+    }
+
+    function periodoValido() {
+        const di = document.getElementById('f-data-inicio').value;
+        const df = document.getElementById('f-data-fim').value;
+        const iniEl = document.getElementById('f-data-inicio');
+        const fimEl = document.getElementById('f-data-fim');
+        const invalido = di && df && di > df;
+        [iniEl, fimEl].forEach(el => el.style.borderColor = invalido ? 'var(--status-red, #ef4444)' : '');
+        if (invalido) {
+            showToast('A data de início não pode ser maior que a data de fim.', 'error');
+            return false;
+        }
+        return true;
+    }
+
+    const FILTROS_IDS = [
+        'f-data-inicio', 'f-data-fim', 'f-status', 'f-estudio', 'f-turma', 'f-professor',
+        'f-disciplina', 'f-tipo-aula', 'f-usuario',
+    ];
+
+    function algumFiltroAtivo() {
+        if (FILTROS_IDS.some(id => {
+            const el = document.getElementById(id);
+            return el && el.value;
+        })) return true;
+        return Array.from(document.querySelectorAll('.filter-pill')).some(p => p.classList.contains('active'));
+    }
+
+    function hojeIso() {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function isoParaBr(iso) {
+        const [a, m, d] = String(iso).split('-');
+        return `${d}/${m}/${a}`;
+    }
+
+    /** Período dos cards: datas do filtro; sem datas, hoje; só uma data, completa com a outra. */
+    function periodoDaAuditoria() {
+        const di = document.getElementById('f-data-inicio').value;
+        const df = document.getElementById('f-data-fim').value;
+        let inicio = di || df || hojeIso();
+        let fim = df || (di ? (di > hojeIso() ? di : hojeIso()) : inicio);
+        if (inicio > fim) fim = inicio;
+        const label = inicio === fim ? isoParaBr(inicio) : `${isoParaBr(inicio)} a ${isoParaBr(fim)}`;
+        return { inicio, fim, label };
+    }
+
+    function applyFilters() {
+        currentOffset = 0;
+        loadReports();
+    }
+
+    // ─── Cards "Situação dos Relatórios" (quantos faltam em cada status) ───
+    const STATUS_RESUMO_CARDS = [
+        { chave: 'rascunho', status: 'RASCUNHO', label: 'Rascunho', cor: 'var(--text-secondary, #94a3b8)', sub: 'ainda não enviados' },
+        { chave: 'aguardando_validacao', status: 'AGUARDANDO_VALIDACAO', label: 'Aguardando validação', cor: 'var(--status-yellow, #f59e0b)', sub: 'na fila para validar' },
+        { chave: 'prontos_para_validar', status: null, fila: 'prontos', label: 'Prontos para validar', cor: 'var(--status-green, #22c55e)', sub: 'vídeo e PDF coletados' },
+        { chave: 'aguardando_links', status: null, fila: 'aguardando', label: 'Aguardando links', cor: '#f97316', sub: 'ainda sem vídeo/PDF', soSeMaiorQueZero: true },
+        { chave: 'validado', status: 'VALIDADO', label: 'Validado', cor: 'var(--status-green, #22c55e)', sub: 'concluídos' },
+        { chave: 'precisa_correcao', status: null, pill: 'correcao', label: 'Precisa Correção', cor: '#f97316', sub: 'devolvidos ao assistente', soSeMaiorQueZero: true },
+        { chave: 'cancelado', status: 'CANCELADO', label: 'Cancelado', cor: 'var(--text-muted, #64748b)', sub: '', soSeMaiorQueZero: true },
+    ];
+    // Fila da coordenação (prontos × aguardando links): filtro extra da lista
+    let FILA_VALIDACAO = '';
+
+    function statusResumoAtivo(card) {
+        const st = document.getElementById('f-status').value;
+        if (card.fila) return FILA_VALIDACAO === card.fila;
+        if (card.status) return st === card.status && !FILA_VALIDACAO;
+        if (card.pill) return document.getElementById('pill-' + card.pill).classList.contains('active');
+        return false;
+    }
+
+    function clicarStatusResumo(chave) {
+        const card = STATUS_RESUMO_CARDS.find(c => c.chave === chave);
+        if (!card) return;
+        const sel = document.getElementById('f-status');
+        if (card.pill) {
+            togglePill(card.pill);
+            return;
+        }
+        if (card.fila) {
+            FILA_VALIDACAO = FILA_VALIDACAO === card.fila ? '' : card.fila;
+            sel.value = FILA_VALIDACAO ? 'AGUARDANDO_VALIDACAO' : '';
+        } else {
+            FILA_VALIDACAO = '';
+            sel.value = sel.value === card.status ? '' : card.status;
+        }
+        applyFilters();
+    }
+
+    function loadStatusResumo(listParams, token, seq) {
+        const box = document.getElementById('status-resumo-box');
+        if (!box) return;
+        if (!algumFiltroAtivo()) {
+            box.style.display = 'none';
+            return;
+        }
+        const p = new URLSearchParams(listParams.toString());
+        ['status', 'limit', 'offset', 'sort_by', 'sort_order', 'fila_validacao'].forEach(k => p.delete(k));
+
+        const di = p.get('data_inicio');
+        const df = p.get('data_fim');
+        let periodo = 'Todo o período';
+        if (di && df) periodo = di === df ? isoParaBr(di) : `${isoParaBr(di)} a ${isoParaBr(df)}`;
+        else if (di) periodo = `A partir de ${isoParaBr(di)}`;
+        else if (df) periodo = `Até ${isoParaBr(df)}`;
+        document.getElementById('status-resumo-periodo').textContent = periodo;
+
+        fetch(`/api/v1/reports/status-resumo?${p.toString()}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        })
+        .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+        .then(resumo => {
+            if (seq !== loadSeq) return; // filtro mudou enquanto carregava
+            const grid = document.getElementById('status-resumo-grid');
+            grid.innerHTML = STATUS_RESUMO_CARDS
+                .filter(c => !c.soSeMaiorQueZero || (resumo[c.chave] || 0) > 0 || statusResumoAtivo(c))
+                .map(c => {
+                    const n = resumo[c.chave] ?? 0;
+                    const pct = resumo.total ? Math.round((n / resumo.total) * 100) : 0;
+                    const sub = [c.sub, resumo.total && !c.fila ? `${pct}% do total` : ''].filter(Boolean).join(' · ');
+                    return `
+                        <div class="stat-card${statusResumoAtivo(c) ? ' ativo' : ''}" style="--sr-cor: ${c.cor};"
+                             onclick="clicarStatusResumo('${c.chave}')" title="Filtrar: ${c.label}">
+                            <div class="stat-value">${n}</div>
+                            <div class="stat-label">${c.label}</div>
+                            ${sub ? `<div class="stat-sub">${sub}</div>` : ''}
+                        </div>`;
+                }).join('') + `
+                        <div class="stat-card" style="--sr-cor: var(--accent-primary, #6366f1); cursor: default;">
+                            <div class="stat-value">${resumo.total ?? 0}</div>
+                            <div class="stat-label">Total</div>
+                            <div class="stat-sub">todos os status</div>
+                        </div>`;
+            box.style.display = 'block';
+            carregarCardsProfessor(p, token, seq);
+        })
+        .catch(() => { box.style.display = 'none'; });
+    }
+
+    /** Professor filtrado: total de aulas (por slot) e total de horas (tempo real). Só visualização. */
+    function carregarCardsProfessor(p, token, seq) {
+        if (!p.get('professor_id')) return;
+        const q = new URLSearchParams();
+        ['professor_id', 'data_inicio', 'data_fim', 'turma_id', 'disciplina_id', 'estudio', 'tipo_aula', 'modalidade_aula']
+            .forEach(k => { if (p.get(k)) q.set(k, p.get(k)); });
+        const st = document.getElementById('f-status').value;
+        if (st) q.set('status', st);
+        fetch(`/api/v1/reports/professor-resumo?${q.toString()}`, { headers: { 'Authorization': `Bearer ${token}` } })
+            .then(res => { if (!res.ok) throw new Error(); return res.json(); })
+            .then(r => {
+                if (seq !== loadSeq) return;
+                const grid = document.getElementById('status-resumo-grid');
+                grid.insertAdjacentHTML('afterbegin', `
+                    <div class="stat-card" id="card-prof-aulas" style="--sr-cor: #0d9488; cursor: default;">
+                        <div class="stat-value">${r.total_aulas}</div>
+                        <div class="stat-label">Total de aulas</div>
+                        <div class="stat-sub">do professor · 1 por horário</div>
+                    </div>
+                    <div class="stat-card" id="card-prof-horas" style="--sr-cor: #0d9488; cursor: default;">
+                        <div class="stat-value">${r.total_horas}</div>
+                        <div class="stat-label">Total de horas</div>
+                        <div class="stat-sub">tempo real das aulas${r.aulas_sem_horario ? ` · ${r.aulas_sem_horario} sem horário` : ''}</div>
+                    </div>`);
+            })
+            .catch(() => {});
+    }
+
+    function togglePill(type) {
+        const pill = document.getElementById('pill-' + type);
+        pill.classList.toggle('active');
+        currentOffset = 0;
+        loadReports();
+    }
+
+    function mergeDirectorAuditRows(classReports, idrItems) {
+        const classIds = new Set(classReports.map(r => r.id));
+        const coveredIdr = new Set(
+            classReports.map(r => r.image_director_report_id).filter(Boolean)
+        );
+        const tipoAulaFilter = document.getElementById('f-tipo-aula').value;
+
+        const extras = idrItems
+            .filter(idr => {
+                if (tipoAulaFilter && !idr.class_report_id) return false;
+                if (coveredIdr.has(idr.id)) return false;
+                if (idr.class_report_id && classIds.has(idr.class_report_id)) return false;
+                return true;
+            })
+            .map(idrToAuditRow);
+
+        return [...classReports, ...extras];
+    }
+
+    function idrToAuditRow(idr) {
+                const hasLinkedClass = !!idr.class_report_id && !!idr.class_report_status;
+                const nomeArquivo = idr.class_report_nome_ficheiro_gerado
+                    || [idr.disciplina_nome, idr.horario_aula].filter(Boolean).join(' · ')
+                    || 'Relatório de Imagem';
+                return {
+                    id: idr.class_report_id || '',
+                    _idr_only: !idr.class_report_id,
+                    _idr_merged: hasLinkedClass,
+                    data_aula: idr.data_relatorio,
+                    turno: idr.turno,
+                    estudio: idr.estudio,
+                    disciplina_nome: idr.disciplina_nome,
+                    conteudo_ministrado: nomeArquivo,
+                    nome_ficheiro_gerado: idr.class_report_nome_ficheiro_gerado || null,
+                    creator_name: idr.class_report_creator_name || idr.diretor_imagem_nome || 'Diretor de Imagem',
+                    status: idr.class_report_status || null,
+                    status_compliance: idr.class_report_status_compliance || 'N/A',
+                    video_link: idr.class_report_video_link || null,
+                    slide_link: idr.class_report_slide_link || null,
+                    validado_por_nome: idr.class_report_validado_por_nome || null,
+                    precisa_correcao: idr.class_report_precisa_correcao || false,
+                    image_director_report_id: idr.id,
+                    image_director_status: idr.status,
+                    image_director_youtube_link: idr.youtube_link,
+                    image_director_validado_por_nome: idr.validado_por_nome,
+                    image_director_precisa_correcao: idr.precisa_correcao,
+                };
+    }
+
+    let loadSeq = 0;
+
+    async function loadReports() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        if (!periodoValido()) return;
+        const params = buildFilterParams();
+        const seq = ++loadSeq;
+
+        try {
+            const limit = parseInt(document.getElementById('page-size').value);
+            params.set('limit', limit);
+            params.set('offset', currentOffset);
+
+            // Perfis com visão dupla: lista unificada (assistente + diretor) com filtro,
+            // total e paginação feitos no servidor.
+            const visaoDupla = shouldMergeDirectorAuditRows();
+            const url = visaoDupla
+                ? `/api/v1/reports/auditoria?${params.toString()}`
+                : `/api/v1/reports/?${params.toString()}`;
+            const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || 'Erro ao carregar relatórios');
+            }
+            const data = await res.json();
+            if (seq !== loadSeq) return; // resposta de um filtro antigo — descarta
+
+            // Aceita os dois formatos: {tipo, data} (lista unificada) ou o relatório direto
+            const reports = (data.items || [])
+                .map(it => {
+                    if (it && it.tipo && it.data) return it.tipo === 'idr' ? idrToAuditRow(it.data) : it.data;
+                    return it;
+                })
+                .filter(Boolean);
+            totalReports = data.total;
+
+            // Audit Logic — os cards aparecem sempre que algum filtro for usado.
+            // Sem período informado: usa o dia de hoje (ou completa a data que faltar).
+            if (algumFiltroAtivo()) {
+                const periodo = periodoDaAuditoria();
+                document.getElementById('audit-summary-box').style.display = 'block';
+                const periodoEl = document.getElementById('audit-periodo');
+                if (periodoEl) periodoEl.textContent = periodo.label;
+
+                const auditParams = new URLSearchParams();
+                auditParams.set('data_inicio', periodo.inicio);
+                auditParams.set('data_fim', periodo.fim);
+                if (params.get('turma_id'))    auditParams.set('turma_id', params.get('turma_id'));
+                if (params.get('professor_id')) auditParams.set('professor_id', params.get('professor_id'));
+                if (params.get('disciplina_id')) auditParams.set('disciplina_id', params.get('disciplina_id'));
+                if (params.get('status'))      auditParams.set('status', params.get('status'));
+                if (params.get('estudio'))     auditParams.set('estudio', params.get('estudio'));
+                if (params.get('tipo_aula'))   auditParams.set('tipo_aula', params.get('tipo_aula'));
+                if (params.get('com_atraso'))  auditParams.set('com_atraso', params.get('com_atraso'));
+                if (params.get('com_substituicao')) auditParams.set('com_substituicao', params.get('com_substituicao'));
+                if (params.get('com_problema')) auditParams.set('com_problema', params.get('com_problema'));
+                if (params.get('precisa_correcao')) auditParams.set('precisa_correcao', params.get('precisa_correcao'));
+                if (params.get('created_by')) auditParams.set('created_by', params.get('created_by'));
+
+                fetch(`/api/v1/reports/audit-stats?${auditParams.toString()}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                })
+                .then(res => res.json())
+                .then(audit => {
+                    const pendentesOp = audit.pendentes_operacionais ?? audit.previstos_pendentes ?? 0;
+                    const semProf = audit.pendentes_sem_professor ?? 0;
+
+                    document.getElementById('audit-previstos').textContent = pendentesOp;
+                    document.getElementById('audit-sem-professor').textContent = semProf;
+                    document.getElementById('audit-ok').textContent = audit.encontrados_ok ?? '—';
+                    document.getElementById('audit-extras').textContent = audit.extras ?? '—';
+                    document.getElementById('audit-total-grade').textContent = audit.total_grades ?? '—';
+
+                    renderAuditSlotList(
+                        'audit-pendentes-container',
+                        'audit-pendentes-list',
+                        'audit-pendentes-badge',
+                        'btn-toggle-pendentes',
+                        audit.pendentes_detalhes || [],
+                        false
+                    );
+                    renderAuditSlotList(
+                        'audit-sem-professor-container',
+                        'audit-sem-professor-list',
+                        'audit-sem-professor-badge',
+                        'btn-toggle-sem-professor',
+                        audit.sem_professor_detalhes || [],
+                        true
+                    );
+                })
+                .catch(() => {
+                    document.getElementById('audit-previstos').textContent = '—';
+                    document.getElementById('audit-sem-professor').textContent = '—';
+                    document.getElementById('audit-ok').textContent = '—';
+                    document.getElementById('audit-extras').textContent = '—';
+                    document.getElementById('audit-total-grade').textContent = '—';
+                    document.getElementById('audit-pendentes-container').style.display = 'none';
+                    document.getElementById('audit-sem-professor-container').style.display = 'none';
+                });
+            } else {
+                document.getElementById('audit-summary-box').style.display = 'none';
+            }
+
+            loadStatusResumo(params, token, seq);
+
+            document.getElementById('reports-count').textContent =
+                `${totalReports} relatório(s) encontrado(s)`;
+
+            // Pagination UI
+            const pageNum = Math.floor(currentOffset / limit) + 1;
+            const totalPages = Math.ceil(totalReports / limit) || 1;
+            document.getElementById('page-info').textContent = `Página ${pageNum} de ${totalPages}`;
+            document.getElementById('btn-prev').disabled = currentOffset === 0;
+            document.getElementById('btn-next').disabled = currentOffset + limit >= totalReports;
+
+            if (reports.length === 0) {
+                document.getElementById('reports-grid').innerHTML = `
+                    <div class="empty-state">
+                        <div class="icon">📋</div>
+                        <p>Nenhum relatório encontrado com os filtros selecionados.</p>
+                    </div>`;
+                return;
+            }
+
+            const isDualLayout = isDualStatusAuditLayout();
+
+            const rows = reports.map(r => {
+                let dataFormatada = r.data_aula;
+                try {
+                    const d = new Date(r.data_aula + 'T00:00:00');
+                    dataFormatada = d.toLocaleDateString('pt-BR');
+                } catch (e) {}
+
+                const ocorrencias = [];
+                if (r.teve_atraso) ocorrencias.push('⏰ Atraso');
+                if (r.teve_substituicao) ocorrencias.push('🔄 Subst.');
+                if (r.problema_material && r.problema_material !== 'Não') ocorrencias.push('⚠️ Problema');
+                if (r.precisa_correcao) ocorrencias.push('🔁 Correção');
+                if (isDualLayout && r.image_director_precisa_correcao) ocorrencias.push('🔁 Correção IDR');
+                const ocorrenciasHtml = ocorrencias.length > 0
+                    ? ocorrencias.map(o => {
+                        const isCorrecao = o.includes('Correção');
+                        return `<span class="badge ${isCorrecao ? 'badge-status-correcao' : 'badge-yellow'}" style="font-size:0.65rem;margin:1px;">${o}</span>`;
+                      }).join(' ')
+                    : '—';
+
+                let slideBadge = '';
+                if (isDualLayout) {
+                    if (r.slide_link) {
+                        slideBadge = `<td style="text-align:center;"><a href="${r.slide_link}" target="_blank" style="text-decoration:none;" title="Abrir Slide PDF" onclick="event.stopPropagation()"><span class="badge badge-green" style="font-size:0.7rem;">&#x2705; VERDE &#x1F4C4;</span></a></td>`;
+                    } else if (r.status_compliance === 'Vermelho') {
+                        slideBadge = `<td style="text-align:center;"><span class="badge badge-red" style="font-size:0.7rem;">&#x274c; VERMELHO</span></td>`;
+                    } else {
+                        slideBadge = `<td style="text-align:center;"><span class="badge badge-yellow" style="font-size:0.7rem;">&#x23f3; PENDENTE</span></td>`;
+                    }
+                }
+
+                let detalheFaltaHtml = '';
+                if (STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado) {
+                    const vOk = !!r.video_link, sOk = !!r.slide_link;
+                    const chip = (ok, label) => `<span class="badge badge-${ok ? 'green' : 'red'}" style="font-size:0.6rem;padding:1px 4px;" title="${label} ${ok ? 'encontrado' : 'não encontrado no Drive'}">${ok ? '✅' : '❌'} ${label}</span>`;
+                    detalheFaltaHtml = `<div style="margin-top:2px;display:flex;gap:3px;justify-content:center;">${chip(vOk, '🎬')}${chip(sOk, '📄')}</div>`;
+                }
+                const complianceHtml = `<span class="badge badge-${complianceBadge(r.status_compliance)}" style="font-size:0.7rem;">${complianceIcon(r.status_compliance)} ${r.status_compliance || 'N/A'}</span>${detalheFaltaHtml}${PAPEIS_YOUTUBE_DIRETOR.includes(currentUserRole) && r.image_director_youtube_link ? `<a href="${r.image_director_youtube_link}" target="_blank" onclick="event.stopPropagation()" title="YouTube — Diretor de Imagem" style="margin-left:6px;font-size:1rem;text-decoration:none;">📺</a>` : ''}`;
+
+                const idrId = r.image_director_report_id || '';
+                const classId = r.id || '';
+
+                if (isDualLayout) {
+                    return `
+                <tr onclick="openDualReportDetail('${classId}', '${idrId}')" style="cursor: pointer;">
+                    <td class="col-aula">
+                        <div class="cel-principal">${dataFormatada}</div>
+                        <div class="cel-sub">${[r.turno, r.estudio].filter(Boolean).join(' · ') || '—'}</div>
+                    </td>
+                    <td class="col-arquivo" title="${(STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado) ? r.nome_ficheiro_gerado : (r.conteudo_ministrado || '')}">
+                        <div class="cel-principal">${(STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado) ? r.nome_ficheiro_gerado : (r.conteudo_ministrado || '—')}</div>
+                        <div class="cel-sub">por ${r.creator_name || 'desconhecido'}</div>
+                    </td>
+                    <td style="text-align:center;">${complianceHtml}</td>
+                    ${slideBadge}
+                    <td>${statusAssistenteHtml(r)}</td>
+                    <td>${statusDiretorHtml(r)}</td>
+                    <td>${ocorrenciasHtml}</td>
+                </tr>`;
+                }
+
+                return `
+                <tr onclick="openDualReportDetail('${classId}', '${idrId}')" style="cursor: pointer;">
+                    <td class="col-aula">
+                        <div class="cel-principal">${dataFormatada}</div>
+                        <div class="cel-sub">${[r.turno, r.estudio].filter(Boolean).join(' · ') || '—'}</div>
+                    </td>
+                    <td class="col-arquivo" title="${(STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado) ? r.nome_ficheiro_gerado : (r.conteudo_ministrado || '')}">
+                        <div class="cel-principal">${(STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado) ? r.nome_ficheiro_gerado : (r.conteudo_ministrado || '—')}</div>
+                        <div class="cel-sub">por ${r.creator_name || 'desconhecido'}</div>
+                    </td>
+                    <td style="text-align:center;">${complianceHtml}</td>
+                    ${slideBadge}
+                    <td>${statusForListRow(r)}</td>
+                    <td>${ocorrenciasHtml}</td>
+                </tr>
+            `}).join('');
+
+            const driveHeaderHtml = isDualLayout ? '<th>PDF</th>' : '';
+
+            const tableHead = isDualLayout
+                ? `<tr>
+                                <th>Aula</th>
+                                <th>Arquivo / conteúdo</th>
+                                <th>Vídeo</th>
+                                ${driveHeaderHtml}
+                                <th>Status Assistente</th>
+                                <th>Status Diretor</th>
+                                <th>OCORRÊNCIAS</th>
+                            </tr>`
+                : `<tr>
+                                <th>Aula</th>
+                                <th>Arquivo / conteúdo</th>
+                                <th>Vídeo</th>
+                                ${driveHeaderHtml}
+                                <th>STATUS</th>
+                                <th>OCORRÊNCIAS</th>
+                            </tr>`;
+
+            document.getElementById('reports-grid').innerHTML = `
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            ${tableHead}
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+        } catch (e) {
+            console.error(e);
+            const msg = String(e && e.message ? e.message : 'Erro ao carregar relatórios.').replace(/</g, '&lt;');
+            document.getElementById('reports-grid').innerHTML = `<p style="color: var(--status-red); padding: 1rem;">${msg}</p>`;
+        }
+    }
+
+    // ===== Config central de status (rótulo, ícone, classe css) =====
+    const STATUS_CONFIG = {
+        RASCUNHO:             { label: 'Rascunho',              icon: icone('lapis', 'ico-sm'), cls: 'badge-status-rascunho' },
+        AGUARDANDO_VALIDACAO: { label: 'Aguardando validação',  icon: icone('relogio', 'ico-sm'), cls: 'badge-status-aguardando' },
+        VALIDADO:             { label: 'Validado',              icon: icone('check', 'ico-sm'), cls: 'badge-status-validado' },
+        CANCELADO:            { label: 'Cancelado',             icon: icone('bloqueado', 'ico-sm'), cls: 'badge-status-cancelado' },
+        // Legado: finalizado antes do fluxo de validação (aulas até 31/08/2026)
+        FINALIZADO:           { label: 'Finalizado (legado)',   icon: '✔️', cls: 'badge-status-validado' },
+    };
+
+    function statusBadgeHtml(status) {
+        const cfg = STATUS_CONFIG[status] || { label: status || 'N/A', icon: icone('vazio', 'ico-sm'), cls: 'badge-status-rascunho' };
+        return `<span class="badge-status ${cfg.cls}">${cfg.icon} ${cfg.label}</span>`;
+    }
+
+    function complianceBadge(status) {
+        switch (status) {
+            case 'Verde': return 'green';
+            case 'Vermelho': return 'red';
+            case 'Pendente': return 'yellow';
+            default: return 'gray';
+        }
+    }
+
+    function complianceIcon(status) {
+        switch (status) {
+            case 'Verde': return '✅';
+            case 'Vermelho': return '❌';
+            case 'Pendente': return '⏳';
+            default: return '❓';
+        }
+    }
+
+    function prevPage() {
+        const limit = parseInt(document.getElementById('page-size').value);
+        currentOffset = Math.max(0, currentOffset - limit);
+        loadReports();
+    }
+
+    function nextPage() {
+        const limit = parseInt(document.getElementById('page-size').value);
+        if (currentOffset + limit < totalReports) {
+            currentOffset += limit;
+            loadReports();
+        }
+    }
+
+    function clearFilters() {
+        FILA_VALIDACAO = '';
+        document.getElementById('f-data-inicio').value = '';
+        document.getElementById('f-data-fim').value = '';
+        document.getElementById('f-status').value = '';
+        document.getElementById('f-estudio').value = '';
+        document.getElementById('f-turma').value = '';
+        document.getElementById('f-professor').value = '';
+        document.getElementById('f-disciplina').value = '';
+        document.getElementById('f-tipo-aula').value = '';
+        document.getElementById('f-usuario').value = '';
+        document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+        currentOffset = 0;
+        loadReports();
+    }
+
+    async function exportExcel(formato = 'xlsx', modelo = '') {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        if (!periodoValido()) return;
+        const params = buildFilterParams();
+        params.delete('limit');
+        params.delete('offset');
+        params.delete('sort_by');
+        params.delete('sort_order');
+        params.set('formato', formato);
+        if (modelo) params.set('modelo', modelo);
+        params.delete('fila_validacao');
+
+        try {
+            showToast(`Gerando exportação ${formato.toUpperCase()}...`, 'info', 2000);
+            const res = await fetch(`/api/v1/reports/export?${params.toString()}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.detail || 'Erro na exportação');
+            }
+
+            const blob = await res.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            const today = new Date().toISOString().split('T')[0];
+            const filename = formato === 'xlsm'
+                ? `relatorios_faturamento_seduc_${today}.xlsm`
+                : (modelo === 'detalhado' ? `relatorios_audit_${today}.xlsx` : `uso_de_estudio_${today}.xlsx`);
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+            showToast(`Exportação ${formato.toUpperCase()} concluída com sucesso!`, 'success', 2800);
+        } catch (e) {
+            showToast('Erro ao exportar: ' + e.message, 'error', 2800);
+        }
+    }
+
+    async function syncAllDrives() {
+        if (!confirm('Deseja iniciar a varredura e sincronização em massa no Drive para todos os relatórios Pendentes?')) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/reports/force-sync-drive', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Erro ao disparar sincronização em massa');
+            showToast('Varredura iniciada! Os relatórios pendentes serão atualizados em breve.', 'success');
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    /**
+     * Perfis "de um lado só" veem apenas o próprio painel no detalhe do relatório:
+     * Assistente → só o painel do Assistente; Diretor de Imagem/Chefe → só o painel do Diretor.
+     * Coordenação/Admin/Gestor/Auditor continuam vendo os dois lados (visão de auditoria).
+     */
+    function getDualPanelVisibility() {
+        if (['assistente', 'coordenador', 'coordenadora'].includes(currentUserRole)) {
+            return { showAssistente: true, showDiretor: false };
+        }
+        if (isDiretorFluxo()) {
+            return { showAssistente: false, showDiretor: true };
+        }
+        return { showAssistente: true, showDiretor: true };
+    }
+
+    function applyDualPanelVisibility() {
+        const { showAssistente, showDiretor } = getDualPanelVisibility();
+        const colAssistente = document.getElementById('drawer-col-assistente');
+        const colDiretor = document.getElementById('drawer-col-diretor');
+        const body = document.getElementById('report-drawer-body');
+        if (colAssistente) colAssistente.hidden = !showAssistente;
+        if (colDiretor) colDiretor.hidden = !showDiretor;
+        if (body) body.classList.toggle('single-col', !(showAssistente && showDiretor));
+        return { showAssistente, showDiretor };
+    }
+
+    async function openDualReportDetail(reportId, imageDirectorReportId) {
+        document.getElementById('report-overlay').classList.add('open');
+        document.getElementById('report-drawer').classList.add('open');
+        const { showAssistente, showDiretor } = applyDualPanelVisibility();
+        if (showAssistente) document.getElementById('report-detail-content').innerHTML = '<div class="spinner"></div>';
+        if (showDiretor) document.getElementById('image-director-detail-content').innerHTML = '<div class="spinner"></div>';
+        const tasks = [];
+        if (showAssistente) tasks.push(renderAssistentePanel(reportId));
+        if (showDiretor) tasks.push(renderDiretorPanel(reportId, imageDirectorReportId));
+        await Promise.all(tasks);
+    }
+
+    async function renderAssistentePanel(reportId) {
+        const container = document.getElementById('report-detail-content');
+        if (!reportId) {
+            container.innerHTML = `<div class="empty-state" style="padding:1.5rem;"><div class="icon">📋</div><p>Nenhum relatório do Assistente para este slot.</p></div>`;
+            return;
+        }
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        await openReportDetail(reportId, token);
+    }
+
+    function renderIdrLessonBlock(l) {
+        const canalChamado = l.transmissao_ou_gravada === 'Transmissão'
+            ? `<div class="detail-item"><span class="detail-label">Canal IPTV</span><span>${escapeHtml(l.canal_utilizado || '—')}</span></div>`
+            : `<div class="detail-item"><span class="detail-label">Nº chamado</span><span>${escapeHtml(l.numero_chamado || '—')}</span></div>`;
+        const extras = [
+            l.video_corrompido === 'Sim' ? `Vídeo corrompido: ${escapeHtml(l.video_corrompido_obs || '—')}` : null,
+            l.problema_audio === 'Sim' ? `Problema áudio: ${escapeHtml(l.problema_audio_obs || '—')}` : null,
+            l.vinhetas_corretas === 'Não' ? `Vinhetas: ${escapeHtml(l.vinhetas_corretas_obs || '—')}` : null,
+            l.interrupcoes === 'Sim' ? 'Houve interrupções' : null,
+            l.observacoes ? `Obs: ${escapeHtml(l.observacoes)}` : null,
+        ].filter(Boolean);
+        return `
+        <div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg-secondary);border-radius:var(--radius-sm);">
+            <strong>AULA ${String(l.numero_aula).padStart(2, '0')}</strong>
+            <div style="font-size:0.78rem;color:var(--text-muted);margin-top:0.25rem;">${escapeHtml(l.disciplina_nome)} · ${escapeHtml(l.professor_nome)}</div>
+            <div class="detail-grid" style="margin-top:0.5rem;">
+                <div class="detail-item"><span class="detail-label">Tipo</span><span>${escapeHtml(l.transmissao_ou_gravada)}</span></div>
+                ${canalChamado}
+                <div class="detail-item"><span class="detail-label">Vídeo corrompido</span><span>${escapeHtml(l.video_corrompido)}</span></div>
+                <div class="detail-item"><span class="detail-label">Problema áudio</span><span>${escapeHtml(l.problema_audio)}</span></div>
+                <div class="detail-item"><span class="detail-label">Vinhetas corretas</span><span>${escapeHtml(l.vinhetas_corretas)}</span></div>
+                <div class="detail-item"><span class="detail-label">Créditos</span><span>${escapeHtml(l.creditos_corretos)}</span></div>
+                <div class="detail-item"><span class="detail-label">Interrupções</span><span>${escapeHtml(l.interrupcoes)}</span></div>
+            </div>
+            ${extras.length ? `<p style="margin-top:0.5rem;font-size:0.82rem;color:var(--text-secondary);">${extras.join(' · ')}</p>` : ''}
+        </div>`;
+    }
+
+    function renderIdrChecklistSection(idr, checklistItems) {
+        const respostas = idr.checklist_respostas || [];
+        if (!checklistItems.length && !respostas.length) return '';
+        const byItem = {};
+        respostas.forEach((r) => { byItem[r.item_id] = r.resposta; });
+        const items = checklistItems.length
+            ? checklistItems
+            : respostas.map((r) => ({ id: r.item_id, nome: 'Item' }));
+        const rows = items.map((item) =>
+            `<div class="detail-item"><span class="detail-label">${escapeHtml(item.nome)}</span><span>${renderSimNao(byItem[item.id])}</span></div>`
+        ).join('');
+        if (!rows) return '';
+        return `
+        <div>
+            <div class="form-section-title">✅ Checklist de Fechamento</div>
+            <div class="detail-grid">${rows}</div>
+        </div>`;
+    }
+
+    function renderIdrCustomAnswersSection(idr, questions) {
+        const answers = idr.respostas_extras || [];
+        if (!answers.length) return '';
+        const qMap = {};
+        (questions || []).forEach((q) => { qMap[q.id] = q; });
+
+        function formatAnswer(a) {
+            const q = qMap[a.question_id];
+            if (q && q.tipo === 'texto') return escapeHtml(a.resposta_texto || '—');
+            if (a.resposta_bool === true) return 'Sim';
+            if (a.resposta_bool === false) return 'Não';
+            return escapeHtml(a.resposta_texto || '—');
+        }
+
+        const porRelatorio = answers.filter((a) => {
+            const q = qMap[a.question_id];
+            return !a.lesson_id && (!q || q.nivel === 'por_relatorio');
+        });
+        const porAula = answers.filter((a) => a.lesson_id);
+
+        let html = '';
+        if (porRelatorio.length) {
+            html += `<div class="form-section-title">❓ Perguntas do Relatório</div><div class="detail-grid">`;
+            porRelatorio.forEach((a) => {
+                const q = qMap[a.question_id];
+                const label = q ? q.texto : 'Pergunta';
+                html += `<div class="detail-item"><span class="detail-label">${escapeHtml(label)}</span><span>${formatAnswer(a)}</span></div>`;
+            });
+            html += '</div>';
+        }
+        if (porAula.length) {
+            html += `<div class="form-section-title" style="margin-top:0.75rem;">❓ Perguntas por Aula</div>`;
+            const byLesson = {};
+            porAula.forEach((a) => {
+                if (!byLesson[a.lesson_id]) byLesson[a.lesson_id] = [];
+                byLesson[a.lesson_id].push(a);
+            });
+            (idr.lessons || []).forEach((l) => {
+                const las = byLesson[l.id];
+                if (!las || !las.length) return;
+                html += `<div style="margin-top:0.5rem;font-size:0.78rem;font-weight:600;">AULA ${String(l.numero_aula).padStart(2, '0')}</div><div class="detail-grid">`;
+                las.forEach((a) => {
+                    const q = qMap[a.question_id];
+                    const label = q ? q.texto : 'Pergunta';
+                    html += `<div class="detail-item"><span class="detail-label">${escapeHtml(label)}</span><span>${formatAnswer(a)}</span></div>`;
+                });
+                html += '</div>';
+            });
+        }
+        return html ? `<div>${html}</div>` : '';
+    }
+
+    function renderIdrDetailHtml(idr, checklistItems, questions) {
+        const validadoInfo = (idr.status === 'VALIDADO' && idr.validado_por_nome) ? `
+            <div style="font-size:0.78rem;color:var(--text-muted);text-align:center;">
+                Validado por <strong>${escapeHtml(idr.validado_por_nome)}</strong>${idr.validado_em ? ` em ${new Date(idr.validado_em).toLocaleString('pt-BR')}` : ''}
+            </div>` : '';
+
+        const avisoCorrecao = idr.precisa_correcao ? `
+            <div style="background:#fffbeb;border:1px solid #fdba74;border-radius:var(--radius-sm);padding:0.85rem 1rem;">
+                <strong style="color:#92400e;">🔁 Devolvido para correção</strong>
+                <p style="margin-top:0.35rem;font-size:0.85rem;color:#7c2d12;">${escapeHtml(idr.observacao_coordenacao || 'Sem observação detalhada.')}</p>
+            </div>` : '';
+
+        const podeValidarDir = isDiretorChefe() && idr.status === 'AGUARDANDO_VALIDACAO';
+        // Reunião (out/2026): vídeo corrompido trava a validação até o diretor recuperar e desmarcar
+        const idrCorrompido = (idr.lessons || []).some(l => l.video_corrompido === 'Sim');
+        const acoesDir = podeValidarDir ? `
+            ${idrCorrompido ? '<p style="margin-top:1rem;font-size:0.8rem;color:var(--status-yellow);">⚠️ Vídeo marcado como corrompido: o diretor precisa recuperar o vídeo, desmarcar e salvar antes da validação.</p>' : ''}
+            <div style="display:flex;gap:0.5rem;margin-top:1rem;">
+                <button class="btn btn-validar btn-sm" ${idrCorrompido ? 'disabled title="Vídeo marcado como corrompido"' : ''} onclick="validarRelatorioImagem('${idr.id}')">✅ Validar</button>
+                <button class="btn btn-corrigir btn-sm" onclick="solicitarCorrecaoImagem('${idr.id}')">🔁 Correção</button>
+                ${idrCorrompido ? `<button class="btn btn-corrigir btn-sm" onclick="solicitarCorrecaoImagem('${idr.id}', TEXTO_VIDEO_CORROMPIDO)">📼 Vídeo corrompido — revisar</button>` : ''}
+            </div>` : '';
+
+        const avulsaHtml = idr.regular === 'Não' ? `
+            <div class="detail-item"><span class="detail-label">Ticket</span><span>${escapeHtml(idr.ticket_number || '—')}</span></div>
+            <div class="detail-item"><span class="detail-label">Horário avulso</span><span>${formatTime(idr.start_time)} – ${formatTime(idr.end_time)}</span></div>` : '';
+
+        const lessonsHtml = (idr.lessons || []).length
+            ? `<div><div class="form-section-title">🎬 Aulas / Detalhes Técnicos</div>${(idr.lessons || []).map(renderIdrLessonBlock).join('')}</div>`
+            : '';
+
+        const metaHtml = (idr.creator_name || idr.created_at) ? `
+            <div style="font-size:0.78rem;color:var(--text-muted);text-align:center;">
+                ${idr.creator_name ? `Criado por <strong>${escapeHtml(idr.creator_name)}</strong>` : ''}
+                ${idr.created_at ? `${idr.creator_name ? ' · ' : ''}${new Date(idr.created_at).toLocaleString('pt-BR')}` : ''}
+            </div>` : '';
+
+        return `
+            <div style="display:grid;gap:1rem;">
+                <div style="text-align:center;padding:0.75rem;background:var(--bg-glass);border-radius:var(--radius-sm);">
+                    ${statusBadgeHtml(idr.status)}
+                    ${validadoInfo}
+                    ${metaHtml}
+                </div>
+                ${avisoCorrecao}
+                <div>
+                    <div class="form-section-title">📌 Contexto</div>
+                    <div class="detail-grid">
+                        <div class="detail-item"><span class="detail-label">Data</span><span>${escapeHtml(idr.data_relatorio)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Turno</span><span>${escapeHtml(idr.turno)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Estúdio</span><span>${escapeHtml(idr.estudio)}</span></div>
+                        <div class="detail-item"><span class="detail-label">Turma</span><span>${escapeHtml(idr.turma_nome || '—')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Diretor</span><span>${escapeHtml(idr.diretor_imagem_nome || '—')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Disciplina</span><span>${escapeHtml(idr.disciplina_nome || '—')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Professor</span><span>${escapeHtml(idr.professor_nome || '—')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Horário</span><span>${escapeHtml(idr.horario_aula || '—')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Regular</span><span>${escapeHtml(idr.regular || 'Sim')}</span></div>
+                        <div class="detail-item"><span class="detail-label">Origem</span><span>${idr.origem === 'gravacao_estudio' ? '🎬 Gravação' : '📅 Grade'}</span></div>
+                        <div class="detail-item"><span class="detail-label">Entrada / Saída</span><span>${formatTime(idr.horario_entrada)} / ${formatTime(idr.horario_saida)}</span></div>
+                        ${avulsaHtml}
+                    </div>
+                </div>
+                ${lessonsHtml}
+                ${renderIdrChecklistSection(idr, checklistItems)}
+                ${renderIdrCustomAnswersSection(idr, questions)}
+                ${idr.observacoes_gerais ? `
+                <div>
+                    <div class="form-section-title">📝 Observações Gerais</div>
+                    <p style="font-size:0.85rem;color:var(--text-secondary);white-space:pre-wrap;">${escapeHtml(idr.observacoes_gerais)}</p>
+                </div>` : ''}
+                ${idr.youtube_link ? `<a href="${escapeHtml(idr.youtube_link)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm">📺 YouTube</a>` : ''}
+                ${acoesDir}
+                <a href="/aula?idr=${idr.id}" class="btn btn-secondary btn-sm">${icone('linha-tempo')} Linha do tempo</a>
+                <a href="/diretor-imagem?id=${idr.id}" class="btn btn-primary btn-sm">${currentUserRole === 'diretor_imagem' ? '✏️ Editar Relatório' : '✏️ Abrir formulário'}</a>
+            </div>`;
+    }
+
+    async function renderDiretorPanel(classReportId, imageDirectorReportId) {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const container = document.getElementById('image-director-detail-content');
+        try {
+            let idrId = imageDirectorReportId;
+            let cr = null;
+            if (!idrId && classReportId) {
+                const crRes = await fetch(`/api/v1/reports/${classReportId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (crRes.ok) {
+                    cr = await crRes.json();
+                    idrId = cr.image_director_report_id;
+                }
+            }
+            if (!idrId) {
+                let cta = '';
+                if (isDiretorFluxo() && cr) {
+                    cta = `<a href="${buildDiretorImagemLockedUrl(cr)}" class="btn btn-primary btn-sm" style="margin-top:1rem;">+ Cadastrar Relatório de Imagem</a>`;
+                }
+                container.innerHTML = `<div class="empty-state" style="padding:1.5rem;"><div class="icon">🎬</div><p>Nenhum relatório do Diretor de Imagem associado.</p>${cta}</div>`;
+                return;
+            }
+
+            const authHeaders = { 'Authorization': `Bearer ${token}` };
+            const [idrRes, checklistRes, questionsRes] = await Promise.all([
+                fetch(`/api/v1/image-director/${idrId}`, { headers: authHeaders }),
+                fetch('/api/v1/image-director/lookup/checklist-items', { headers: authHeaders }),
+                fetch('/api/v1/image-director/lookup/questions', { headers: authHeaders }),
+            ]);
+            if (!idrRes.ok) throw new Error('Erro ao carregar relatório de imagem');
+            const idr = await idrRes.json();
+            const checklistItems = checklistRes.ok ? await checklistRes.json() : [];
+            const questions = questionsRes.ok ? await questionsRes.json() : [];
+
+            container.innerHTML = renderIdrDetailHtml(idr, checklistItems, questions);
+        } catch (e) {
+            container.innerHTML = `<p style="color:var(--status-red);">Erro ao carregar relatório de imagem.</p>`;
+        }
+    }
+
+    async function validarRelatorioImagem(id) {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const aviso = await textoConferenciaPar(`/api/v1/image-director/${id}/conferencia-par`);
+        if (!confirm('Confirmar validação deste relatório de imagem?' + aviso)) return;
+        try {
+            const res = await fetch(`/api/v1/image-director/${id}/validar`, {
+                method: 'PATCH', headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Falha ao validar');
+            showToast('Relatório de imagem validado!', 'success');
+            loadReports();
+            await renderDiretorPanel('', id);
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    const TEXTO_VIDEO_CORROMPIDO = 'Vídeo corrompido: recupere o vídeo (ou baixe do YouTube, corte e coloque na pasta), desmarque "vídeo corrompido" e salve o relatório.';
+    async function solicitarCorrecaoImagem(id, textoPadrao = '') {
+        const obs = prompt('Descreva o motivo da correção:', textoPadrao);
+        if (!obs) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/image-director/${id}/solicitar-correcao`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ observacao_coordenacao: obs })
+            });
+            if (!res.ok) throw new Error('Falha ao solicitar correção');
+            showToast('Relatório devolvido para correção.', 'success');
+            loadReports();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function openReportDetail(reportId, tokenOverride) {
+        const token = tokenOverride || localStorage.getItem('token') || localStorage.getItem('access_token');
+
+        let r;
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Erro ao carregar');
+            r = await res.json();
+
+            const podeValidar = isCoordenacao() && r.status === 'AGUARDANDO_VALIDACAO';
+            const isGravacao = (r.tipo_aula || '').toLowerCase().includes('gravação');
+            const substitutoNome = r.teve_substituicao
+                ? (resolveProfessorNameById(r.professor_substituto_id)
+                    || r.professor_substituto_nome_externo
+                    || '—')
+                : null;
+
+            const avisoCorrecaoHtml = r.precisa_correcao ? `
+                <div style="background: #fffbeb; border: 1px solid #fdba74; border-radius: var(--radius-sm); padding: 0.85rem 1rem;">
+                    <strong style="color: #92400e;">🔁 Devolvido para correção</strong>
+                    <p style="margin-top: 0.35rem; font-size: 0.85rem; color: #7c2d12;">${escapeHtml(r.observacao_coordenacao || 'Sem observação detalhada.')}</p>
+                </div>` : '';
+
+            const validadoInfoHtml = (r.status === 'VALIDADO' && r.validado_por_nome) ? `
+                <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center;">
+                    Validado por <strong>${escapeHtml(r.validado_por_nome)}</strong>${r.validado_em ? ` em ${new Date(r.validado_em).toLocaleString('pt-BR')}` : ''}
+                </div>` : '';
+
+            const metaHtml = (r.creator_name || r.created_at) ? `
+                <div style="font-size: 0.78rem; color: var(--text-muted); text-align: center;">
+                    ${r.creator_name ? `Criado por <strong>${escapeHtml(r.creator_name)}</strong>` : ''}
+                    ${r.created_at ? `${r.creator_name ? ' · ' : ''}${new Date(r.created_at).toLocaleString('pt-BR')}` : ''}
+                </div>` : '';
+
+            const avulsaHtml = r.regular === 'Não' ? `
+                <div class="detail-item"><span class="detail-label">Ticket</span><span>${escapeHtml(r.ticket_number || '—')}</span></div>
+                <div class="detail-item"><span class="detail-label">Horário avulso</span><span>${formatTime(r.start_time)} – ${formatTime(r.end_time)}</span></div>` : '';
+
+            const isCoordenador = ['coordenador', 'coordenadora'].includes(currentUserRole);
+
+            const idrVinculoHtml = (r.image_director_report_id && !isCoordenador) ? `
+                    <div>
+                        <div class="form-section-title">🎬 Diretor de Imagem (vinculado)</div>
+                        <div class="detail-grid">
+                            <div class="detail-item"><span class="detail-label">Status IDR</span><span>${escapeHtml(r.image_director_status || '—')}</span></div>
+                            <div class="detail-item"><span class="detail-label">Origem</span><span>${r.image_director_origem === 'gravacao_estudio' ? 'Gravação' : 'Grade'}</span></div>
+                            ${r.image_director_validado_por_nome ? `<div class="detail-item"><span class="detail-label">Validado por</span><span>${escapeHtml(r.image_director_validado_por_nome)}</span></div>` : ''}
+                        </div>
+                        ${r.image_director_youtube_link ? `<a href="${escapeHtml(r.image_director_youtube_link)}" target="_blank" rel="noopener" class="btn btn-secondary btn-sm" style="margin-top:0.5rem;">📺 YouTube (IDR)</a>` : ''}
+                    </div>` : '';
+
+            // Reunião (out/2026): só valida com os dois links (vídeo e PDF) coletados no Drive
+            const linksOk = !!(r.video_link && r.slide_link);
+            const acoesValidacaoHtml = podeValidar ? `
+                ${linksOk ? '' : `<p style="font-size:0.8rem;color:var(--status-yellow);margin:0 0 0.5rem;">⏳ Aguardando a coleta do link do ${[!r.video_link ? 'vídeo' : '', !r.slide_link ? 'PDF' : ''].filter(Boolean).join(' e do ')} no Drive — a validação libera quando os dois links forem coletados.</p>`}
+                <div style="display: flex; gap: 0.75rem;">
+                    <button class="btn btn-validar btn-full" ${linksOk ? '' : 'disabled title="Aguardando os links do vídeo e do PDF"'} onclick="validarRelatorio('${r.id}')">✅ Relatório Validado</button>
+                    <button class="btn btn-corrigir btn-full" onclick="solicitarCorrecao('${r.id}')">🔁 Enviar para Correção</button>
+                </div>` : '';
+
+            document.getElementById('report-detail-content').innerHTML = `
+                <div style="display: grid; gap: 1.5rem;">
+                    <!-- Status Badge -->
+                    <div style="text-align: center; padding: 0.75rem; background: var(--bg-glass); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 0.4rem; align-items: center;">
+                        ${statusBadgeHtml(r.status)}
+                        ${validadoInfoHtml}
+                        ${metaHtml}
+                    </div>
+
+                    ${avisoCorrecaoHtml}
+
+                    <!-- Contexto Operacional -->
+                    <div>
+                        <div class="form-section-title">📌 Contexto</div>
+                        <div class="detail-grid">
+                            <div class="detail-item"><span class="detail-label">Data</span><span>${escapeHtml(r.data_aula)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Turno</span><span>${escapeHtml(r.turno)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Horário</span><span>${escapeHtml(r.horario_aula || '—')}</span></div>
+                            <div class="detail-item"><span class="detail-label">Turma</span><span>${escapeHtml(r.turma_nome)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Disciplina</span><span>${escapeHtml(r.disciplina_nome)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Professor</span><span>${escapeHtml(r.professor_nome || r.professor_nome_externo || '—')}</span></div>
+                            ${r.professor_nome_externo && r.professor_nome !== r.professor_nome_externo ? `<div class="detail-item"><span class="detail-label">Professor externo</span><span>${escapeHtml(r.professor_nome_externo)}</span></div>` : ''}
+                            <div class="detail-item"><span class="detail-label">Regular</span><span>${escapeHtml(r.regular)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Estúdio</span><span>${escapeHtml(r.estudio)}</span></div>
+                            ${avulsaHtml}
+                        </div>
+                    </div>
+
+                    <!-- Execução -->
+                    <div>
+                        <div class="form-section-title">🎬 Execução</div>
+                        <div class="detail-grid">
+                            <div class="detail-item"><span class="detail-label">Tipo de Aula</span><span>${escapeHtml(r.tipo_aula)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Canal</span><span>${escapeHtml(r.canal_utilizado || '—')}</span></div>
+                            <div class="detail-item"><span class="detail-label">Interação</span><span>${escapeHtml(r.interacao_professor_aluno)}</span></div>
+                            <div class="detail-item"><span class="detail-label">Atividade</span><span>${escapeHtml(r.atividade_pratica || '—')}</span></div>
+                            ${!isCoordenador ? `<div class="detail-item"><span class="detail-label">Diretor Imagem</span><span>${escapeHtml(r.diretor_imagem_nome || '—')}</span></div>` : ''}
+                            ${isGravacao ? `<div class="detail-item"><span class="detail-label">Precisa edição</span><span>${r.needs_editing ? 'Sim' : 'Não'}</span></div>` : ''}
+                        </div>
+                        ${r.interacao_professor_aluno === 'Outras' && r.interacao_outras_desc ? `
+                        <div style="margin-top: 0.5rem;">
+                            <div class="detail-label">Descrição da interação</div>
+                            <p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.interacao_outras_desc)}</p>
+                        </div>` : ''}
+                        <div style="margin-top: 0.75rem;">
+                            <div class="detail-label">Conteúdo Ministrado</div>
+                            <p style="margin-top: 0.25rem; color: var(--text-primary); font-size: 0.9rem;">${escapeHtml(r.conteudo_ministrado)}</p>
+                        </div>
+                        ${r.bncc_habilidades ? `
+                        <div style="margin-top: 0.75rem;">
+                            <div class="detail-label">Habilidades BNCC / Currículo Piauí</div>
+                            <div style="margin-top: 0.25rem; font-size: 0.75rem; background: var(--bg-secondary); padding: 8px 12px; border-radius: 4px; border-left: 3px solid var(--status-green); white-space: pre-wrap; color: var(--text-primary);">
+                                ${escapeHtml(r.bncc_habilidades)}
+                            </div>
+                        </div>` : ''}
+                        ${r.escolas_participantes && r.escolas_participantes.length > 0 ? `
+                        <div style="margin-top: 0.75rem;">
+                            <div class="detail-label">Escolas Participantes</div>
+                            <div style="margin-top: 0.25rem; display: flex; gap: 4px; flex-wrap: wrap;">
+                                ${r.escolas_participantes.map(e => `<span class="badge badge-gray">${escapeHtml(e)}</span>`).join('')}
+                            </div>
+                        </div>` : ''}
+                        ${r.observacoes ? `<div style="margin-top: 0.5rem;"><div class="detail-label">Observações</div><p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.observacoes)}</p></div>` : ''}
+                        ${r.observacoes_manha ? `<div style="margin-top: 0.5rem;"><div class="detail-label">Observações da manhã</div><p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.observacoes_manha)}</p></div>` : ''}
+                    </div>
+
+                    <!-- Recursos -->
+                    <div>
+                        <div class="form-section-title">📦 Recursos</div>
+                        <div class="detail-grid">
+                            <div class="detail-item"><span class="detail-label">Recursos</span><span>${r.tipo_recursos_utilizados ? r.tipo_recursos_utilizados.map(escapeHtml).join(', ') : '—'}</span></div>
+                            <div class="detail-item"><span class="detail-label">Problema Material</span><span>${escapeHtml(r.problema_material)}</span></div>
+                        </div>
+                        ${r.recursos_outro_desc ? `<div style="margin-top: 0.5rem;"><div class="detail-label">Recurso (Outro)</div><p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.recursos_outro_desc)}</p></div>` : ''}
+                        ${r.problema_material_outro_desc ? `<div style="margin-top: 0.5rem;"><div class="detail-label">Problema material (Outro)</div><p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.problema_material_outro_desc)}</p></div>` : ''}
+                        ${r.problematic_materials && r.problematic_materials.length > 0 ? `
+                        <div style="margin-top: 0.75rem; background: #fff1f2; padding: 0.5rem 1rem; border: 1px solid #fecdd3; border-radius: 4px;">
+                            <div class="detail-label" style="color: #be123c;">⚠️ Detalhes Materiais Problemáticos</div>
+                            <ul style="margin-top: 0.25rem; margin-bottom: 0; font-size: 0.85rem; color: #9f1239; padding-left: 1.25rem;">
+                                ${r.problematic_materials.map(m => `<li><strong>${escapeHtml(m.material)}:</strong> ${escapeHtml(m.descricao)}</li>`).join('')}
+                            </ul>
+                        </div>` : ''}
+                    </div>
+
+                    <!-- Ocorrências -->
+                    <div>
+                        <div class="form-section-title">⚠️ Ocorrências</div>
+                        <div class="detail-grid">
+                            <div class="detail-item"><span class="detail-label">Substituição</span><span>${r.teve_substituicao ? 'Sim' : 'Não'}</span></div>
+                            ${substitutoNome ? `<div class="detail-item"><span class="detail-label">Professor substituto</span><span>${escapeHtml(substitutoNome)}</span></div>` : ''}
+                            <div class="detail-item"><span class="detail-label">Atraso</span><span>${r.teve_atraso ? escapeHtml(r.minutos_atraso) + ' min' : 'Não'}</span></div>
+                        </div>
+                        ${r.observacao_atraso ? `<div style="margin-top: 0.5rem;"><div class="detail-label">Obs. Atraso</div><p style="color: var(--text-secondary); font-size: 0.85rem;">${escapeHtml(r.observacao_atraso)}</p></div>` : ''}
+                    </div>
+
+                    ${idrVinculoHtml}
+
+                    <!-- Compliance Digital (§6) -->
+                    <div>
+                        <div class="form-section-title">🛡️ Compliance Digital</div>
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            <div class="detail-item">
+                                <span class="detail-label">Status Vídeo</span>
+                                <span class="badge badge-outline-${complianceBadge(r.status_compliance)}">${r.status_compliance}</span>
+                            </div>
+                            ${r.youtube_link ? `
+                            <a href="${r.youtube_link}" target="_blank" class="btn btn-sm btn-full" style="background: #ef4444; color: white; text-decoration: none; text-align: center;">
+                                📺 Ver no YouTube
+                            </a>` : ''}
+                            ${r.vimeo_link ? `
+                            <a href="${r.vimeo_link}" target="_blank" class="btn btn-sm btn-full" style="background: #1ab7ea; color: white; text-decoration: none; text-align: center;">
+                                ▶️ Ver no Vimeo
+                            </a>` : ''}
+                            ${r.video_link ? `
+                            <a href="${r.video_link}" target="_blank" class="btn btn-sm btn-full" style="background: #10b981; color: white; text-decoration: none; text-align: center;">
+                                🎥 Ver Vídeo no Drive
+                            </a>` : ''}
+                            ${r.video_folder_link ? `
+                            <a href="${r.video_folder_link}" target="_blank" class="btn btn-sm btn-full" style="background: #3b82f6; color: white; text-decoration: none; text-align: center;">
+                                📂 Abrir Pasta do Drive
+                            </a>` : ''}
+                            ${r.slide_link ? `
+                            <a href="${r.slide_link}" target="_blank" class="btn btn-sm btn-full" style="background: #f59e0b; color: white; text-decoration: none; text-align: center;">
+                                📑 Abrir Slide/Apresentação
+                            </a>` : ''}
+                            ${(r.status !== 'RASCUNHO' && (!r.video_link || !r.slide_link)) ? `
+                            <button class="btn btn-sm btn-full" style="background: #6366f1; color: white; border: none; text-align: center;" onclick="syncIndividual('${r.id}')">
+                                🔍 Re-verificar no Drive
+                            </button>` : ''}
+                        </div>
+                    </div>
+
+                    <!-- Naming Engine -->
+                    ${r.nome_ficheiro_gerado ? `
+                    <div>
+                        <div class="form-section-title">🎞️ Nome do Arquivo</div>
+                        <div class="naming-preview">${escapeHtml(r.nome_ficheiro_gerado)}</div>
+                    </div>` : ''}
+
+                    ${acoesValidacaoHtml}
+
+                    <div style="margin-top: ${acoesValidacaoHtml ? '0' : '1.5rem'}; display: grid; gap: 0.75rem;">
+                        <a href="/aula?cr=${r.id}" class="btn btn-secondary btn-full" style="text-align: center; text-decoration: none;" title="Assistente, diretor, Drive, validações, faturamento e histórico">
+                            ${icone('linha-tempo')} Linha do tempo da aula
+                        </a>
+                        ${!isDiretorFluxo() ? `
+                        <a href="/report?report_id=${r.id}" class="btn btn-primary btn-full" style="text-align: center; text-decoration: none;">
+                            ✏️ Editar Relatório
+                        </a>` : ''}
+                        ${(currentUserRole === 'admin' || r.created_by === currentUserId) && !isDiretorFluxo() ? `
+                        <button class="btn btn-danger btn-full" onclick="deleteReport('${r.id}')" style="background: #dc2626;">
+                            🗑️ Excluir Relatório
+                        </button>` : ''}
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.error('Erro ao processar detalhes do relatório:', e, r);
+            document.getElementById('report-detail-content').innerHTML = `
+                <div style="color: var(--status-red); text-align: center; padding: 1rem;">
+                    <p>⚠️ Erro ao carregar detalhe.</p>
+                    <p style="font-size: 0.7rem; opacity: 0.7; margin-top: 0.5rem;">${e.message}</p>
+                </div>
+            `;
+        }
+    }
+
+    function closeReportDetail() {
+        document.getElementById('report-overlay').classList.remove('open');
+        document.getElementById('report-drawer').classList.remove('open');
+    }
+
+    async function syncIndividual(reportId) {
+        if (!confirm('Deseja forçar a re-verificação imediata deste relatório no Drive?')) return;
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}/sync-individual`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (!res.ok) throw new Error('Erro ao disparar verificação');
+            showToast('Verificação iniciada. O status deve ser atualizado em breve.', 'success');
+            const idrRes = await fetch(`/api/v1/reports/${reportId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            let idrId = '';
+            if (idrRes.ok) {
+                const cr = await idrRes.json();
+                idrId = cr.image_director_report_id || '';
+            }
+            openDualReportDetail(reportId, idrId);
+            loadReports();
+        } catch (e) {
+            showToast(e.message, 'error');
+        }
+    }
+
+    function statusBadge(status) {
+        switch (status) {
+            case 'FINALIZADO': return 'green';
+            case 'RASCUNHO': return 'yellow';
+            case 'CANCELADO': return 'red';
+            default: return 'gray';
+        }
+    }
+
+    function complianceBadge(status) {
+        switch (status) {
+            case 'Verde': return 'green';
+            case 'Vermelho': return 'red';
+            case 'Pendente': return 'yellow';
+            default: return 'gray';
+        }
+    }
+
+    function complianceIcon(status) {
+        switch (status) {
+            case 'Verde': return '✅';
+            case 'Vermelho': return '❌';
+            case 'Pendente': return '⏳';
+            default: return '❓';
+        }
+    }
+
+    function formatAuditDate(isoDate) {
+        try {
+            return new Date(isoDate + 'T00:00:00').toLocaleDateString('pt-BR');
+        } catch (e) {
+            return isoDate;
+        }
+    }
+
+    function renderAuditSlotList(containerId, listId, badgeId, btnId, items, isSemProfessor) {
+        const container = document.getElementById(containerId);
+        const listDiv = document.getElementById(listId);
+        document.getElementById(badgeId).textContent = items.length;
+
+        if (items.length === 0) {
+            container.style.display = 'none';
+            listDiv.style.display = 'none';
+            document.getElementById(btnId).textContent = 'Mostrar Lista';
+            return;
+        }
+
+        container.style.display = 'block';
+        listDiv.innerHTML = items.map(p => {
+            const dataFormatada = formatAuditDate(p.data);
+            const profLabel = isSemProfessor
+                ? 'Cadastro incompleto — vincule professor à disciplina'
+                : `Professor(es): <strong>${p.professor_nome || '—'}</strong>`;
+            return `
+                <a href="/grade?turma=${p.turma_id}&week=${p.week}&highlight_date=${p.data}&highlight_horario=${encodeURIComponent(p.horario)}&highlight_disciplina=${p.disciplina_id}" class="pendente-item" style="text-decoration: none; color: inherit; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; flex-direction: column; gap: 0.2rem;">
+                        <span style="font-weight: 600; color: var(--accent-primary);">${p.disciplina_nome} - ${dataFormatada} (${p.dia_semana}) - ${p.horario}</span>
+                        <span style="font-size: 0.75rem; color: var(--text-muted);">${profLabel}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-primary); display: block;">Turma: ${p.turma_nome}</span>
+                    </div>
+                </a>
+            `;
+        }).join('');
+    }
+
+    function togglePendentesList() {
+        const listDiv = document.getElementById('audit-pendentes-list');
+        const btn = document.getElementById('btn-toggle-pendentes');
+        if (listDiv.style.display === 'none' || listDiv.style.display === '') {
+            listDiv.style.display = 'flex';
+            listDiv.style.flexDirection = 'column';
+            btn.textContent = 'Ocultar Lista';
+        } else {
+            listDiv.style.display = 'none';
+            btn.textContent = 'Mostrar Lista';
+        }
+    }
+
+    function toggleSemProfessorList() {
+        const listDiv = document.getElementById('audit-sem-professor-list');
+        const btn = document.getElementById('btn-toggle-sem-professor');
+        if (listDiv.style.display === 'none' || listDiv.style.display === '') {
+            listDiv.style.display = 'flex';
+            listDiv.style.flexDirection = 'column';
+            btn.textContent = 'Ocultar Lista';
+        } else {
+            listDiv.style.display = 'none';
+            btn.textContent = 'Mostrar Lista';
+        }
+    }
+</script>
+{% endblock %}

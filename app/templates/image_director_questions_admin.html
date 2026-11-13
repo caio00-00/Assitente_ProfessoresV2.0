@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}Checklist do diretor — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-checklist"/></svg> Checklist do diretor de imagem</h1>
+        <p class="page-subtitle">Perguntas e itens que o diretor responde em cada turno (definidos pelo diretor-chefe)</p>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>🔧 Checklist de Fechamento de Estúdio</span>
+        <button class="btn btn-primary btn-sm" style="width:auto;" onclick="openItemModal()">+ Novo Item</button>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted);">Itens que aparecem no bloco "Fechamento de Estúdio" (ex.: Microfone, Caneta, Controle da TV).</p>
+    <div id="checklist-items-table"><div class="spinner"></div></div>
+</div>
+
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>❓ Perguntas Extras</span>
+        <button class="btn btn-primary btn-sm" style="width:auto;" onclick="openQuestionModal()">+ Nova Pergunta</button>
+    </div>
+    <p style="font-size: 0.8rem; color: var(--text-muted);">Perguntas adicionais exibidas no formulário do Diretor de Imagem — por aula ou uma vez por relatório.</p>
+    <div id="questions-table"><div class="spinner"></div></div>
+</div>
+
+<!-- Modal Item de Checklist -->
+<div class="drawer-overlay" id="item-overlay" onclick="closeItemModal()"></div>
+<div class="drawer" id="item-drawer">
+    <div class="drawer-header"><h3>Item do Checklist</h3><button class="drawer-close" onclick="closeItemModal()">✕</button></div>
+    <form onsubmit="saveItem(event)" style="padding: 1.5rem;">
+        <input type="hidden" id="item-id">
+        <div class="form-group"><label class="form-label">Nome do item</label>
+            <input type="text" id="item-nome" class="form-input" placeholder="Ex: Microfone" required></div>
+        <div class="form-group"><label class="form-label">Ordem de exibição</label>
+            <input type="number" id="item-ordem" class="form-input" value="0"></div>
+        <div style="display:flex; gap:1rem; margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeItemModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">Guardar</button>
+        </div>
+    </form>
+</div>
+
+<!-- Modal Pergunta Extra -->
+<div class="drawer-overlay" id="question-overlay" onclick="closeQuestionModal()"></div>
+<div class="drawer" id="question-drawer">
+    <div class="drawer-header"><h3>Pergunta Extra</h3><button class="drawer-close" onclick="closeQuestionModal()">✕</button></div>
+    <form onsubmit="saveQuestion(event)" style="padding: 1.5rem;">
+        <input type="hidden" id="q-id">
+        <div class="form-group"><label class="form-label">Texto da pergunta</label>
+            <textarea id="q-texto" class="form-textarea" rows="2" required></textarea></div>
+        <div class="form-group"><label class="form-label">Tipo de resposta</label>
+            <select id="q-tipo" class="form-select">
+                <option value="sim_nao">Sim / Não</option>
+                <option value="texto">Texto livre</option>
+            </select></div>
+        <div class="form-group"><label class="form-label">Onde aparece</label>
+            <select id="q-nivel" class="form-select">
+                <option value="por_relatorio">Uma vez por relatório</option>
+                <option value="por_aula">Repetida em cada bloco de aula</option>
+            </select></div>
+        <div class="form-group">
+            <label style="display:flex; align-items:center; gap:0.5rem; font-size:0.85rem;">
+                <input type="checkbox" id="q-obrigatoria"> Obrigatória
+            </label>
+        </div>
+        <div class="form-group"><label class="form-label">Ordem de exibição</label>
+            <input type="number" id="q-ordem" class="form-input" value="0"></div>
+        <div style="display:flex; gap:1rem; margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeQuestionModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">Guardar</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserProfile();
+        await Promise.all([loadItems(), loadQuestions()]);
+    });
+
+    // ─── Checklist Items ─────────────────────────────────────────────
+
+    async function loadItems() {
+        const data = await apiGet('/api/v1/image-director/admin/checklist-items') || [];
+        if (data.length === 0) {
+            document.getElementById('checklist-items-table').innerHTML = '<div class="empty-state"><p>Nenhum item cadastrado.</p></div>';
+            return;
+        }
+        const rows = data.map(i => `
+            <tr style="${!i.ativo ? 'opacity:0.5;' : ''}">
+                <td>${i.nome}</td>
+                <td>${i.ordem}</td>
+                <td>${i.ativo ? '✅ Ativo' : '❌ Inativo'}</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick='openItemModal(${JSON.stringify(i)})'>✏️</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteItem('${i.id}')">🗑️</button>
+                </td>
+            </tr>`).join('');
+        document.getElementById('checklist-items-table').innerHTML = `
+            <div class="table-container"><table>
+                <thead><tr><th>Nome</th><th>Ordem</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table></div>`;
+    }
+
+    function openItemModal(item) {
+        document.getElementById('item-id').value = item ? item.id : '';
+        document.getElementById('item-nome').value = item ? item.nome : '';
+        document.getElementById('item-ordem').value = item ? item.ordem : 0;
+        document.getElementById('item-overlay').classList.add('open');
+        document.getElementById('item-drawer').classList.add('open');
+    }
+    function closeItemModal() {
+        document.getElementById('item-overlay').classList.remove('open');
+        document.getElementById('item-drawer').classList.remove('open');
+    }
+
+    async function saveItem(e) {
+        e.preventDefault();
+        const id = document.getElementById('item-id').value;
+        const body = { nome: document.getElementById('item-nome').value, ordem: parseInt(document.getElementById('item-ordem').value) || 0 };
+        try {
+            if (id) await apiPatch(`/api/v1/image-director/admin/checklist-items/${id}`, body);
+            else await apiPost('/api/v1/image-director/admin/checklist-items', body);
+            showToast('Item salvo!', 'success');
+            closeItemModal();
+            loadItems();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteItem(id) {
+        const token = getToken();
+        await fetch(`/api/v1/image-director/admin/checklist-items/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        showToast('Item desativado.', 'success');
+        loadItems();
+    }
+
+    // ─── Perguntas Extras ────────────────────────────────────────────
+
+    async function loadQuestions() {
+        const data = await apiGet('/api/v1/image-director/admin/questions') || [];
+        if (data.length === 0) {
+            document.getElementById('questions-table').innerHTML = '<div class="empty-state"><p>Nenhuma pergunta cadastrada.</p></div>';
+            return;
+        }
+        const nivelLabel = { por_relatorio: 'Por relatório', por_aula: 'Por aula' };
+        const tipoLabel = { sim_nao: 'Sim/Não', texto: 'Texto' };
+        const rows = data.map(q => `
+            <tr style="${!q.ativa ? 'opacity:0.5;' : ''}">
+                <td>${q.texto}</td>
+                <td>${tipoLabel[q.tipo] || q.tipo}</td>
+                <td>${nivelLabel[q.nivel] || q.nivel}</td>
+                <td>${q.obrigatoria ? 'Sim' : 'Não'}</td>
+                <td>${q.ativa ? '✅ Ativa' : '❌ Inativa'}</td>
+                <td>
+                    <button class="btn btn-secondary btn-sm" onclick='openQuestionModal(${JSON.stringify(q)})'>✏️</button>
+                    <button class="btn btn-danger btn-sm" onclick="deleteQuestion('${q.id}')">🗑️</button>
+                </td>
+            </tr>`).join('');
+        document.getElementById('questions-table').innerHTML = `
+            <div class="table-container"><table>
+                <thead><tr><th>Pergunta</th><th>Tipo</th><th>Aparece</th><th>Obrigatória</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table></div>`;
+    }
+
+    function openQuestionModal(q) {
+        document.getElementById('q-id').value = q ? q.id : '';
+        document.getElementById('q-texto').value = q ? q.texto : '';
+        document.getElementById('q-tipo').value = q ? q.tipo : 'sim_nao';
+        document.getElementById('q-nivel').value = q ? q.nivel : 'por_relatorio';
+        document.getElementById('q-obrigatoria').checked = q ? q.obrigatoria : false;
+        document.getElementById('q-ordem').value = q ? q.ordem : 0;
+        document.getElementById('question-overlay').classList.add('open');
+        document.getElementById('question-drawer').classList.add('open');
+    }
+    function closeQuestionModal() {
+        document.getElementById('question-overlay').classList.remove('open');
+        document.getElementById('question-drawer').classList.remove('open');
+    }
+
+    async function saveQuestion(e) {
+        e.preventDefault();
+        const id = document.getElementById('q-id').value;
+        const body = {
+            texto: document.getElementById('q-texto').value,
+            tipo: document.getElementById('q-tipo').value,
+            nivel: document.getElementById('q-nivel').value,
+            obrigatoria: document.getElementById('q-obrigatoria').checked,
+            ordem: parseInt(document.getElementById('q-ordem').value) || 0,
+        };
+        try {
+            if (id) await apiPatch(`/api/v1/image-director/admin/questions/${id}`, body);
+            else await apiPost('/api/v1/image-director/admin/questions', body);
+            showToast('Pergunta salva!', 'success');
+            closeQuestionModal();
+            loadQuestions();
+        } catch (e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteQuestion(id) {
+        const token = getToken();
+        await fetch(`/api/v1/image-director/admin/questions/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        showToast('Pergunta desativada.', 'success');
+        loadQuestions();
+    }
+</script>
+{% endblock %}

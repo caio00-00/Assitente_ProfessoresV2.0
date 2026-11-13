@@ -1,0 +1,88 @@
+# Canal Educação v4 — ambiente local completo (Postgres + Redis + API + worker + beat).
+#
+#   copy .env.example .env      (Windows)   |   cp .env.example .env   (Linux/Mac)
+#   docker compose up -d --build
+#   http://localhost:8000
+#
+# Nenhuma senha fica neste arquivo: tudo vem do .env. Postgres e Redis só
+# aceitam conexão da própria máquina (127.0.0.1), não da rede.
+# Para usar o Supabase no lugar do Postgres local: docker-compose.supabase.yml.
+
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    POSTGRES_HOST: db
+    REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+  volumes:
+    - ./credentials.json:/app/credentials.json:ro
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:${POSTGRES_VERSION:-15}   # mesma versão do banco de HML (pg_restore não lê dump de versão mais nova)
+    container_name: ${CONTAINER_PREFIX:-canal_edu}_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-assistente_professores}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres-prd}   # padrão igual ao compose antigo; no local o .env usa canal_local
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT_LOCAL:-5432}:5432"
+    volumes:
+      - postgres_data_final:/var/lib/postgresql/data
+      - ./scripts/dados_hml:/dados_hml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-assistente_professores} -d ${POSTGRES_DB:-postgres-prd}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: ${CONTAINER_PREFIX:-canal_edu}_redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-redis_local}"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT_LOCAL:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_local}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *app
+    container_name: ${CONTAINER_PREFIX:-canal_edu}_api
+    command: ["api-dev"]
+    ports:
+      - "${API_PORT_LOCAL:-8000}:8000"
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./app:/app/app          # recarrega ao salvar arquivos (modo desenvolvimento)
+
+  worker:
+    <<: *app
+    container_name: ${CONTAINER_PREFIX:-canal_edu}_worker
+    command: ["worker"]
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+      RUN_MIGRATIONS: "0"
+
+  beat:
+    <<: *app
+    container_name: ${CONTAINER_PREFIX:-canal_edu}_beat
+    command: ["beat"]
+    environment:
+      POSTGRES_HOST: db
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+      RUN_MIGRATIONS: "0"
+
+volumes:
+  postgres_data_final:

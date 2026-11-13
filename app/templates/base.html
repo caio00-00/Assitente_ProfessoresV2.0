@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Canal Educação - Sistema de Gestão de Relatórios de Aula">
+    <title>{% block title %}Canal Educação{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=4.1">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    {% block head %}{% endblock %}
+</head>
+
+<body>
+    {% include "_icones.html" %}
+    {% block body %}
+    <div class="app-layout">
+        <!-- Sidebar Toggle Btn -->
+        <button id="sidebar-toggle" class="sidebar-toggle-btn" aria-label="Abrir ou fechar o menu" onclick="document.body.classList.toggle('sidebar-toggled')">
+            <svg class="ico"><use href="#i-menu"/></svg>
+        </button>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-logo">
+                <div class="logo-icon"><svg class="ico"><use href="#i-tv"/></svg></div>
+                <div>
+                    <h2>Canal Educação</h2>
+                    <div class="logo-sub">Relatórios de aula</div>
+                </div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="/inicio" class="nav-link" data-page="inicio" id="nav-inicio" title="O que precisa da sua atenção agora">
+                    <span class="icon"><svg class="ico"><use href="#i-casa"/></svg></span>
+                    <span class="nav-texto">Início</span>
+                </a>
+                <div class="nav-secao">Aulas</div>
+                <a href="/dashboard" class="nav-link" data-page="dashboard" id="nav-dashboard" title="Números das aulas e dos relatórios">
+                    <span class="icon"><svg class="ico"><use href="#i-painel"/></svg></span>
+                    <span class="nav-texto">Visão geral</span>
+                </a>
+                <a href="/grade" class="nav-link" data-page="grade" id="nav-grade" title="Aulas por estúdio, dia e horário">
+                    <span class="icon"><svg class="ico"><use href="#i-calendario"/></svg></span>
+                    <span class="nav-texto">Grade horária</span>
+                </a>
+                <a href="/reports-audit" class="nav-link" data-page="reports-audit" id="nav-reports-audit" title="Buscar, conferir o Drive, validar e exportar">
+                    <span class="icon"><svg class="ico"><use href="#i-relatorio"/></svg></span>
+                    <span class="nav-texto">Relatórios de aula</span>
+                </a>
+                <a href="/live-monitor" class="nav-link" data-page="live-monitor" id="nav-live-monitor" title="O que está no ar em cada estúdio">
+                    <span class="icon"><svg class="ico"><use href="#i-aovivo"/></svg></span>
+                    <span class="nav-texto">Ao vivo agora</span>
+                </a>
+                <div class="nav-secao" id="nav-secao-imagem" style="display: none;">Imagem</div>
+                <a href="/diretor-imagem/historico" class="nav-link" data-page="diretor-imagem-historico" id="nav-diretor-imagem-historico" style="display: none;" title="Relatórios dos diretores de imagem por turno">
+                    <span class="icon"><svg class="ico"><use href="#i-claquete"/></svg></span>
+                    <span class="nav-texto">Relatórios de imagem</span>
+                </a>
+                <a href="/diretor-imagem/perguntas" class="nav-link" data-page="diretor-imagem-perguntas" id="nav-diretor-imagem-perguntas" style="display: none;" title="Perguntas e itens que o diretor responde em cada turno">
+                    <span class="icon"><svg class="ico"><use href="#i-checklist"/></svg></span>
+                    <span class="nav-texto">Checklist do diretor</span>
+                </a>
+                <a href="/agenda-estudios" class="nav-link" data-page="agenda-estudios" id="nav-agenda-estudios" style="display: none;" title="Uso dos estúdios dia a dia">
+                    <span class="icon"><svg class="ico"><use href="#i-agenda"/></svg></span>
+                    <span class="nav-texto">Agenda dos estúdios</span>
+                </a>
+                <div class="nav-secao" id="nav-secao-gestao" style="display: none;">Gestão</div>
+                <a href="/admin/users" class="nav-link" data-page="admin" id="nav-admin" style="display: none;" title="Convites, perfis e permissões">
+                    <span class="icon"><svg class="ico"><use href="#i-usuarios"/></svg></span>
+                    <span class="nav-texto">Usuários e acessos</span>
+                </a>
+                <a href="/admin/cadastros" class="nav-link" data-page="cadastros" id="nav-cadastros" style="display: none;" title="Professores, disciplinas, turmas e estúdios">
+                    <span class="icon"><svg class="ico"><use href="#i-cadastros"/></svg></span>
+                    <span class="nav-texto">Cadastros</span>
+                </a>
+                <div style="margin-top: auto; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+                    <a class="nav-link" id="theme-toggle" onclick="toggleTheme()" style="cursor: pointer;">
+                        <span class="icon"><svg class="ico"><use id="theme-icon" href="#i-sol"/></svg></span>
+                        <span id="theme-text">Tema claro</span>
+                    </a>
+                </div>
+            </nav>
+            <div class="sidebar-usuario">
+                <div class="usuario-cartao">
+                    <div class="usuario-avatar" id="user-avatar"><svg class="ico"><use href="#i-usuario"/></svg></div>
+                    <div style="min-width: 0;">
+                        <div class="usuario-nome" id="user-name">Carregando...</div>
+                        <div class="usuario-papel" id="user-role"></div>
+                    </div>
+                </div>
+                <button class="btn btn-secondary btn-sm btn-full btn-icone" style="margin-top: 0.5rem;" onclick="logout()">
+                    <svg class="ico"><use href="#i-sair"/></svg> Sair
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% endblock %}
+
+    <!-- Toast Container -->
+    <div id="toast-container"></div>
+
+    <script>window.CANAL_TEMPO_REAL = {{ 'true' if tempo_real else 'false' }};</script>
+    <script src="/static/js/app.js?v=4.1"></script>
+    <script>
+        // Highlight active nav link based on current path
+        document.addEventListener('DOMContentLoaded', () => {
+            const path = window.location.pathname;
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === path) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+
+</html>

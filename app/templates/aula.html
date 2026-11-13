@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}Linha do tempo da aula — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-linha-tempo"/></svg> <span id="aula-titulo">Linha do tempo da aula</span></h1>
+        <p class="page-subtitle" id="aula-subtitulo">Relatório do assistente, relatório do diretor, Drive, validações e faturamento em um só lugar.</p>
+        <div class="v4-faixa" id="aula-faixa"></div>
+    </div>
+    <div class="v4-toolbar">
+        <button class="btn btn-secondary btn-sm" onclick="history.length > 1 ? history.back() : (location.href='/inicio')"><svg class="ico"><use href="#i-voltar"/></svg> Voltar</button>
+    </div>
+</div>
+
+<div id="aula-erro"></div>
+
+<div class="v4-aula-grid" id="aula-corpo" style="display:none;">
+    <section class="card v4-aula-etapas">
+        <div class="card-header"><h3 class="card-title"><svg class="ico"><use href="#i-linha-tempo"/></svg> Etapas da aula</h3></div>
+        <div class="v4-progresso-rot" id="aula-progresso-rot"></div>
+        <div class="v4-progresso"><span id="aula-progresso" style="width:0%"></span></div>
+        <ol class="v4-etapas" id="aula-etapas"></ol>
+    </section>
+    <div class="v4-aula-dir">
+        <div class="v4-duas-colunas">
+            <section class="card">
+                <div class="card-header"><h3 class="card-title"><svg class="ico"><use href="#i-documento"/></svg> Relatório do assistente</h3><span id="aula-cr-acao"></span></div>
+                <div id="aula-cr"></div>
+            </section>
+            <section class="card">
+                <div class="card-header"><h3 class="card-title"><svg class="ico"><use href="#i-claquete"/></svg> Relatório de imagem</h3><span id="aula-idr-acao"></span></div>
+                <div id="aula-idr"></div>
+            </section>
+        </div>
+        <div class="v4-duas-colunas">
+            <section class="card">
+                <div class="card-header"><h3 class="card-title"><svg class="ico"><use href="#i-historico"/></svg> Histórico — aula</h3></div>
+                <ul class="v4-versoes" id="aula-versoes-cr"></ul>
+            </section>
+            <section class="card">
+                <div class="card-header"><h3 class="card-title"><svg class="ico"><use href="#i-historico"/></svg> Histórico — imagem</h3></div>
+                <ul class="v4-versoes" id="aula-versoes-idr"></ul>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    // Cada etapa tem o ícone do assunto; a cor da bola mostra o estado
+    const ICONE_ETAPA = {
+        assistente: 'documento', diretor: 'claquete', par: 'comparar', drive: 'nuvem',
+        validacao_aula: 'validado', validacao_imagem: 'validado', faturamento: 'faturamento',
+    };
+    const ICONE_ESTADO = { ok: 'check', atencao: 'alerta', pendente: 'relogio', bloqueado: 'fechar', nao_se_aplica: 'vazio' };
+    const NOME_ESTADO = { ok: 'feito', atencao: 'atenção', pendente: 'aguardando', bloqueado: 'travado', nao_se_aplica: 'não se aplica' };
+    const EVENTO = {
+        CRIADO: 'Criado', EDITADO: 'Editado', FINALIZADO: 'Finalizado', VALIDADO: 'Validado',
+        DEVOLVIDO: 'Devolvido para correção', REABERTO: 'Reaberto (editado depois de validado)',
+        CANCELADO: 'Cancelado', EXCLUIDO: 'Excluído',
+    };
+    const STATUS = {
+        RASCUNHO: 'Rascunho', AGUARDANDO_VALIDACAO: 'Aguardando validação', FINALIZADO: 'Finalizado (antigo)',
+        VALIDADO: 'Validado', CANCELADO: 'Cancelado',
+    };
+
+    const FAIXA_ICONE = { 'Lançamento': 'calendario', 'Cobrar': 'faturamento', 'Pedido SEDUC': 'usuarios', 'Arquivo': 'documento' };
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function dataBR(iso) {
+        if (!iso) return '—';
+        const [a, m, d] = iso.slice(0, 10).split('-');
+        return `${d}/${m}/${a}`;
+    }
+    function dataHoraBR(iso) {
+        if (!iso) return '';
+        const dt = new Date(iso);
+        return isNaN(dt) ? iso : dt.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+    }
+    function link(url, texto) {
+        if (!url) return '<span style="color:var(--text-muted)">—</span>';
+        if (!/^https?:\/\//i.test(url)) return esc(url);
+        return `<a href="${esc(url)}" target="_blank" rel="noopener">${esc(texto || 'abrir')}</a>`;
+    }
+    function campos(lista) {
+        return '<dl class="v4-campos">' + lista
+            .filter(([, v]) => v !== undefined)
+            .map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v === null || v === '' ? '<span style="color:var(--text-muted)">—</span>' : v}</dd>`)
+            .join('') + '</dl>';
+    }
+
+    function renderEtapas(etapas) {
+        const contam = etapas.filter(e => e.estado !== 'nao_se_aplica');
+        const feitas = contam.filter(e => e.estado === 'ok').length;
+        const pct = contam.length ? Math.round(100 * feitas / contam.length) : 0;
+        document.getElementById('aula-progresso').style.width = pct + '%';
+        document.getElementById('aula-progresso-rot').textContent = `${feitas} de ${contam.length} etapas concluídas`;
+        document.getElementById('aula-etapas').innerHTML = etapas.map(e => `
+            <li class="v4-etapa ${esc(e.estado)}">
+                <div class="v4-bola" title="${esc(NOME_ESTADO[e.estado] || e.estado)}">${icone(e.estado === 'ok' || e.estado === 'pendente' ? (ICONE_ETAPA[e.chave] || ICONE_ESTADO[e.estado]) : ICONE_ESTADO[e.estado] || 'vazio')}</div>
+                <div>
+                    <h4>${esc(e.titulo)}<span class="estado-rotulo">${esc(NOME_ESTADO[e.estado] || '')}</span></h4>
+                    <div class="det">${esc(e.detalhe)}</div>
+                    ${(e.quem || e.quando) ? `<div class="meta">${esc(e.quem || '')}${e.quem && e.quando ? ' · ' : ''}${e.quando ? dataBR(e.quando) : ''}</div>` : ''}
+                </div>
+            </li>`).join('');
+    }
+
+    function renderCR(cr) {
+        const alvo = document.getElementById('aula-cr');
+        const acao = document.getElementById('aula-cr-acao');
+        if (!cr) { alvo.innerHTML = '<div class="v4-vazio">Nenhum relatório de aula ligado a este turno.</div>'; acao.innerHTML = ''; return; }
+        const user = getUser() || {};
+        if (['admin', 'gestor', 'coordenador', 'assistente'].includes(user.role)) {
+            acao.innerHTML = `<a class="btn btn-secondary btn-sm" href="/report?report_id=${encodeURIComponent(cr.id)}">${icone('abrir')} Abrir relatório</a>`;
+        }
+        alvo.innerHTML = campos([
+            ['Status', esc(STATUS[cr.status] || cr.status) + (cr.precisa_correcao ? ' — <b>devolvido</b>' : '')],
+            ['Professor', esc(cr.professor)],
+            ['Horário', esc(cr.horario)],
+            ['Estúdio', esc(cr.estudio)],
+            ['Conteúdo', esc(cr.conteudo)],
+            ['Gravada em', cr.data_gravacao ? dataBR(cr.data_gravacao) : null],
+            ['Referência', cr.data_referencia ? `${dataBR(cr.data_referencia)} ${esc(cr.motivo_referencia || '')}` : null],
+            ['Drive (vídeo)', link(cr.video_link, 'vídeo')],
+            ['Drive (PDF)', link(cr.slide_link, 'PDF')],
+            ['Vimeo', link(cr.vimeo_link, 'vimeo')],
+            ['Busca no Drive', esc(cr.compliance)],
+            ['Nota da coordenação', esc(cr.observacao_coordenacao)],
+        ]);
+    }
+
+    function renderIDR(idr) {
+        const alvo = document.getElementById('aula-idr');
+        const acao = document.getElementById('aula-idr-acao');
+        if (!idr) { alvo.innerHTML = '<div class="v4-vazio">Nenhum relatório de imagem ligado a esta aula.</div>'; acao.innerHTML = ''; return; }
+        const user = getUser() || {};
+        if (['admin', 'gestor', 'diretor_chefe', 'diretor_imagem'].includes(user.role)) {
+            acao.innerHTML = `<a class="btn btn-secondary btn-sm" href="/diretor-imagem?id=${encodeURIComponent(idr.id)}">${icone('abrir')} Abrir relatório</a>`;
+        }
+        const aulas = (idr.aulas_detalhe || []).map(a =>
+            `${esc(a.numero)}ª — ${esc(a.disciplina || '—')} (${esc(a.professor || 'sem professor')})` +
+            `${a.tipo ? ' · ' + esc(a.tipo) : ''}${a.video_corrompido === 'Sim' ? ' · <b style="color:var(--status-red)">vídeo corrompido</b>' : ''}` +
+            `${a.chamado ? ' · chamado ' + esc(a.chamado) : ''}`).join('<br>');
+        alvo.innerHTML = campos([
+            ['Status', esc(STATUS[idr.status] || idr.status) + (idr.precisa_correcao ? ' — <b>devolvido</b>' : '')],
+            ['Diretor', esc(idr.diretor)],
+            ['Turno', esc(idr.turno)],
+            ['Estúdio', esc(idr.estudio)],
+            ['Aulas do turno', aulas || null],
+            ['Nota do chefe', esc(idr.observacao_coordenacao)],
+        ]);
+    }
+
+    function renderVersoes(id, versoes) {
+        const alvo = document.getElementById(id);
+        if (!versoes.length) {
+            alvo.innerHTML = '<li class="v4-vazio">Sem histórico registrado (relatórios anteriores à v4 começam a ter histórico na próxima alteração).</li>';
+            return;
+        }
+        alvo.innerHTML = versoes.slice().reverse().map(v => `
+            <li>
+                <span class="ev">v${v.versao} · ${esc(EVENTO[v.evento] || v.evento)}</span>
+                ${v.status_anterior && v.status_anterior !== v.status_novo ? `<span class="v4-chip">${esc(STATUS[v.status_anterior] || v.status_anterior)} → ${esc(STATUS[v.status_novo] || v.status_novo)}</span>` : ''}
+                <div class="quando">${esc(v.quem || 'sistema')} · ${dataHoraBR(v.quando)}</div>
+                ${v.motivo ? `<div class="campos">Motivo: ${esc(v.motivo)}</div>` : ''}
+                ${v.campos_alterados && v.campos_alterados.length && v.evento !== 'CRIADO' ? `<div class="campos">Campos: ${v.campos_alterados.map(esc).join(', ')}</div>` : ''}
+            </li>`).join('');
+    }
+
+    async function carregar() {
+        const p = new URLSearchParams(location.search);
+        const cr = p.get('cr'), idr = p.get('idr');
+        const erro = document.getElementById('aula-erro');
+        if (!cr && !idr) {
+            erro.innerHTML = '<div class="card"><div class="v4-vazio">Abra esta página a partir do Início, da Auditoria ou do Histórico de imagem.</div></div>';
+            return;
+        }
+        const q = cr ? `class_report_id=${encodeURIComponent(cr)}` : `image_director_report_id=${encodeURIComponent(idr)}`;
+        let d;
+        try {
+            const token = getToken();
+            const res = await fetch(`/api/v1/aulas/linha-do-tempo?${q}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.status === 401) { logout(); return; }
+            if (!res.ok) {
+                const corpo = await res.json().catch(() => ({}));
+                throw new Error(corpo.detail || `Erro ${res.status}`);
+            }
+            d = await res.json();
+        } catch (e) {
+            erro.innerHTML = `<div class="card"><div class="v4-vazio">${icone('alerta')} ${esc(e.message)}</div></div>`;
+            return;
+        }
+        const a = d.aula;
+        document.getElementById('aula-titulo').textContent = `${a.turma || 'Aula'} · ${a.disciplina || '—'}`;
+        document.getElementById('aula-subtitulo').textContent = `${dataBR(a.data)}${a.horario ? ' · ' + a.horario : ''}${a.estudio ? ' · ' + a.estudio : ''}`;
+        document.getElementById('aula-faixa').innerHTML = [
+            ['Lançamento', a.lancamento],
+            ['Cobrar', a.cobrar],
+            ['Pedido SEDUC', a.pedido_seduc ? 'Sim (cobrança dupla)' : 'Não'],
+            ['Arquivo', a.nome_arquivo],
+        ].filter(([, v]) => v).map(([k, v]) => `<span>${icone(FAIXA_ICONE[k] || 'documento', 'ico-sm')} ${esc(k)}: <b>${esc(v)}</b></span>`).join('')
+            + (a.youtube ? `<span>${icone('video', 'ico-sm')} ${link(a.youtube, 'YouTube')}</span>` : '');
+
+        renderEtapas(d.etapas);
+        renderCR(d.relatorio_aula);
+        renderIDR(d.relatorio_imagem);
+        renderVersoes('aula-versoes-cr', d.versoes_aula);
+        renderVersoes('aula-versoes-idr', d.versoes_imagem);
+        document.getElementById('aula-corpo').style.display = '';
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!getToken()) { window.location.href = '/'; return; }
+        loadUserProfile();
+        carregar();
+    });
+})();
+</script>
+{% endblock %}

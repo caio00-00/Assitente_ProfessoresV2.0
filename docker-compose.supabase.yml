@@ -1,0 +1,58 @@
+# Canal Educação v4 — API, worker e beat no Docker local, banco no Supabase.
+#
+#   No .env: DATABASE_URL=postgresql://postgres.<ref>:<senha>@aws-0-<região>.pooler.supabase.com:5432/postgres?sslmode=require
+#   (use a "Session pooler" porta 5432; a "Transaction pooler" 6543 não serve
+#    para as migrações do Alembic nem para o advisory lock do db_bootstrap)
+#
+#   docker compose -f docker-compose.supabase.yml up -d --build
+#
+# O Redis continua local: o Supabase não substitui a fila do worker.
+
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+  volumes:
+    - ./credentials.json:/app/credentials.json:ro
+  depends_on:
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: canal_edu_redis_sb
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-redis_local}"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_local}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    <<: *app
+    container_name: canal_edu_api_sb
+    command: ["api-dev"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./credentials.json:/app/credentials.json:ro
+      - ./app:/app/app
+
+  worker:
+    <<: *app
+    container_name: canal_edu_worker_sb
+    command: ["worker"]
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+      RUN_MIGRATIONS: "0"
+
+  beat:
+    <<: *app
+    container_name: canal_edu_beat_sb
+    command: ["beat"]
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_local}@redis:6379/0
+      RUN_MIGRATIONS: "0"

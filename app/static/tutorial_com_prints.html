@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manual Ilustrado com Telas — Canal Educação v3.5</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --font-main: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+
+      --bg-body: #090E17;
+      --bg-surface: #101726;
+      --bg-surface-elevated: #162035;
+      --bg-surface-subtle: #1D2A45;
+      --border-subtle: #243555;
+      --border-focus: #3B82F6;
+
+      --text-primary: #F8FAFC;
+      --text-secondary: #94A3B8;
+      --text-muted: #64748B;
+
+      --primary: #3B82F6;
+      --primary-hover: #2563EB;
+      --primary-light: rgba(59, 130, 246, 0.15);
+
+      --success: #10B981;
+      --success-light: rgba(16, 185, 129, 0.12);
+      --warning: #F59E0B;
+      --warning-light: rgba(245, 158, 11, 0.12);
+      --danger: #EF4444;
+      --danger-light: rgba(239, 68, 68, 0.12);
+      --purple: #8B5CF6;
+      --purple-light: rgba(139, 92, 246, 0.12);
+
+      --sidebar-width: 300px;
+      --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+      --shadow-lg: 0 10px 20px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+    }
+
+    [data-theme="light"] {
+      --bg-body: #F8FAFC;
+      --bg-surface: #FFFFFF;
+      --bg-surface-elevated: #F1F5F9;
+      --bg-surface-subtle: #E2E8F0;
+      --border-subtle: #CBD5E1;
+      --border-focus: #2563EB;
+
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+
+      --primary: #2563EB;
+      --primary-hover: #1D4ED8;
+      --primary-light: rgba(37, 99, 235, 0.1);
+
+      --success: #059669;
+      --success-light: rgba(5, 150, 105, 0.1);
+      --warning: #D97706;
+      --warning-light: rgba(217, 119, 6, 0.1);
+      --danger: #DC2626;
+      --danger-light: rgba(220, 38, 38, 0.1);
+      --purple: #7C3AED;
+      --purple-light: rgba(124, 58, 237, 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease; }
+
+    body {
+      font-family: var(--font-main);
+      background-color: var(--bg-body);
+      color: var(--text-primary);
+      line-height: 1.6;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* ─── SIDEBAR ─── */
+    aside.sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--bg-surface);
+      border-right: 1px solid var(--border-subtle);
+      position: fixed;
+      top: 0; bottom: 0; left: 0;
+      display: flex; flex-direction: column;
+      z-index: 100;
+      box-shadow: var(--shadow-md);
+    }
+
+    .sidebar-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; gap: 12px;
+    }
+
+    .brand-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, #2563EB, #7C3AED);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-weight: 800; font-size: 20px;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    }
+
+    .brand-title { font-size: 16px; font-weight: 700; line-height: 1.2; }
+    .brand-sub { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; }
+
+    .search-box { padding: 16px 20px 10px; }
+    .search-input-wrapper { position: relative; }
+    .search-input {
+      width: 100%; padding: 10px 14px 10px 38px; border-radius: 8px;
+      border: 1px solid var(--border-subtle); background-color: var(--bg-surface-elevated);
+      color: var(--text-primary); font-size: 13px; outline: none;
+    }
+    .search-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 14px; }
+
+    nav.nav-menu { flex: 1; overflow-y: auto; padding: 12px 14px; }
+    .nav-section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); padding: 12px 10px 6px; }
+    .nav-link {
+      display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+      color: var(--text-secondary); text-decoration: none; font-size: 13.5px; font-weight: 500;
+      border-radius: 6px; margin-bottom: 2px; cursor: pointer;
+    }
+    .nav-link:hover { background-color: var(--bg-surface-elevated); color: var(--text-primary); }
+    .nav-link.active { background-color: var(--primary-light); color: var(--primary); font-weight: 600; }
+
+    .role-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      padding: 2px 7px; border-radius: 12px; margin-left: auto; text-transform: uppercase;
+    }
+    .badge-admin { background-color: var(--danger-light); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2); }
+    .badge-coord { background-color: var(--purple-light); color: var(--purple); border: 1px solid rgba(139, 92, 246, 0.2); }
+    .badge-assist { background-color: var(--primary-light); color: var(--primary); border: 1px solid rgba(59, 130, 246, 0.2); }
+    .badge-chefe { background-color: var(--warning-light); color: var(--warning); border: 1px solid rgba(245, 158, 11, 0.2); }
+    .badge-oper { background-color: var(--success-light); color: var(--success); border: 1px solid rgba(16, 185, 129, 0.2); }
+
+    .sidebar-footer {
+      padding: 16px 20px; border-top: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* ─── MAIN CONTENT ─── */
+    main.content {
+      margin-left: var(--sidebar-width);
+      flex: 1; padding: 36px 48px 80px; max-width: 1240px;
+    }
+
+    .topbar {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 32px; padding-bottom: 20px; border-bottom: 1px solid var(--border-subtle);
+    }
+    .top-meta { font-size: 13px; color: var(--text-muted); }
+    .top-actions { display: flex; gap: 10px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px;
+      border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 1px solid transparent; text-decoration: none;
+    }
+    .btn-secondary { background-color: var(--bg-surface-elevated); color: var(--text-primary); border-color: var(--border-subtle); }
+    .btn-secondary:hover { background-color: var(--bg-surface-subtle); }
+    .btn-primary { background-color: var(--primary); color: white; }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+
+    h1.hero-title {
+      font-size: 34px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 12px;
+      background: linear-gradient(120deg, #60A5FA, #A78BFA, #34D399);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    p.hero-desc { font-size: 16px; color: var(--text-secondary); margin-bottom: 36px; max-width: 900px; }
+
+    section.tutorial-section { margin-bottom: 64px; scroll-margin-top: 40px; }
+    h2.section-heading {
+      font-size: 23px; font-weight: 700; letter-spacing: -0.3px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 12px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    h3.subheading { font-size: 17.5px; font-weight: 600; margin: 24px 0 12px; display: flex; align-items: center; gap: 8px; }
+
+    .card {
+      background-color: var(--bg-surface); border: 1px solid var(--border-subtle);
+      border-radius: 12px; padding: 24px; margin-bottom: 24px; box-shadow: var(--shadow-md);
+    }
+
+    /* ─── MOLDURA DE NAVEGADOR PARA PRINTS (BROWSER FRAME) ─── */
+    .screenshot-frame {
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      overflow: hidden;
+      background: var(--bg-surface-elevated);
+      margin: 20px 0 28px;
+      box-shadow: var(--shadow-lg);
+    }
+
+    .browser-header {
+      background: var(--bg-surface-subtle);
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .browser-dots {
+      display: flex; gap: 6px;
+    }
+    .browser-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .dot-red { background: #EF4444; }
+    .dot-yellow { background: #F59E0B; }
+    .dot-green { background: #10B981; }
+
+    .browser-url-bar {
+      flex: 1;
+      background: var(--bg-body);
+      border-radius: 6px;
+      padding: 4px 12px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .screenshot-img-container {
+      position: relative;
+      cursor: zoom-in;
+      background: #0B111E;
+      display: flex;
+      justify-content: center;
+    }
+
+    .screenshot-img {
+      width: 100%;
+      height: auto;
+      display: block;
+      transition: transform 0.25s ease;
+    }
+
+    .screenshot-caption {
+      padding: 12px 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      background: var(--bg-surface);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .screenshot-caption strong {
+      color: var(--text-primary);
+    }
+
+    /* ─── CALLOUTS & TABLES ─── */
+    .callout {
+      border-left: 4px solid var(--primary); background-color: var(--bg-surface-elevated);
+      border-radius: 0 8px 8px 0; padding: 16px 20px; margin: 18px 0; font-size: 14px;
+    }
+    .callout.callout-info { border-left-color: var(--primary); background: var(--primary-light); }
+    .callout.callout-success { border-left-color: var(--success); background: var(--success-light); }
+    .callout.callout-warning { border-left-color: var(--warning); background: var(--warning-light); }
+    .callout.callout-danger { border-left-color: var(--danger); background: var(--danger-light); }
+
+    .callout-title { font-weight: 700; font-size: 14.5px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+
+    .table-container { overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: 10px; margin: 20px 0; }
+    table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; text-align: left; }
+    table.data-table th {
+      background-color: var(--bg-surface-elevated); padding: 12px 16px; font-weight: 700;
+      border-bottom: 1px solid var(--border-subtle); color: var(--text-secondary);
+      text-transform: uppercase; font-size: 11.5px; letter-spacing: 0.5px;
+    }
+    table.data-table td { padding: 14px 16px; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); }
+    table.data-table tr:last-child td { border-bottom: none; }
+    table.data-table tr:hover td { background-color: var(--bg-surface-elevated); }
+
+    code.code-inline {
+      font-family: var(--font-mono); background-color: var(--bg-surface-subtle);
+      color: #93C5FD; padding: 2px 6px; border-radius: 4px; font-size: 12.5px;
+    }
+
+    .copyable-code {
+      display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono);
+      background-color: var(--bg-surface-subtle); border: 1px solid var(--border-subtle);
+      padding: 3px 8px; border-radius: 5px; font-size: 12.5px; cursor: pointer;
+    }
+    .copyable-code:hover { border-color: var(--border-focus); }
+
+    /* ─── LIGHTBOX MODAL PARA EXPANDIR PRINTS ─── */
+    .lightbox-modal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.88);
+      backdrop-filter: blur(4px);
+      align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .lightbox-modal.active { display: flex; }
+    .lightbox-content {
+      max-width: 95vw;
+      max-height: 92vh;
+      border-radius: 8px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.8);
+      object-fit: contain;
+    }
+    .lightbox-close {
+      position: absolute; top: 20px; right: 28px;
+      color: white; font-size: 32px; font-weight: 700; cursor: pointer;
+    }
+
+    /* FAQ */
+    .faq-item {
+      border: 1px solid var(--border-subtle); border-radius: 8px;
+      background-color: var(--bg-surface); margin-bottom: 12px; overflow: hidden;
+    }
+    .faq-question {
+      padding: 16px 20px; font-weight: 600; font-size: 15px; cursor: pointer;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .faq-question:hover { background-color: var(--bg-surface-elevated); }
+    .faq-answer {
+      padding: 0 20px 16px; font-size: 14px; color: var(--text-secondary);
+      display: none; border-top: 1px solid var(--border-subtle); padding-top: 14px;
+    }
+    .faq-item.open .faq-answer { display: block; }
+    .faq-item.open .faq-question { color: var(--primary); }
+  </style>
+</head>
+<body data-theme="dark">
+
+  <!-- ─── SIDEBAR ─── -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-icon">CE</div>
+      <div>
+        <div class="brand-title">Canal Educação</div>
+        <div class="brand-sub">Manual Ilustrado v3.5</div>
+      </div>
+    </div>
+
+    <div class="search-box">
+      <div class="search-input-wrapper">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar no manual ilustrado...">
+      </div>
+    </div>
+
+    <nav class="nav-menu">
+      <div class="nav-section-title">Início & Autenticação</div>
+      <a class="nav-link active" onclick="scrollToSection('tela-login')">
+        <span>🔐</span> Tela de Login
+      </a>
+      <a class="nav-link" onclick="scrollToSection('matriz-acessos')">
+        <span>🔑</span> Credenciais Rápidas
+      </a>
+
+      <div class="nav-section-title">Telas do Sistema com Prints</div>
+      <a class="nav-link" onclick="scrollToSection('tela-grade-estudio')">
+        <span>🎙️</span> Grade por Estúdio
+        <span class="role-badge badge-admin">v3.5</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('tela-agenda-eventos')">
+        <span>🎬</span> Agenda & Eventos SEDUC
+        <span class="role-badge badge-chefe">Agenda</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('tela-diretor-simplificado')">
+        <span>📹</span> Diretor de Imagem
+        <span class="role-badge badge-oper">Técnico</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('tela-assistente-faturamento')">
+        <span>📝</span> Relatório & Faturamento
+        <span class="role-badge badge-assist">Operador</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('tela-auditoria-admin')">
+        <span>📊</span> Auditoria & Export (.xlsm)
+        <span class="role-badge badge-admin">SEDUC</span>
+      </a>
+      <a class="nav-link" onclick="scrollToSection('tela-auditoria-coord')">
+        <span>🎓</span> Auditoria Coordenador (RBAC)
+        <span class="role-badge badge-coord">Privado</span>
+      </a>
+
+      <div class="nav-section-title">Regras & Suporte</div>
+      <a class="nav-link" onclick="scrollToSection('dicionario-colunas')">
+        <span>📑</span> 20 Colunas SEDUC (.xlsm)
+      </a>
+      <a class="nav-link" onclick="scrollToSection('faq-pratico')">
+        <span>❓</span> FAQs & Erros Resolvidos
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span style="font-size: 12px; color: var(--text-muted);">Canal Educação © 2026</span>
+      <button class="btn btn-secondary" onclick="toggleTheme()" title="Alternar tema">🌓</button>
+    </div>
+  </aside>
+
+  <!-- ─── MAIN CONTENT ─── -->
+  <main class="content">
+
+    <div class="topbar">
+      <div class="top-meta">
+        Manual Operacional Ilustrado com Capturas de Tela em Alta Resolução • Versão 3.5
+      </div>
+      <div class="top-actions">
+        <a href="/static/tutorial.html" class="btn btn-secondary">Versão Texto Puro ↗</a>
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        <a href="http://localhost:8000" target="_blank" class="btn btn-primary">Acessar Sistema ↗</a>
+      </div>
+    </div>
+
+    <h1 class="hero-title">Manual Ilustrado de Uso do Sistema</h1>
+    <p class="hero-desc">
+      Apresentação visual detalhada das telas da plataforma Canal Educação v3.5, com indicações dos novos botões de cópia rápida, campos de eventos, aba executiva em formato .xlsm e regras de segurança por perfil.
+    </p>
+
+    <!-- ─── SEÇÃO 1: LOGIN ─── -->
+    <section id="tela-login" class="tutorial-section">
+      <h2 class="section-heading">🔐 1. Tela de Login e Autenticação</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        A porta de entrada do sistema é autenticada via JWT. O perfil do usuário determina automaticamente quais telas, botões e dados estarão visíveis.
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/login</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/01_tela_login.png" class="screenshot-img" alt="Tela de Login do Canal Educação" onerror="this.src='../app/static/img/tutorial/01_tela_login.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 1:</strong> Tela de autenticação centralizada do Canal Educação. Clique na imagem para ampliar em tela cheia.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 2: MATRIZ DE ACESSOS ─── -->
+    <section id="matriz-acessos" class="tutorial-section">
+      <h2 class="section-heading">🔑 2. Credenciais de Teste para Cada Perfil</h2>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Perfil</th>
+              <th>E-mail de Login</th>
+              <th>Senha</th>
+              <th>Destino Pós-Login</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="role-badge badge-admin">Admin</span></td>
+              <td><span class="copyable-code" onclick="copyText('admin@canaleducacao.com')">admin@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('admin123')">admin123 📋</span></td>
+              <td><code class="code-inline">/dashboard</code> — Acesso total</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-coord">Coordenador</span></td>
+              <td><span class="copyable-code" onclick="copyText('coordenador@canaleducacao.com')">coordenador@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('coord123')">coord123 📋</span></td>
+              <td><code class="code-inline">/grade</code> e <code class="code-inline">/reports-audit</code> (sem dados técnicos)</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-assist">Assistente</span></td>
+              <td><span class="copyable-code" onclick="copyText('assistente@canaleducacao.com')">assistente@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('assistente123')">assistente123 📋</span></td>
+              <td><code class="code-inline">/grade</code> — Lançamento de relatórios pedagógicos</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-chefe">Diretor-Chefe</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor.chefe@canaleducacao.com')">diretor.chefe@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('chefe123')">chefe123 📋</span></td>
+              <td><code class="code-inline">/agenda-estudios</code> — Gestão de estúdios e eventos</td>
+            </tr>
+            <tr>
+              <td><span class="role-badge badge-oper">Diretor Operador</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor.imagem@canaleducacao.com')">diretor.imagem@canaleducacao.com 📋</span></td>
+              <td><span class="copyable-code" onclick="copyText('diretor123')">diretor123 📋</span></td>
+              <td><code class="code-inline">/diretor-imagem/historico</code> — Operação de estúdio</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 3: GRADE POR ESTÚDIO ─── -->
+    <section id="tela-grade-estudio" class="tutorial-section">
+      <h2 class="section-heading">🎙️ 3. Grade Horária por Estúdio</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        Na versão 3.5, a tela de grade horária ganhou um seletor visual em abas: <strong>"🏢 Estúdio"</strong> e <strong>"👥 Turma"</strong>.
+        Ao escolher "Estúdio", a matriz semanal passa a exibir exatamente as transmissões e gravações que ocupam o estúdio selecionado (Estúdios 01 a 09 ou Externo).
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/grade</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/02_grade_estudio.png" class="screenshot-img" alt="Grade Horária Filtrada por Estúdio" onerror="this.src='../app/static/img/tutorial/02_grade_estudio.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 2:</strong> Grade Horária por Estúdio mostrando o seletor ("ESTUDIO 01"), a badge de sincronização com a Agenda e os horários ocupados.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 4: AGENDA DE ESTÚDIOS & EVENTOS ─── -->
+    <section id="tela-agenda-eventos" class="tutorial-section">
+      <h2 class="section-heading">🎬 4. Agenda de Estúdios: Cadastro de Eventos & Stream Key</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        O Diretor-Chefe e o Administrador utilizam o painel de <strong>Agenda de Estúdios</strong> para montar a escala operacional.
+        Ao selecionar o tipo <strong>Evento (SEDUC / departamento)</strong>, o modal abre automaticamente os campos institucionais obrigatórios:
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/agenda-estudios</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/03_agenda_estudios_evento.png" class="screenshot-img" alt="Drawer de Agendamento de Eventos e Chave de Transmissão" onerror="this.src='../app/static/img/tutorial/03_agenda_estudios_evento.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 3:</strong> Drawer lateral de "Novo agendamento" com os campos <em>Nome do Evento *</em>, <em>Departamento / Solicitante</em>, <em>Chave de Transmissão</em> e chamado SEDUC.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-title">💡 Integração em Tempo Real com o Estúdio:</div>
+        Todos os dados informados neste modal (inclusive o Link do YouTube e a Chave de Transmissão) são disponibilizados instantaneamente para a tela do Diretor de Imagem quando este abrir o turno daquele estúdio.
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 5: DIRETOR DE IMAGEM ─── -->
+    <section id="tela-diretor-simplificado" class="tutorial-section">
+      <h2 class="section-heading">📹 5. Operação do Diretor de Imagem</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        O formulário do Diretor de Imagem foi enxugado para garantir agilidade na mesa de corte de vídeo:
+        o campo "Turma" não é mais exigido e foram adicionados botões de cópia rápida.
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/diretor-imagem/historico</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/05_diretor_imagem_simplificado.png" class="screenshot-img" alt="Histórico e Operação do Diretor de Imagem" onerror="this.src='../app/static/img/tutorial/05_diretor_imagem_simplificado.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 4:</strong> Visão do Diretor de Imagem Operacional alocado no Estúdio 01 com grade de slots e opções de gravação rápida.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 6: ASSISTENTE & REGRAS DE FATURAMENTO ─── -->
+    <section id="tela-assistente-faturamento" class="tutorial-section">
+      <h2 class="section-heading">📝 6. Assistente: Mês de Execução × Mês de Referência e Chamado SEDUC</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        No preenchimento de aulas de reposição ou antecipação, o Assistente dispõe da nova seção de conciliação:
+      </p>
+
+      <div class="card">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 16px;">
+          <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border-left: 3px solid var(--primary);">
+            <strong style="color: var(--primary);">Data de Execução Real</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Data em que a gravação ocorreu no estúdio. Define o mês de faturamento da SEDUC (ex: Outubro/2026).</p>
+          </div>
+          <div style="background: var(--bg-surface-elevated); padding: 16px; border-radius: 8px; border-left: 3px solid var(--success);">
+            <strong style="color: var(--success);">Data de Referência da Aula</strong>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">Data da aula na grade pedagógica. Define o pagamento do professor e a frequência do aluno (ex: Setembro/2026).</p>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-title">⚠️ Regra Institucional de Antecipação:</div>
+          Se o campo <strong>Solicitante</strong> for marcado como <strong>SEDUC</strong>, o sistema torna o campo <strong>Nº de Chamado SEDUC</strong> obrigatório, gerando autorização de faturamento duplo (gravação + transmissão).
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 7: AUDITORIA ADMIN & EXPORTAÇÃO .XLSM ─── -->
+    <section id="tela-auditoria-admin" class="tutorial-section">
+      <h2 class="section-heading">📊 7. Auditoria Executiva & Exportação Oficial (.xlsm)</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        Na tela de <strong>Relatórios & Auditoria</strong> (<code class="code-inline">/reports-audit</code>), o Administrador conta com visão completa de todas as transmissões e pode emitir a prestação de contas oficial da SEDUC:
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/reports-audit (Admin)</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/06_auditoria_admin_xlsm.png" class="screenshot-img" alt="Auditoria Geral com Botão Exportar SEDUC .xlsm" onerror="this.src='../app/static/img/tutorial/06_auditoria_admin_xlsm.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 5:</strong> Tela de Auditoria Executiva. Note no canto superior direito os botões <strong>"Exportar Excel (.xlsx)"</strong> e o novo botão verde <strong>"📊 Exportar SEDUC (.xlsm)"</strong>.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 8: AUDITORIA COORDENADOR (RBAC) ─── -->
+    <section id="tela-auditoria-coord" class="tutorial-section">
+      <h2 class="section-heading">🎓 8. Auditoria do Coordenador Pedagógico (Segurança RBAC)</h2>
+      <p style="color: var(--text-secondary); margin-bottom: 16px;">
+        Ao entrar com login de <strong>Coordenador</strong>, o sistema oculta automaticamente os dados da equipe técnica de Direção de Imagem para proteger a privacidade operacional:
+      </p>
+
+      <div class="screenshot-frame">
+        <div class="browser-header">
+          <div class="browser-dots">
+            <div class="browser-dot dot-red"></div>
+            <div class="browser-dot dot-yellow"></div>
+            <div class="browser-dot dot-green"></div>
+          </div>
+          <div class="browser-url-bar">🔒 http://localhost:8000/reports-audit (Coordenador)</div>
+        </div>
+        <div class="screenshot-img-container" onclick="openLightbox(this)">
+          <img src="/static/img/tutorial/07_auditoria_coordenador_oculto.png" class="screenshot-img" alt="Auditoria Coordenador com Colunas de Diretor Ocultadas" onerror="this.src='../app/static/img/tutorial/07_auditoria_coordenador_oculto.png'">
+        </div>
+        <div class="screenshot-caption">
+          <span><strong>Figura 6:</strong> Tela de Auditoria vista por um Coordenador: as colunas e abas de Diretor de Imagem foram totalmente omitidas, garantindo conformidade com a governança da instituição.</span>
+          <span style="font-size: 11.5px; color: var(--primary);">🔍 Clique para expandir</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 9: DICIONÁRIO DE COLUNAS ─── -->
+    <section id="dicionario-colunas" class="tutorial-section">
+      <h2 class="section-heading">📑 9. Dicionário das 20 Colunas do Faturamento SEDUC (.xlsm)</h2>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Coluna Oficial</th>
+              <th>Tipo</th>
+              <th>Regra de Preenchimento & Auditoria</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td><code class="code-inline">DATA_EXECUÇÃO_REAL</code></td><td>Data</td><td>Data em que o estúdio foi operado pelo técnico e professor.</td></tr>
+            <tr><td>2</td><td><code class="code-inline">MÊS_EXECUÇÃO</code></td><td>Texto (MM/AAAA)</td><td>Mês base da nota fiscal da emissora.</td></tr>
+            <tr><td>3</td><td><code class="code-inline">DATA_REFERÊNCIA</code></td><td>Data</td><td>Data em que a aula deveria ocorrer na grade regular.</td></tr>
+            <tr><td>4</td><td><code class="code-inline">MÊS_REFERÊNCIA</code></td><td>Texto (MM/AAAA)</td><td>Mês base do pagamento docente e registro do aluno.</td></tr>
+            <tr><td>5</td><td><code class="code-inline">INDICATIVO_REPOSIÇÃO</code></td><td>Texto</td><td>Texto padrão: <em>"Gravação por reposição/falta, ref. à aula do dia DD/MM/AAAA"</em>.</td></tr>
+            <tr><td>6</td><td><code class="code-inline">MODALIDADE</code></td><td>Texto</td><td><strong>GRAVACAO</strong> ou <strong>TRANSMISSAO</strong>.</td></tr>
+            <tr><td>7</td><td><code class="code-inline">ESTÚDIO</code></td><td>Texto</td><td>Estúdio 01 até Estúdio 09 ou Externo.</td></tr>
+            <tr><td>8</td><td><code class="code-inline">TURNO</code></td><td>Texto</td><td>Manhã, Tarde ou Noite.</td></tr>
+            <tr><td>9</td><td><code class="code-inline">CURSO_TURMA</code></td><td>Texto</td><td>Turma atendida (ex: 3º Ano Médio - Regular).</td></tr>
+            <tr><td>10</td><td><code class="code-inline">DISCIPLINA</code></td><td>Texto</td><td>Nome da disciplina ministrada.</td></tr>
+            <tr><td>11</td><td><code class="code-inline">PROFESSOR</code></td><td>Texto</td><td>Nome do professor em estúdio.</td></tr>
+            <tr><td>12</td><td><code class="code-inline">DIRETOR_IMAGEM</code></td><td>Texto</td><td>Nome do operador de vídeo (suprimido para coordenadores).</td></tr>
+            <tr><td>13</td><td><code class="code-inline">É_ANTECIPAÇÃO</code></td><td>Texto</td><td><strong>SIM</strong> ou <strong>NÃO</strong>.</td></tr>
+            <tr><td>14</td><td><code class="code-inline">SOLICITANTE_ANTECIPAÇÃO</code></td><td>Texto</td><td><strong>SEDUC</strong> ou <strong>PROFESSOR</strong>.</td></tr>
+            <tr><td>15</td><td><code class="code-inline">Nº_CHAMADO_SEDUC</code></td><td>Texto</td><td>Ticket/OS autorizadora (obrigatório se solicitante for SEDUC).</td></tr>
+            <tr><td>16</td><td><code class="code-inline">COBRANÇA_SEDUC</code></td><td>Texto</td><td><strong>DUPLA</strong>, <strong>ÚNICA</strong> ou <strong>EVENTO</strong>.</td></tr>
+            <tr><td>17</td><td><code class="code-inline">VALOR_FATURÁVEL</code></td><td>Texto</td><td><strong>FATURÁVEL</strong> ou <strong>NÃO_FATURÁVEL</strong>.</td></tr>
+            <tr><td>18</td><td><code class="code-inline">STATUS_ASSISTENTE</code></td><td>Texto</td><td>Situação do relatório da coordenação (VALIDADO, etc.).</td></tr>
+            <tr><td>19</td><td><code class="code-inline">STATUS_DIR_IMAGEM</code></td><td>Texto</td><td>Situação do relatório técnico de vídeo.</td></tr>
+            <tr><td>20</td><td><code class="code-inline">CONGRUÊNCIA_MODALIDADE</code></td><td>Texto</td><td><strong>CONGRUENTE</strong> ou <strong>DIVERGENTE</strong> (trava de consistência).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ─── SEÇÃO 10: FAQS ─── -->
+    <section id="faq-pratico" class="tutorial-section">
+      <h2 class="section-heading">❓ 10. Perguntas Frequentes & Diagnóstico Rápido</h2>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          1. O que significa a mensagem de erro "Inconsistência de faturamento (HTTP 422)"?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Essa trava protege o faturamento. O erro ocorre se um relatório foi gravado como "Gravação" e o relatório parceiro como "Transmissão". Ambos os operadores devem selecionar o mesmo tipo de aula para o mesmo horário e estúdio antes de finalizar.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          2. Como posso ampliar as capturas de tela para visualizar os detalhes?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          Basta clicar em qualquer uma das imagens deste manual. Uma caixa de ampliação (lightbox) se abrirá em alta definição, permitindo ler claramente botões, seletores e textos. Clique fora ou no "X" para fechar.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <div class="faq-question" onclick="toggleFaq(this)">
+          3. O arquivo .xlsm abre com aviso de segurança no Excel?
+          <span>▼</span>
+        </div>
+        <div class="faq-answer">
+          O formato <code class="code-inline">.xlsm</code> possui o MIME type macro-enabled padrão da Microsoft (<code class="code-inline">application/vnd.ms-excel.sheet.macroEnabled.12</code>). Dependendo da política da sua rede, o Excel pode exibir a barra amarela de "Modo de Exibição Protegido". Basta clicar em <strong>"Habilitar Edição"</strong> para visualizar todas as abas e fórmulas contábeis.
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─── LIGHTBOX MODAL ─── -->
+  <div id="lightboxModal" class="lightbox-modal" onclick="closeLightbox()">
+    <span class="lightbox-close">&times;</span>
+    <img id="lightboxImg" class="lightbox-content" alt="Visualização em tela cheia">
+  </div>
+
+  <script>
+    function scrollToSection(id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.nav-link').forEach(link => link.classList.remove('active'));
+        if (event && event.currentTarget) event.currentTarget.classList.add('active');
+      }
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      const current = body.getAttribute('data-theme');
+      body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
+    }
+
+    function copyText(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copiado para a área de transferência: ' + text);
+      });
+    }
+
+    function toggleFaq(btn) {
+      const item = btn.parentElement;
+      item.classList.toggle('open');
+      const arrow = btn.querySelector('span');
+      arrow.textContent = item.classList.contains('open') ? '▲' : '▼';
+    }
+
+    // Lightbox para visualização de prints
+    function openLightbox(container) {
+      const img = container.querySelector('img');
+      if (!img) return;
+      const modal = document.getElementById('lightboxModal');
+      const modalImg = document.getElementById('lightboxImg');
+      modalImg.src = img.src;
+      modal.classList.add('active');
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightboxModal').classList.remove('active');
+    }
+
+    // Busca rápida
+    document.getElementById('searchInput').addEventListener('input', function(e) {
+      const query = e.target.value.toLowerCase().trim();
+      const sections = document.querySelectorAll('.tutorial-section');
+
+      if (!query) {
+        sections.forEach(s => s.style.display = '');
+        return;
+      }
+
+      sections.forEach(sec => {
+        const text = sec.innerText.toLowerCase();
+        sec.style.display = text.includes(query) ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

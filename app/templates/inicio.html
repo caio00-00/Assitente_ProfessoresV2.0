@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% block title %}Início — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="ini-saudacao" id="ini-data"></div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-casa"/></svg> <span id="ini-titulo">Início</span></h1>
+        <p class="page-subtitle" id="ini-subtitulo">O que precisa da sua atenção agora.</p>
+    </div>
+    <div class="v4-toolbar">
+        <label for="ini-dias" style="font-size:0.8rem;color:var(--text-secondary);">Aulas dos</label>
+        <select id="ini-dias" class="form-control">
+            <option value="15">últimos 15 dias</option>
+            <option value="45" selected>últimos 45 dias</option>
+            <option value="90">últimos 90 dias</option>
+            <option value="180">últimos 6 meses</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="ini-atualizar" title="Buscar de novo">
+            <svg class="ico"><use href="#i-atualizar"/></svg> Atualizar
+        </button>
+    </div>
+</div>
+
+<div class="v4-resumo" id="ini-resumo"></div>
+<div id="ini-grupos">
+    <div class="card"><div class="v4-vazio">Carregando…</div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const PAPEIS_COM_FORM_AULA = ['admin', 'gestor', 'coordenador', 'assistente'];
+    const PAPEIS_COM_FORM_IMAGEM = ['admin', 'gestor', 'diretor_chefe', 'diretor_imagem'];
+    const MESES = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+
+    // Ícone de cada grupo (pelo título que a API manda)
+    const ICONE_GRUPO = {
+        'Devolvidos para corrigir': 'devolvido',
+        'Devolvidos ao assistente': 'devolvido',
+        'Rascunhos': 'lapis',
+        'Esperando vídeo e PDF no Drive': 'nuvem',
+        'Na fila, esperando o Drive': 'nuvem',
+        'Validados': 'validado',
+        'Prontos para validar': 'ok',
+        'Vermelhos no Drive': 'alerta',
+        'Vídeo marcado como corrompido': 'video-quebrado',
+        'Vídeo corrompido': 'video-quebrado',
+        'Aguardando o diretor-chefe': 'relogio',
+        'Relatórios de imagem para validar': 'claquete',
+    };
+    const ROTULO_ACAO = {
+        corrigir: ['lapis', 'Corrigir'],
+        finalizar: ['check', 'Abrir e finalizar'],
+        validar: ['ok', 'Validar'],
+        reverificar: ['nuvem', 'Ver no Drive'],
+        acompanhar: ['abrir', 'Abrir'],
+        ver: ['abrir', 'Abrir'],
+    };
+
+    function esc(v) {
+        return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+    function dataBR(iso) {
+        if (!iso) return '—';
+        const [a, m, d] = iso.slice(0, 10).split('-');
+        return `${d}/${m}/${a}`;
+    }
+    function dataCurta(iso) {
+        if (!iso) return '<b>—</b>';
+        const [a, m, d] = iso.slice(0, 10).split('-').map(Number);
+        const dia = new Date(a, m - 1, d);
+        return `<small>${DIAS[dia.getDay()]}</small><b>${String(d).padStart(2, '0')} ${MESES[m - 1]}</b>`;
+    }
+    function saudacao() {
+        const h = new Date().getHours();
+        return h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite';
+    }
+    function slug(t) { return 'g-' + String(t).normalize('NFD').replace(/[^\w]+/g, '-').toLowerCase(); }
+
+    function linkLinhaDoTempo(it) {
+        return it.tipo === 'class_report' ? `/aula?cr=${encodeURIComponent(it.id)}` : `/aula?idr=${encodeURIComponent(it.id)}`;
+    }
+    function linkFormulario(it, papel) {
+        if (it.tipo === 'class_report') {
+            return PAPEIS_COM_FORM_AULA.includes(papel) ? `/report?report_id=${encodeURIComponent(it.id)}` : null;
+        }
+        return PAPEIS_COM_FORM_IMAGEM.includes(papel) ? `/diretor-imagem?id=${encodeURIComponent(it.id)}` : null;
+    }
+
+    function chip(ok, texto, iconeOk = 'check', iconeFalta = 'relogio') {
+        return `<span class="v4-chip ${ok ? 'ok' : 'falta'}">${icone(ok ? iconeOk : iconeFalta)} ${texto}</span>`;
+    }
+
+    function linha(it, acao, papel) {
+        const form = linkFormulario(it, papel);
+        const sub = [];
+        if (it.tipo === 'class_report') {
+            if (it.horario) sub.push(esc(it.horario));
+            if (it.estudio) sub.push(esc(it.estudio));
+        } else {
+            if (it.turno) sub.push('Turno ' + esc(it.turno));
+            if (it.estudio) sub.push(esc(it.estudio));
+            if (it.aulas != null) sub.push(`${it.aulas} aula(s)`);
+        }
+        let chips = '';
+        if (it.tipo === 'class_report' && it.status !== 'RASCUNHO') {
+            chips += chip(it.tem_video, 'vídeo') + chip(it.tem_pdf, 'PDF');
+        }
+        if (it.video_corrompido) chips += `<span class="v4-chip ruim">${icone('video-quebrado')} vídeo corrompido</span>`;
+        const nota = it.observacao_coordenacao && it.precisa_correcao
+            ? `<div class="v4-nota">${icone('mensagem', 'ico-sm')}<span>${esc(it.observacao_coordenacao)}</span></div>` : '';
+
+        let botoes = `<a class="btn btn-secondary btn-sm" href="${linkLinhaDoTempo(it)}" title="Ver a aula de ponta a ponta">${icone('linha-tempo')} Linha do tempo</a>`;
+        if (acao === 'validar') {
+            const destino = it.tipo === 'class_report' ? '/reports-audit' : '/diretor-imagem/historico';
+            botoes = `<a class="btn btn-primary btn-sm" href="${destino}">${icone('ok')} Validar</a>` + botoes;
+        } else if (form && acao !== 'ver') {
+            const [ic, rot] = ROTULO_ACAO[acao] || ['abrir', 'Abrir'];
+            botoes = `<a class="btn btn-primary btn-sm" href="${form}">${icone(ic)} ${rot}</a>` + botoes;
+        }
+        return `<li class="v4-linha">
+            <span class="data" title="${dataBR(it.data)}">${dataCurta(it.data)}</span>
+            <div>
+                <div class="titulo">${esc(it.turma) || '<em>sem turma</em>'} · ${esc(it.disciplina) || '—'}${chips}</div>
+                <div class="sub">${sub.join(' · ')}</div>${nota}
+            </div>
+            <div class="acoes">${botoes}</div>
+        </li>`;
+    }
+
+    async function carregar() {
+        const dias = document.getElementById('ini-dias').value;
+        const caixa = document.getElementById('ini-grupos');
+        const resumo = document.getElementById('ini-resumo');
+        caixa.innerHTML = '<div class="card"><div class="v4-vazio">Carregando…</div></div>';
+        let dados;
+        try {
+            dados = await apiGet(`/api/v1/painel/inicio?dias=${encodeURIComponent(dias)}`);
+        } catch (e) {
+            caixa.innerHTML = `<div class="card"><div class="v4-vazio">${icone('alerta')} Não foi possível carregar. Tente de novo em instantes.</div></div>`;
+            return;
+        }
+        if (!dados) return;
+        const papel = dados.usuario.papel;
+        const primeiroNome = (dados.usuario.nome || '').split(' ')[0];
+        document.getElementById('ini-titulo').textContent = primeiroNome ? `${saudacao()}, ${primeiroNome}` : 'Início';
+        document.getElementById('ini-subtitulo').textContent =
+            `${nomeDoPapel(papel)} · mostrando aulas desde ${dataBR(dados.desde)}`;
+
+        const pendentes = dados.grupos.filter(g => g.cor !== 'verde').reduce((s, g) => s + g.total, 0);
+        if (!dados.grupos.length || pendentes === 0) {
+            resumo.innerHTML = '';
+            caixa.innerHTML = `<div class="card v4-tudo-certo">
+                ${icone('ok', 'ico-xl')}
+                <h3>Tudo em dia</h3>
+                <p>Nada esperando por você neste período.</p>
+            </div>`;
+            if (!dados.grupos.length) return;
+        } else {
+            resumo.innerHTML = dados.grupos.map(g =>
+                `<div class="v4-resumo-item v4-cor-${esc(g.cor)} ${g.total ? '' : 'zerado'}" data-alvo="${slug(g.titulo)}" role="button" tabindex="0">
+                    <div class="bolha">${icone(ICONE_GRUPO[g.titulo] || 'vazio', 'ico-lg')}</div>
+                    <div><div class="num">${g.total}</div><div class="rot">${esc(g.titulo)}</div></div>
+                </div>`).join('');
+            resumo.querySelectorAll('.v4-resumo-item').forEach(el => {
+                const ir = () => document.getElementById(el.dataset.alvo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                el.addEventListener('click', ir);
+                el.addEventListener('keydown', ev => { if (ev.key === 'Enter') ir(); });
+            });
+            caixa.innerHTML = '';
+        }
+
+        // Grupos com itens primeiro; os vazios ficam no fim, recolhidos numa linha
+        const comItens = dados.grupos.filter(g => g.total > 0);
+        const vazios = dados.grupos.filter(g => g.total === 0);
+        caixa.innerHTML += comItens.map(g => {
+            const mais = g.total > g.itens.length ? ` · mostrando ${g.itens.length}` : '';
+            return `<section class="card v4-grupo v4-cor-${esc(g.cor)}" id="${slug(g.titulo)}">
+                <div class="v4-grupo-cab">
+                    <div><h3>${icone(ICONE_GRUPO[g.titulo] || 'vazio')} ${esc(g.titulo)}</h3><p>${esc(g.descricao)}</p></div>
+                    <span class="v4-grupo-total">${g.total} ${g.total === 1 ? 'item' : 'itens'}${mais}</span>
+                </div>
+                <ul class="v4-lista">${g.itens.map(it => linha(it, g.acao, papel)).join('')}</ul>
+            </section>`;
+        }).join('');
+        if (vazios.length && comItens.length) {
+            caixa.innerHTML += `<div class="v4-vazio" style="padding:0 0.25rem;">${icone('check', 'ico-sm')}
+                Sem pendências em: ${vazios.map(g => esc(g.titulo)).join(', ')}.</div>`;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        if (!getToken()) { window.location.href = '/'; return; }
+        document.getElementById('ini-data').textContent =
+            new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+        loadUserProfile();
+        document.getElementById('ini-dias').addEventListener('change', carregar);
+        document.getElementById('ini-atualizar').addEventListener('click', carregar);
+        carregar();
+    });
+})();
+</script>
+{% endblock %}

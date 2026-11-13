@@ -1,0 +1,1470 @@
+{% extends "base.html" %}
+{% block title %}Cadastros — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-cadastros"/></svg> Cadastros</h1>
+        <p class="page-subtitle">Professores, disciplinas, turmas, estúdios e o que mais o sistema usa</p>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.25rem;">
+    <button class="tab-btn active" onclick="switchTab('professores')" id="tab-professores">👨‍🏫 Professores</button>
+    <button class="tab-btn" onclick="switchTab('disciplinas')" id="tab-disciplinas">📚 Disciplinas</button>
+    <button class="tab-btn" onclick="switchTab('turmas')" id="tab-turmas">🎓 Turmas</button>
+    <button class="tab-btn" onclick="switchTab('estudios')" id="tab-estudios">🏢 Estúdios</button>
+    <button class="tab-btn" onclick="switchTab('iptv')" id="tab-iptv">📡 Login IPTV</button>
+    <button class="tab-btn" onclick="switchTab('grades')" id="tab-grades">🗓️ Gestão de Grades</button>
+</div>
+
+<!-- ═══ Professores Tab ═══ -->
+<div class="card" id="panel-professores">
+    <div class="card-header">
+        <h3 class="card-title">👨‍🏫 Professores</h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" id="show-inactive-prof" onchange="loadProfessores()"> Mostrar inativos
+            </label>
+            <button class="btn btn-primary btn-sm" onclick="openModal('professor')">+ Novo Professor</button>
+        </div>
+    </div>
+    <div id="professores-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Disciplinas Tab ═══ -->
+<div class="card" id="panel-disciplinas" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">📚 Disciplinas</h3>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 4px;">
+                <input type="checkbox" id="show-inactive-disc" onchange="loadDisciplinas()"> Mostrar inativos
+            </label>
+            <button class="btn btn-primary btn-sm" onclick="openModal('disciplina')">+ Nova Disciplina</button>
+        </div>
+    </div>
+    <div id="disciplinas-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Turmas Tab ═══ -->
+<div class="card" id="panel-turmas" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">🎓 Turmas <span id="turmas-contagem" style="font-size:0.75rem;font-weight:400;color:var(--text-muted);"></span></h3>
+        <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+            <label style="display:inline-flex;align-items:center;gap:0.4rem;font-size:0.82rem;color:var(--text-secondary);cursor:pointer;">
+                <input type="checkbox" id="turmas-mostrar-inativas" onchange="renderTurmas()"> Mostrar turmas inativas
+            </label>
+            <button class="btn btn-secondary btn-sm" onclick="abrirModalClonar()">📋 Clonar Estrutura</button>
+            <button class="btn btn-primary btn-sm" onclick="openModal('turma')">+ Nova Turma</button>
+        </div>
+    </div>
+    <div id="turmas-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Estúdios Tab ═══ -->
+<div class="card" id="panel-estudios" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">🏢 Estúdios</h3>
+        <button class="btn btn-primary btn-sm" onclick="openEstudioModal()">+ Novo Estúdio</button>
+    </div>
+    <div id="estudios-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Login IPTV Tab ═══ -->
+<div class="card" id="panel-iptv" style="display: none;">
+    <div class="card-header">
+        <h3 class="card-title">📡 Login IPTV / Canais</h3>
+        <button class="btn btn-primary btn-sm" onclick="openIptvModal()">+ Novo Canal IPTV</button>
+    </div>
+    <div id="iptv-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Grades Tab ═══ -->
+<div id="panel-grades" style="display: none;">
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">🗓️ Gestão de Grade por Turma</h3>
+        </div>
+        <div class="card-body" style="padding: 1.5rem;">
+            <div class="form-group">
+                <label class="form-label">Selecionar Turma</label>
+                <select id="gv-turma-select" class="form-select" onchange="loadGradeVersoes()" style="max-width:400px;">
+                    <option value="">Selecione uma turma...</option>
+                </select>
+            </div>
+            <div id="gv-status-bar" style="display:none; margin-top: 1rem; padding: 0.75rem 1rem; border-radius: 8px; background: var(--bg-hover);">
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap: wrap; gap: 0.5rem;">
+                    <div>
+                        <span id="gv-status-badge" class="badge"></span>
+                        <span id="gv-status-text" style="margin-left: 0.5rem; font-size: 0.85rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+                        <button id="btn-ativar-turma" class="btn btn-primary btn-sm" onclick="ativarDraftVersao()" style="display:none;">✅ Ativar Turma (V1)</button>
+                        <button id="btn-nova-versao" class="btn btn-secondary btn-sm" onclick="criarNovaVersao()" style="display:none;">+ Nova Versão</button>
+                        <button id="btn-clonar-turma" class="btn btn-secondary btn-sm" onclick="abrirModalClonar()" style="display:none;">📋 Clonar Estrutura</button>
+                    </div>
+                </div>
+            </div>
+            <div id="gv-versoes-container" style="display:none; margin-top: 1.5rem;">
+                <div id="gv-versoes-list"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ Modal CRUD Drawer ═══ -->
+<div class="drawer-overlay" id="cadastro-overlay" onclick="closeModal()"></div>
+<div class="drawer" id="cadastro-drawer">
+    <div class="drawer-header">
+        <h3 id="modal-title">Novo Cadastro</h3>
+        <button class="drawer-close" onclick="closeModal()">✕</button>
+    </div>
+    <form id="cadastro-form" onsubmit="saveCadastro(event)" style="padding: 1.5rem;">
+        <input type="hidden" id="cadastro-id">
+        <input type="hidden" id="cadastro-type">
+
+        <div class="form-group">
+            <label class="form-label">Nome</label>
+            <input type="text" id="cadastro-nome" class="form-input" placeholder="Nome completo" required>
+        </div>
+
+        <div class="form-group" id="field-nomenclatura" style="display: none;">
+            <label class="form-label">Nomenclatura Padrão (Sigla)</label>
+            <input type="text" id="cadastro-nomenclatura" class="form-input" placeholder="Ex: MAT, PORT, FIS">
+        </div>
+
+        <div id="fields-turma" style="display: none;">
+            <div class="form-group">
+                <label class="form-label">Série / Módulo</label>
+                <input type="text" id="cadastro-serie" class="form-input" placeholder="Ex: 3ª Série">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Turno</label>
+                <select id="cadastro-turno" class="form-select">
+                    <option value="MANHÃ">Manhã</option>
+                    <option value="TARDE">Tarde</option>
+                    <option value="NOITE">Noite</option>
+                    <option value="INTEGRAL">Integral</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Modalidade</label>
+                <select id="cadastro-modalidade" class="form-select">
+                    <option value="REGULAR">Regular</option>
+                    <option value="TECNICO">Técnico</option>
+                    <option value="UAPI">UAPI</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group" id="field-disciplinas-link" style="display: none;">
+            <label class="form-label">Disciplinas Vinculadas</label>
+            <div id="disciplinas-checkboxes" style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 0.75rem;"></div>
+        </div>
+
+        <div style="display: flex; gap: 1rem; margin-top: 2rem;">
+            <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex: 2;">Guardar</button>
+        </div>
+    </form>
+</div>
+
+<!-- ═══ Modal Estúdio ═══ -->
+<div class="drawer-overlay" id="estudio-overlay" onclick="closeEstudioModal()"></div>
+<div id="estudio-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;width:440px;max-width:95vw;z-index:1001;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+        <h3 id="estudio-modal-title" style="margin:0;font-size:1.1rem;font-weight:600;">Novo Estúdio</h3>
+        <button onclick="closeEstudioModal()" class="drawer-close">✕</button>
+    </div>
+    <form onsubmit="saveEstudio(event)">
+        <input type="hidden" id="estudio-id">
+        <div class="form-group">
+            <label class="form-label">Nome do Estúdio *</label>
+            <input type="text" id="estudio-nome" class="form-input" placeholder="Ex: Estúdio Principal" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Disponibilidade</label>
+            <div style="display:flex; gap:1rem; margin-bottom:0.75rem;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="radio" name="estudio-disponibilidade" id="estudio-24h" value="24h" checked onchange="toggleEstudioHorario()"> 24 horas
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                    <input type="radio" name="estudio-disponibilidade" id="estudio-periodo" value="periodo" onchange="toggleEstudioHorario()"> Período definido
+                </label>
+            </div>
+            <div id="estudio-horario-fields" style="display:none; gap:1rem;">
+                <div class="form-group" style="flex:1; margin:0;">
+                    <label class="form-label" style="font-size:0.8rem;">Início</label>
+                    <input type="time" id="estudio-inicio" class="form-input" value="08:00">
+                </div>
+                <div class="form-group" style="flex:1; margin:0;">
+                    <label class="form-label" style="font-size:0.8rem;">Fim</label>
+                    <input type="time" id="estudio-fim" class="form-input" value="22:00">
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeEstudioModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">Guardar</button>
+        </div>
+    </form>
+</div>
+
+<!-- ═══ Modal IPTV ═══ -->
+<div class="drawer-overlay" id="iptv-overlay" onclick="closeIptvModal()"></div>
+<div id="iptv-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;width:440px;max-width:95vw;z-index:1001;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+        <h3 id="iptv-modal-title" style="margin:0;font-size:1.1rem;font-weight:600;">Novo Canal IPTV</h3>
+        <button onclick="closeIptvModal()" class="drawer-close">✕</button>
+    </div>
+    <form onsubmit="saveIptv(event)">
+        <input type="hidden" id="iptv-id">
+        <div class="form-group">
+            <label class="form-label">Nome do Canal *</label>
+            <input type="text" id="iptv-nome" class="form-input" placeholder="Ex: Canal Educação 01" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Número do Canal *</label>
+            <input type="number" id="iptv-numero" class="form-input" placeholder="Ex: 1" min="1" required>
+        </div>
+        <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeIptvModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2;">Guardar</button>
+        </div>
+    </form>
+</div>
+
+<!-- ═══ Modal Slot ═══ -->
+<div class="drawer-overlay" id="slot-overlay" onclick="closeSlotModal()"></div>
+<div id="slot-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;width:520px;max-width:95vw;z-index:1001;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+        <h3 id="slot-modal-title" style="margin:0;font-size:1.1rem;font-weight:600;">Novo Slot</h3>
+        <button onclick="closeSlotModal()" class="drawer-close">✕</button>
+    </div>
+    <input type="hidden" id="slot-id">
+    <input type="hidden" id="slot-versao-id">
+    <input type="hidden" id="slot-turma-id-hidden">
+
+    <!-- Conflict warning -->
+    <div id="slot-conflict-alert" style="display:none; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; padding:0.75rem; margin-bottom:1rem; font-size:0.85rem; color: var(--status-red);"></div>
+
+    <!-- Days -->
+    <div class="form-group">
+        <label class="form-label">Dias da Semana *</label>
+        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+            <label class="day-label"><input type="checkbox" class="day-check" value="0" onchange="_noop()"> Seg</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="1" onchange="_noop()"> Ter</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="2" onchange="_noop()"> Qua</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="3" onchange="_noop()"> Qui</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="4" onchange="_noop()"> Sex</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="5" onchange="_noop()"> Sáb</label>
+            <label class="day-label"><input type="checkbox" class="day-check" value="6" onchange="_noop()"> Dom</label>
+        </div>
+    </div>
+
+    <!-- Time -->
+    <div class="form-row">
+        <div class="form-group">
+            <label class="form-label">Início *</label>
+            <input type="time" id="slot-inicio" class="form-input" required>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Fim *</label>
+            <input type="time" id="slot-fim" class="form-input" required>
+        </div>
+    </div>
+
+    <!-- Studio -->
+    <div class="form-group">
+        <label class="form-label">Estúdio (opcional)</label>
+        <select id="slot-estudio" class="form-select" onchange="updateEstudioInfo()">
+            <option value="">Sem estúdio vinculado</option>
+        </select>
+        <small id="slot-estudio-info" style="color:var(--text-muted); font-size:0.75rem;"></small>
+    </div>
+
+    <!-- Canal IPTV -->
+    <div class="form-group">
+        <label class="form-label">Canal IPTV (opcional)</label>
+        <select id="slot-canal" class="form-select">
+            <option value="">Sem canal vinculado</option>
+        </select>
+    </div>
+
+    <!-- Discipline -->
+    <div class="form-group">
+        <label class="form-label">Disciplina (opcional)</label>
+        <select id="slot-disciplina" class="form-select">
+            <option value="">Sem disciplina definida</option>
+        </select>
+    </div>
+
+    <!-- Type -->
+    <div class="form-group">
+        <label class="form-label">Tipo de Slot</label>
+        <select id="slot-tipo" class="form-select">
+            <option value="aula">Aula</option>
+            <option value="gravacao">Gravação</option>
+        </select>
+    </div>
+
+    <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+        <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeSlotModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary" style="flex:2;" onclick="saveSlot()">Salvar Slot</button>
+    </div>
+</div>
+
+<!-- ═══ Modal Clonar Turma ═══ -->
+<div class="drawer-overlay" id="clonar-overlay" onclick="closeClonarModal()"></div>
+<div id="clonar-modal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;width:480px;max-width:95vw;z-index:1001;max-height:90vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+        <h3 style="margin:0;font-size:1.1rem;font-weight:600;">📋 Criar Nova Turma a Partir de Estrutura Existente</h3>
+        <button onclick="closeClonarModal()" class="drawer-close">✕</button>
+    </div>
+    <p style="font-size:0.85rem;color:var(--text-muted);margin-bottom:1.25rem;">Selecione a turma de origem, preencha o nome da nova turma e clique em Clonar. A nova turma nasce como rascunho, independente da original.</p>
+    <div class="form-group">
+        <label class="form-label">Turma de Origem *</label>
+        <select id="clonar-source-select" class="form-select">
+            <option value="">Selecione a turma a copiar...</option>
+        </select>
+        <small id="clonar-source-info" style="color:var(--text-muted);font-size:0.75rem;"></small>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Nome da Nova Turma *</label>
+        <input type="text" id="clonar-nome" class="form-input" placeholder="Ex: EM 2 TI" required>
+    </div>
+    <div class="form-group">
+        <label class="form-label">Nomenclatura Padrão (opcional)</label>
+        <input type="text" id="clonar-nomenclatura" class="form-input" placeholder="Ex: EM2TI">
+    </div>
+    <div style="display:flex;gap:1rem;margin-top:1.5rem;">
+        <button type="button" class="btn btn-secondary" style="flex:1;" onclick="closeClonarModal()">Cancelar</button>
+        <button type="button" class="btn btn-primary" style="flex:2;" onclick="executarClonar()">Clonar Turma</button>
+    </div>
+</div>
+
+<style>
+    .status-toggle {
+        display: inline-flex; align-items: center; gap: 6px; padding: 0.25rem 0.6rem;
+        border-radius: 20px; font-size: 0.7rem; font-weight: 600; cursor: pointer;
+        border: none; transition: all 0.2s;
+    }
+    .status-toggle.active { background: rgba(16,185,129,0.15); color: var(--status-green); }
+    .status-toggle.inactive { background: rgba(239,68,68,0.15); color: var(--status-red); }
+    .status-toggle:hover { transform: scale(1.05); }
+    .disc-chip {
+        display: inline-block; background: rgba(79,70,229,0.1); color: var(--accent-primary);
+        padding: 2px 8px; border-radius: 12px; font-size: 0.65rem; margin: 1px;
+    }
+    .badge-rascunho { background: rgba(245,158,11,0.15); color: #d97706; }
+    .badge-ativa { background: rgba(16,185,129,0.15); color: #059669; }
+    .day-label {
+        display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+        border: 1px solid var(--border-color); border-radius: 20px; cursor: pointer;
+        font-size: 0.8rem; transition: all 0.15s; user-select: none;
+    }
+    .day-label:has(input:checked) {
+        background: rgba(79,70,229,0.15); border-color: var(--accent-primary); color: var(--accent-primary); font-weight: 600;
+    }
+    #estudio-modal, #iptv-modal, #slot-modal, #clonar-modal { box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+    .drawer-overlay.open { display: block !important; }
+    #estudio-overlay.open, #iptv-overlay.open, #slot-overlay.open, #clonar-overlay.open { display: block !important; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .versao-card {
+        border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 1rem; overflow: hidden;
+    }
+    .versao-card.ativa { border-left: 4px solid var(--status-green); }
+    .versao-card.rascunho { border-left: 4px solid var(--status-yellow); }
+    .slot-table { width: 100%; font-size: 0.85rem; border-collapse: collapse; }
+    .slot-table th, .slot-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--border-color); }
+    .slot-table th { font-weight: 600; font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; }
+    .btn-icon { background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 0.85rem; }
+    /* Grade horária em quadro: dias nas colunas, faixas de horário nas linhas */
+    .gq-toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .gq-modos { display: inline-flex; border: 1px solid var(--border-subtle); border-radius: 8px; overflow: hidden; }
+    .gq-modos button { background: transparent; border: 0; padding: 0.3rem 0.8rem; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); cursor: pointer; }
+    .gq-modos button.on { background: rgba(79,70,229,0.18); color: var(--accent-start); }
+    .gq-dica { font-size: 0.75rem; color: var(--text-muted); }
+    .gq-wrap { overflow-x: auto; }
+    .gq { width: 100%; min-width: 760px; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 0.78rem; }
+    .gq th { position: sticky; top: 0; background: var(--bg-glass); color: var(--text-muted); font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 0.5rem; border-bottom: 1px solid var(--border-subtle); text-align: left; }
+    .gq th.gq-h, .gq td.gq-h { width: 108px; }
+    .gq td { vertical-align: top; padding: 4px; border-bottom: 1px solid var(--border-subtle); border-left: 1px solid var(--border-subtle); }
+    .gq td.gq-h { border-left: 0; font-weight: 600; color: var(--text-secondary); white-space: nowrap; padding: 0.6rem 0.5rem; font-variant-numeric: tabular-nums; }
+    .gq-slot { position: relative; display: block; width: 100%; text-align: left; border: 1px solid transparent; border-left: 3px solid var(--accent-start); background: rgba(79,70,229,0.12); color: var(--text-primary); border-radius: 6px; padding: 5px 22px 5px 7px; margin-bottom: 4px; cursor: pointer; font: inherit; }
+    .gq-slot:hover { border-color: var(--accent-start); }
+    .gq-slot.grav { border-left-color: var(--status-yellow); background: rgba(245,158,11,0.12); }
+    .gq-slot b { display: block; font-size: 0.74rem; line-height: 1.25; overflow-wrap: break-word; hyphens: auto; }
+    .gq-slot small { display: block; color: var(--text-muted); font-size: 0.68rem; margin-top: 2px; }
+    .gq-slot .gq-x { position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; line-height: 16px; text-align: center; border-radius: 4px; color: var(--text-muted); font-size: 0.75rem; }
+    .gq-slot .gq-x:hover { background: rgba(239,68,68,0.15); color: var(--status-red); }
+    .gq-add { display: block; width: 100%; min-height: 34px; border: 1px dashed transparent; background: transparent; color: transparent; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+    td:hover > .gq-add, .gq-add:focus-visible { border-color: var(--border-subtle); color: var(--text-muted); }
+    .gq-add:hover { border-color: var(--accent-start) !important; color: var(--accent-start) !important; }
+    .btn-icon:hover { background: var(--bg-glass); }
+    .btn-icon.danger:hover { background: rgba(239,68,68,0.1); color: var(--status-red); }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let allDisciplinas = [];
+    let allEstudios = [];
+    let allCanais = [];
+    let allTurmas = [];
+    let currentVersionsData = [];
+
+    // ─── State for Grades panel ───────────────────────────────────────
+    let currentGradeTurmaId = null;
+    let currentDraftVersaoId = null;
+    let currentActiveVersaoId = null;
+
+    function _noop() {}
+
+    // ─── Init ─────────────────────────────────────────────────────────
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const token = getToken();
+        if (!token) { window.location.href = '/'; return; }
+        loadUserProfile();
+        loadProfessores();
+        loadAllDisciplinasForSelect();
+        loadAllEstudios();
+        loadAllCanais();
+    });
+
+    // ─── Tab switching ─────────────────────────────────────────────────
+
+    function switchTab(tab) {
+        const tabs = ['professores','disciplinas','turmas','estudios','iptv','grades'];
+        tabs.forEach(t => {
+            const panel = document.getElementById('panel-' + t);
+            const btn = document.getElementById('tab-' + t);
+            if (panel) panel.style.display = t === tab ? 'block' : 'none';
+            if (btn) btn.classList.toggle('active', t === tab);
+        });
+        if (tab === 'disciplinas') loadDisciplinas();
+        if (tab === 'professores') loadProfessores();
+        if (tab === 'grades') loadGradeTurmas();
+        if (tab === 'turmas') loadTurmas();
+        if (tab === 'estudios') loadEstudiosTab();
+        if (tab === 'iptv') loadIptvTab();
+    }
+
+    // ─── Cache loaders ─────────────────────────────────────────────────
+
+    async function loadAllDisciplinasForSelect() {
+        try {
+            const res = await fetch('/api/v1/cadastros/disciplinas?incluir_inativos=false', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.ok) allDisciplinas = await res.json();
+        } catch(e) {}
+    }
+
+    async function loadAllEstudios() {
+        try {
+            const res = await fetch('/api/v1/configuracoes/estudios', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.ok) allEstudios = await res.json();
+        } catch(e) {}
+    }
+
+    async function loadAllCanais() {
+        try {
+            const res = await fetch('/api/v1/configuracoes/canais-iptv', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.ok) allCanais = await res.json();
+        } catch(e) {}
+    }
+
+    async function loadAllTurmas() {
+        try {
+            const res = await fetch('/api/v1/turmas/', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+            if (res.ok) allTurmas = await res.json();
+        } catch(e) {}
+    }
+    loadAllTurmas();
+
+    // ─── Professores ──────────────────────────────────────────────────
+
+    async function loadProfessores() {
+        const showInactive = document.getElementById('show-inactive-prof').checked;
+        try {
+            const res = await fetch(`/api/v1/cadastros/professores?incluir_inativos=${showInactive}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            if (data.length === 0) {
+                document.getElementById('professores-table').innerHTML = '<div class="empty-state"><div class="icon">👨‍🏫</div><p>Nenhum professor cadastrado.</p></div>';
+                return;
+            }
+
+            const rows = data.map(p => `
+                <tr style="${!p.is_active ? 'opacity: 0.5;' : ''}">
+                    <td><strong>${p.nome}</strong></td>
+                    <td>${p.disciplinas.map(d => `<span class="disc-chip">${d.nome}</span>`).join(' ') || '—'}</td>
+                    <td>
+                        <button class="status-toggle ${p.is_active ? 'active' : 'inactive'}"
+                                onclick="toggleActive('professores', '${p.id}')">
+                            ${p.is_active ? '✅ Ativo' : '❌ Inativo'}
+                        </button>
+                    </td>
+                    <td>
+                        <button class="btn btn-secondary btn-sm" onclick="editItem('professor', '${p.id}', '${p.nome.replace(/'/g,"\\'")}', ${JSON.stringify(p.disciplinas.map(d => d.id)).replace(/"/g,'&quot;')})">✏️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('professores-table').innerHTML = `
+                <div class="table-container"><table>
+                    <thead><tr><th>Nome</th><th>Disciplinas</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        } catch(e) { console.error(e); }
+    }
+
+    // ─── Disciplinas ──────────────────────────────────────────────────
+
+    async function loadDisciplinas() {
+        const showInactive = document.getElementById('show-inactive-disc').checked;
+        try {
+            const res = await fetch(`/api/v1/cadastros/disciplinas?incluir_inativos=${showInactive}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            if (data.length === 0) {
+                document.getElementById('disciplinas-table').innerHTML = '<div class="empty-state"><div class="icon">📚</div><p>Nenhuma disciplina cadastrada.</p></div>';
+                return;
+            }
+
+            const rows = data.map(d => `
+                <tr style="${!d.is_active ? 'opacity: 0.5;' : ''}">
+                    <td><strong>${d.nome}</strong></td>
+                    <td>${d.nomenclatura_padrao || '—'}</td>
+                    <td><button class="status-toggle ${d.is_active ? 'active' : 'inactive'}" onclick="toggleActive('disciplinas', '${d.id}')">${d.is_active ? '✅ Ativa' : '❌ Inativa'}</button></td>
+                    <td><button class="btn btn-secondary btn-sm" onclick="editDisciplina('${d.id}','${d.nome.replace(/'/g,"\\'")}','${(d.nomenclatura_padrao||'').replace(/'/g,"\\'")}')">✏️</button></td>
+                </tr>
+            `).join('');
+
+            document.getElementById('disciplinas-table').innerHTML = `
+                <div class="table-container"><table>
+                    <thead><tr><th>Nome</th><th>Nomenclatura</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        } catch(e) { console.error(e); }
+    }
+
+    // ─── Turmas ───────────────────────────────────────────────────────
+
+    // Turmas: por padrão só as ativas; a caixa "Mostrar turmas inativas" traz as demais.
+    let turmasCache = [];
+
+    async function loadTurmas() {
+        try {
+            const res = await fetch('/api/v1/turmas/?incluir_inativos=true', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) throw new Error();
+            turmasCache = await res.json();
+            renderTurmas();
+        } catch(e) { console.error(e); }
+    }
+
+    function renderTurmas() {
+        const data = turmasCache;
+        const totalAtivas = data.filter(t => t.is_active).length;
+        const totalInativas = data.length - totalAtivas;
+        const mostrarInativas = document.getElementById('turmas-mostrar-inativas')?.checked;
+        const contagem = document.getElementById('turmas-contagem');
+        if (contagem) {
+            contagem.textContent = `· ${totalAtivas} ativa${totalAtivas === 1 ? '' : 's'}` +
+                (totalInativas ? ` · ${totalInativas} inativa${totalInativas === 1 ? '' : 's'}` : '');
+        }
+
+        const visiveis = mostrarInativas ? data : data.filter(t => t.is_active);
+        if (visiveis.length === 0) {
+            const msg = data.length === 0 ? 'Nenhuma turma cadastrada.' : 'Nenhuma turma ativa. Marque "Mostrar turmas inativas" para ver as demais.';
+            document.getElementById('turmas-table').innerHTML = `<div class="empty-state"><div class="icon">🎓</div><p>${msg}</p></div>`;
+            return;
+        }
+
+        const rows = visiveis.map(t => {
+            const isAtiva = t.status === 'ativa';
+            const isEnabled = t.is_active;
+            let situacaoBadge;
+            if (!isEnabled) {
+                situacaoBadge = '<span class="badge" style="font-size:0.65rem;background:rgba(107,114,128,0.15);color:#6b7280;">DESATIVADA</span>';
+            } else if (isAtiva) {
+                situacaoBadge = `<span class="badge badge-green" style="font-size:0.65rem;">ATIVA</span>${t.versao_ativa_num ? ` <span style="font-size:0.7rem;color:var(--text-muted);">V${t.versao_ativa_num}</span>` : ''}`;
+            } else {
+                situacaoBadge = '<span class="badge badge-yellow" style="font-size:0.65rem;">RASCUNHO</span>';
+            }
+            const nomeSafe = t.nome.replace(/'/g,"\\'");
+            const serieSafe = (t.serie_modulo||'').replace(/'/g,"\\'");
+            const modalSafe = (t.modalidade||'').replace(/'/g,"\\'");
+            const nomencSafe = (t.nomenclatura_padrao||'').replace(/'/g,"\\'");
+            return `
+            <tr style="${!isEnabled ? 'opacity:0.6;' : ''}">
+                <td><strong>${t.nome}</strong></td>
+                <td>${t.turno}</td>
+                <td>${t.serie_modulo || '—'}</td>
+                <td>${t.nomenclatura_padrao || '—'}</td>
+                <td>${situacaoBadge}</td>
+                <td>
+                    <button class="status-toggle ${isEnabled ? 'active' : 'inactive'}" onclick="toggleActive('turmas', '${t.id}')">${isEnabled ? '✅ Ativa' : '❌ Inativa'}</button>
+                </td>
+                <td style="display:flex;gap:4px;flex-wrap:wrap;">
+                    <button class="btn btn-secondary btn-sm" onclick="editTurma('${t.id}','${nomeSafe}','${t.turno}','${serieSafe}','${modalSafe}','${nomencSafe}')">✏️</button>
+                    <button class="btn btn-secondary btn-sm" onclick="abrirModalClonar('${t.id}')" title="Clonar estrutura desta turma">📋</button>
+                    <button class="btn btn-primary btn-sm" onclick="gerirGrade('${t.id}')">🗓️ Grade</button>
+                </td>
+            </tr>`;
+        }).join('');
+
+        document.getElementById('turmas-table').innerHTML = `
+            <div class="table-container"><table>
+                <thead><tr><th>Nome</th><th>Turno</th><th>Série/Módulo</th><th>Nomenclatura</th><th>Situação</th><th>Status</th><th>Ações</th></tr></thead>
+                <tbody>${rows}</tbody>
+            </table></div>`;
+}
+
+    function gerirGrade(turmaId) {
+        switchTab('grades');
+        setTimeout(() => {
+            const sel = document.getElementById('gv-turma-select');
+            if (sel) { sel.value = turmaId; loadGradeVersoes(); }
+        }, 100);
+    }
+
+    // ─── Estúdios ─────────────────────────────────────────────────────
+
+    async function loadEstudiosTab() {
+        document.getElementById('estudios-table').innerHTML = '<div class="spinner"></div>';
+        try {
+            const res = await fetch('/api/v1/configuracoes/estudios', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            if (data.length === 0) {
+                document.getElementById('estudios-table').innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>Nenhum estúdio cadastrado.</p></div>';
+                return;
+            }
+
+            const rows = data.map(e => {
+                const horario = e.funciona_24h ? '24 horas' : `${e.horario_inicio || ''} – ${e.horario_fim || ''}`;
+                return `
+                <tr>
+                    <td><strong>${e.nome}</strong></td>
+                    <td>${horario}</td>
+                    <td><span class="badge ${e.ativo ? 'badge-green' : 'badge-red'}" style="font-size:0.65rem;">${e.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
+                    <td style="display:flex;gap:4px;">
+                        <button class="btn btn-secondary btn-sm" onclick="editEstudio(${e.id},'${e.nome.replace(/'/g,"\\'")}',${e.funciona_24h},'${e.horario_inicio||'08:00'}','${e.horario_fim||'22:00'}')">✏️</button>
+                        <button class="btn btn-sm btn-icon danger" onclick="excluirEstudio(${e.id},'${e.nome.replace(/'/g,"\\'")}')">🗑️</button>
+                    </td>
+                </tr>`;
+            }).join('');
+
+            document.getElementById('estudios-table').innerHTML = `
+                <div class="table-container"><table>
+                    <thead><tr><th>Nome</th><th>Disponibilidade</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        } catch(e) { document.getElementById('estudios-table').innerHTML = '<p style="color:var(--status-red);padding:1rem;">Erro ao carregar estúdios.</p>'; }
+    }
+
+    function openEstudioModal(data) {
+        document.getElementById('estudio-id').value = '';
+        document.getElementById('estudio-nome').value = '';
+        document.getElementById('estudio-modal-title').textContent = 'Novo Estúdio';
+        document.getElementById('estudio-24h').checked = true;
+        document.getElementById('estudio-horario-fields').style.display = 'none';
+        document.getElementById('estudio-overlay').classList.add('open');
+        document.getElementById('estudio-modal').style.display = 'block';
+    }
+
+    function editEstudio(id, nome, funciona24h, inicio, fim) {
+        document.getElementById('estudio-id').value = id;
+        document.getElementById('estudio-nome').value = nome;
+        document.getElementById('estudio-modal-title').textContent = 'Editar Estúdio';
+        if (funciona24h) {
+            document.getElementById('estudio-24h').checked = true;
+            document.getElementById('estudio-horario-fields').style.display = 'none';
+        } else {
+            document.getElementById('estudio-periodo').checked = true;
+            document.getElementById('estudio-horario-fields').style.display = 'flex';
+            document.getElementById('estudio-inicio').value = inicio;
+            document.getElementById('estudio-fim').value = fim;
+        }
+        document.getElementById('estudio-overlay').classList.add('open');
+        document.getElementById('estudio-modal').style.display = 'block';
+    }
+
+    function closeEstudioModal() {
+        document.getElementById('estudio-overlay').classList.remove('open');
+        document.getElementById('estudio-modal').style.display = 'none';
+    }
+
+    function toggleEstudioHorario() {
+        const is24h = document.getElementById('estudio-24h').checked;
+        document.getElementById('estudio-horario-fields').style.display = is24h ? 'none' : 'flex';
+    }
+
+    async function saveEstudio(e) {
+        e.preventDefault();
+        const id = document.getElementById('estudio-id').value;
+        const nome = document.getElementById('estudio-nome').value.trim();
+        const funciona_24h = document.getElementById('estudio-24h').checked;
+        const horario_inicio = funciona_24h ? '00:00' : document.getElementById('estudio-inicio').value;
+        const horario_fim = funciona_24h ? '23:59' : document.getElementById('estudio-fim').value;
+
+        const body = { nome, horario_inicio, horario_fim, funciona_24h };
+        const url = id ? `/api/v1/configuracoes/estudios/${id}` : '/api/v1/configuracoes/estudios';
+        const method = id ? 'PATCH' : 'POST';
+
+        try {
+            const res = await fetch(url, {
+                method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            showToast('Estúdio salvo com sucesso!', 'success');
+            closeEstudioModal();
+            loadEstudiosTab();
+            loadAllEstudios();
+        } catch(err) { showToast(err.message, 'error'); }
+    }
+
+    async function excluirEstudio(id, nome) {
+        if (!confirm(`Desativar o estúdio "${nome}"?`)) return;
+        try {
+            const res = await fetch(`/api/v1/configuracoes/estudios/${id}`, {
+                method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok && res.status !== 204) throw new Error('Erro ao desativar');
+            showToast('Estúdio desativado.', 'success');
+            loadEstudiosTab();
+            loadAllEstudios();
+        } catch(err) { showToast(err.message, 'error'); }
+    }
+
+    // ─── IPTV ─────────────────────────────────────────────────────────
+
+    async function loadIptvTab() {
+        document.getElementById('iptv-table').innerHTML = '<div class="spinner"></div>';
+        try {
+            const res = await fetch('/api/v1/configuracoes/canais-iptv', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+
+            if (data.length === 0) {
+                document.getElementById('iptv-table').innerHTML = '<div class="empty-state"><div class="icon">📡</div><p>Nenhum canal IPTV cadastrado.</p></div>';
+                return;
+            }
+
+            const rows = data.map(c => `
+                <tr>
+                    <td><strong>${c.nome}</strong></td>
+                    <td>${c.numero}</td>
+                    <td><span class="badge ${c.ativo !== false ? 'badge-green' : 'badge-red'}" style="font-size:0.65rem;">${c.ativo !== false ? 'ATIVO' : 'INATIVO'}</span></td>
+                    <td style="display:flex;gap:4px;">
+                        <button class="btn btn-secondary btn-sm" onclick="editIptv(${c.id},'${c.nome.replace(/'/g,"\\'")}',${c.numero})">✏️</button>
+                        <button class="btn btn-sm btn-icon danger" onclick="excluirIptv(${c.id},'${c.nome.replace(/'/g,"\\'")}')">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('iptv-table').innerHTML = `
+                <div class="table-container"><table>
+                    <thead><tr><th>Nome</th><th>Número</th><th>Status</th><th>Ações</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+        } catch(e) { document.getElementById('iptv-table').innerHTML = '<p style="color:var(--status-red);padding:1rem;">Erro ao carregar canais IPTV.</p>'; }
+    }
+
+    function openIptvModal() {
+        document.getElementById('iptv-id').value = '';
+        document.getElementById('iptv-nome').value = '';
+        document.getElementById('iptv-numero').value = '';
+        document.getElementById('iptv-modal-title').textContent = 'Novo Canal IPTV';
+        document.getElementById('iptv-overlay').classList.add('open');
+        document.getElementById('iptv-modal').style.display = 'block';
+    }
+
+    function editIptv(id, nome, numero) {
+        document.getElementById('iptv-id').value = id;
+        document.getElementById('iptv-nome').value = nome;
+        document.getElementById('iptv-numero').value = numero;
+        document.getElementById('iptv-modal-title').textContent = 'Editar Canal IPTV';
+        document.getElementById('iptv-overlay').classList.add('open');
+        document.getElementById('iptv-modal').style.display = 'block';
+    }
+
+    function closeIptvModal() {
+        document.getElementById('iptv-overlay').classList.remove('open');
+        document.getElementById('iptv-modal').style.display = 'none';
+    }
+
+    async function saveIptv(e) {
+        e.preventDefault();
+        const id = document.getElementById('iptv-id').value;
+        const nome = document.getElementById('iptv-nome').value.trim();
+        const numero = parseInt(document.getElementById('iptv-numero').value);
+        const body = { nome, numero };
+        const url = id ? `/api/v1/configuracoes/canais-iptv/${id}` : '/api/v1/configuracoes/canais-iptv';
+        const method = id ? 'PATCH' : 'POST';
+        try {
+            const res = await fetch(url, {
+                method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            showToast('Canal IPTV salvo!', 'success');
+            closeIptvModal();
+            loadIptvTab();
+            loadAllCanais();
+        } catch(err) { showToast(err.message, 'error'); }
+    }
+
+    async function excluirIptv(id, nome) {
+        if (!confirm(`Desativar o canal "${nome}"?`)) return;
+        try {
+            const res = await fetch(`/api/v1/configuracoes/canais-iptv/${id}`, {
+                method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok && res.status !== 204) throw new Error('Erro');
+            showToast('Canal desativado.', 'success');
+            loadIptvTab();
+            loadAllCanais();
+        } catch(err) { showToast(err.message, 'error'); }
+    }
+
+    // ─── Toggle Active ─────────────────────────────────────────────────
+
+    async function toggleActive(entity, id) {
+        const url = entity === 'turmas'
+            ? `/api/v1/turmas/${id}/toggle-active`
+            : `/api/v1/cadastros/${entity}/${id}/toggle-active`;
+        try {
+            const res = await fetch(url, { method: 'PATCH', headers: { 'Authorization': `Bearer ${getToken()}` } });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro'); }
+            const data = await res.json();
+            showToast(data.message, 'success');
+            if (entity === 'professores') loadProfessores();
+            if (entity === 'disciplinas') loadDisciplinas();
+            if (entity === 'turmas') loadTurmas();
+        } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Modal CRUD ────────────────────────────────────────────────────
+
+    async function openModal(type) {
+        document.getElementById('cadastro-id').value = '';
+        document.getElementById('cadastro-type').value = type;
+        document.getElementById('cadastro-nome').value = '';
+        document.getElementById('cadastro-nomenclatura').value = '';
+        document.getElementById('field-nomenclatura').style.display = (type === 'disciplina' || type === 'turma') ? 'block' : 'none';
+        document.getElementById('field-disciplinas-link').style.display = type === 'professor' ? 'block' : 'none';
+        document.getElementById('fields-turma').style.display = type === 'turma' ? 'block' : 'none';
+        if (type === 'professor') {
+            if (allDisciplinas.length === 0) await loadAllDisciplinasForSelect();
+            renderDisciplinaCheckboxes([]);
+        }
+        const titles = { professor: 'Novo Professor', disciplina: 'Nova Disciplina', turma: 'Nova Turma' };
+        document.getElementById('modal-title').textContent = titles[type] || 'Novo Cadastro';
+        document.getElementById('cadastro-overlay').classList.add('open');
+        document.getElementById('cadastro-drawer').classList.add('open');
+    }
+
+    function closeModal() {
+        document.getElementById('cadastro-overlay').classList.remove('open');
+        document.getElementById('cadastro-drawer').classList.remove('open');
+    }
+
+    function renderDisciplinaCheckboxes(selectedIds) {
+        const container = document.getElementById('disciplinas-checkboxes');
+        if (allDisciplinas.length === 0) {
+            container.innerHTML = '<p style="color: var(--text-muted); font-size: 0.8rem;">Carregando disciplinas...</p>';
+            return;
+        }
+        container.innerHTML = allDisciplinas.map(d => `
+            <label style="display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 0.85rem; cursor: pointer;">
+                <input type="checkbox" class="disc-link-check" value="${d.id}" ${selectedIds.includes(String(d.id)) ? 'checked' : ''}>
+                ${d.nome}
+            </label>
+        `).join('');
+    }
+
+    async function editItem(type, id, nome, discIds) {
+        await openModal(type);
+        document.getElementById('cadastro-id').value = id;
+        document.getElementById('cadastro-nome').value = nome;
+        document.getElementById('modal-title').textContent = 'Editar Professor';
+        if (type === 'professor' && discIds) renderDisciplinaCheckboxes(discIds.map(String));
+    }
+
+    function editDisciplina(id, nome, nomenclatura) {
+        openModal('disciplina');
+        document.getElementById('cadastro-id').value = id;
+        document.getElementById('cadastro-nome').value = nome;
+        document.getElementById('cadastro-nomenclatura').value = nomenclatura || '';
+        document.getElementById('modal-title').textContent = 'Editar Disciplina';
+    }
+
+    function editTurma(id, nome, turno, serie_modulo, modalidade, nomenclatura) {
+        openModal('turma');
+        document.getElementById('cadastro-id').value = id;
+        document.getElementById('cadastro-nome').value = nome;
+        document.getElementById('cadastro-turno').value = turno;
+        document.getElementById('cadastro-serie').value = serie_modulo;
+        document.getElementById('cadastro-modalidade').value = modalidade;
+        document.getElementById('cadastro-nomenclatura').value = nomenclatura || '';
+        document.getElementById('modal-title').textContent = 'Editar Turma';
+    }
+
+    async function saveCadastro(e) {
+        e.preventDefault();
+        const type = document.getElementById('cadastro-type').value;
+        const id = document.getElementById('cadastro-id').value;
+        const nome = document.getElementById('cadastro-nome').value;
+        const entityMap = { professor: 'professores', disciplina: 'disciplinas', turma: 'turmas' };
+        const entity = entityMap[type];
+        let body = { nome };
+        if (type === 'disciplina') body.nomenclatura_padrao = document.getElementById('cadastro-nomenclatura').value || null;
+        if (type === 'turma') {
+            body.nomenclatura_padrao = document.getElementById('cadastro-nomenclatura').value || null;
+            body.turno = document.getElementById('cadastro-turno').value;
+            body.serie_modulo = document.getElementById('cadastro-serie').value;
+            body.modalidade = document.getElementById('cadastro-modalidade').value;
+        }
+        if (type === 'professor') {
+            const checked = document.querySelectorAll('.disc-link-check:checked');
+            body.disciplina_ids = Array.from(checked).map(cb => cb.value);
+        }
+        const method = id ? (type === 'turma' ? 'PUT' : 'PATCH') : 'POST';
+        const url = type === 'turma'
+            ? (id ? `/api/v1/turmas/${id}` : '/api/v1/turmas/')
+            : (id ? `/api/v1/cadastros/${entity}/${id}` : `/api/v1/cadastros/${entity}`);
+        try {
+            const res = await fetch(url, {
+                method, headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) { const data = await res.json(); throw new Error(data.detail || 'Erro ao salvar'); }
+            showToast(`${type.charAt(0).toUpperCase() + type.slice(1)} salvo com sucesso!`, 'success');
+            closeModal();
+            if (type === 'professor') { loadProfessores(); loadAllDisciplinasForSelect(); }
+            if (type === 'disciplina') { loadDisciplinas(); loadAllDisciplinasForSelect(); }
+            if (type === 'turma') { loadTurmas(); loadAllTurmas(); }
+        } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Grades: Listar turmas para o seletor ─────────────────────────
+    // Apenas turmas ATIVAS aparecem aqui, ordenadas em ordem alfabética.
+
+    async function loadGradeTurmas() {
+        const res = await fetch('/api/v1/turmas/?incluir_inativos=true', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (!res.ok) return;
+        const turmas = await res.json();
+        allTurmas = turmas;
+        const sel = document.getElementById('gv-turma-select');
+        if (!sel) return;
+
+        const ativas = turmas.filter(t => t.is_active !== false);
+        const rotulos = rotulosDeTurmas(ativas);
+        const turmasAtivasOrdenadas = ativas
+            .map(t => ({
+                id: t.id,
+                label: rotulos[t.id]
+            }))
+            .sort((a, b) => a.label.localeCompare(b.label, 'pt-BR', { sensitivity: 'base' }));
+
+        sel.innerHTML = '<option value="">Selecione uma turma...</option>' +
+            turmasAtivasOrdenadas.map(t => `<option value="${t.id}">${t.label}</option>`).join('');
+    }
+
+    // ─── Grades: Carregar versões e status ────────────────────────────
+
+    async function loadGradeVersoes() {
+        const turmaId = document.getElementById('gv-turma-select').value;
+        const statusBar = document.getElementById('gv-status-bar');
+        const container = document.getElementById('gv-versoes-container');
+
+        if (!turmaId) { statusBar.style.display = 'none'; container.style.display = 'none'; return; }
+
+        currentGradeTurmaId = turmaId;
+        currentDraftVersaoId = null;
+        currentActiveVersaoId = null;
+
+        // Load turma status
+        const turmaRes = await fetch(`/api/v1/turmas/${turmaId}`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (turmaRes.ok) {
+            const t = await turmaRes.json();
+            currentDraftVersaoId = t.draft_versao_id;
+            currentActiveVersaoId = t.versao_ativa_id;
+
+            statusBar.style.display = 'block';
+            const badge = document.getElementById('gv-status-badge');
+            const text = document.getElementById('gv-status-text');
+            const btnAtivar = document.getElementById('btn-ativar-turma');
+            const btnNovaVersao = document.getElementById('btn-nova-versao');
+            const btnClonar = document.getElementById('btn-clonar-turma');
+
+            if (t.status === 'ativa') {
+                badge.className = 'badge badge-green'; badge.textContent = 'ATIVA';
+                text.textContent = t.versao_ativa_num
+                    ? `Versão ${t.versao_ativa_num}${t.data_ativacao ? ' · Ativada em ' + new Date(t.data_ativacao).toLocaleDateString('pt-BR') : ''}`
+                    : '';
+                btnAtivar.style.display = 'none';
+                btnNovaVersao.style.display = currentDraftVersaoId ? 'none' : 'inline-flex';
+                btnClonar.style.display = 'inline-flex';
+            } else {
+                badge.className = 'badge badge-yellow'; badge.textContent = 'RASCUNHO';
+                text.textContent = currentDraftVersaoId ? 'Configure os slots e ative a turma.' : 'Sem grade definida.';
+                btnAtivar.style.display = currentDraftVersaoId ? 'inline-flex' : 'none';
+                btnNovaVersao.style.display = 'none';
+                btnClonar.style.display = 'inline-flex';
+            }
+        }
+
+        // Load versions list
+        const res = await fetch(`/api/v1/turmas/${turmaId}/grade-versao`, { headers: { 'Authorization': `Bearer ${getToken()}` } });
+        if (!res.ok) { showToast('Erro ao carregar versões', 'error'); return; }
+        const versoes = await res.json();
+        container.style.display = 'block';
+        const list = document.getElementById('gv-versoes-list');
+
+        if (!versoes.length) {
+            list.innerHTML = '<p style="color:var(--text-muted)">Nenhuma versão de grade para esta turma.</p>';
+            return;
+        }
+
+        // Salva os IDs das versões de grade que estão expandidas atualmente
+        const expandedIds = [];
+        document.querySelectorAll('[id^="slots-"]').forEach(el => {
+            if (el.style.display === 'block') {
+                const id = el.id.replace('slots-', '');
+                expandedIds.push(parseInt(id));
+            }
+        });
+
+        currentVersionsData = versoes;
+        // Sem nada aberto ainda: abre a versão mais recente já no quadro
+        if (!expandedIds.length && versoes.length) expandedIds.push(versoes[0].id);
+
+        list.innerHTML = versoes.map((v, idx) => {
+            const versaoNum = versoes.length - idx;
+            const isDraft = !v.is_active;
+            const cardClass = v.is_active ? 'ativa' : 'rascunho';
+            const badgeClass = v.is_active ? 'badge-green' : 'badge-yellow';
+            const badgeText = v.is_active ? `V${versaoNum} · ATIVA` : `V${versaoNum} · RASCUNHO`;
+            const displayStyle = expandedIds.includes(v.id) ? 'block' : 'none';
+
+            const slotsHTML = renderSlotsVersao(v);
+
+            return `
+            <div class="versao-card ${cardClass}">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:0.75rem 1rem;background:var(--bg-hover);">
+                    <div>
+                        <span class="badge ${badgeClass}">${badgeText}</span>
+                        <span style="margin-left:0.5rem;font-size:0.8rem;color:var(--text-muted);">
+                            Criada em ${new Date(v.data_criacao).toLocaleDateString('pt-BR')}
+                            ${v.data_ativacao ? ' · Ativada em ' + new Date(v.data_ativacao).toLocaleDateString('pt-BR') : ''}
+                        </span>
+                    </div>
+                    <div style="display:flex;gap:0.5rem;">
+                        <button class="btn btn-sm btn-primary" onclick="openSlotModal(${v.id})">+ Adicionar Slot</button>
+                        ${isDraft ? `<button class="btn btn-sm" style="background:rgba(16,185,129,0.15);color:#059669;border:1px solid rgba(16,185,129,0.3);" onclick="ativarVersaoId('${turmaId}',${v.id})">✅ Ativar</button>` : ''}
+                        <button class="btn btn-sm btn-secondary" onclick="toggleSlots(${v.id})">Ver Slots (${v.slots.length})</button>
+                    </div>
+                </div>
+                <div id="slots-${v.id}" style="display:${displayStyle};padding:1rem;">
+                    ${slotsHTML}
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // ─── Grades: quadro semanal ou lista ─────────────────────────────
+    const GQ_DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
+    let modoSlots = 'quadro';
+    try { modoSlots = localStorage.getItem('gestao_grade_modo') || 'quadro'; } catch (e) {}
+
+    function escG(t) {
+        return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function setModoSlots(modo) {
+        modoSlots = modo;
+        try { localStorage.setItem('gestao_grade_modo', modo); } catch (e) {}
+        loadGradeVersoes();
+    }
+
+    function renderSlotsVersao(v) {
+        const toolbar = `
+            <div class="gq-toolbar">
+                <div class="gq-modos" role="group" aria-label="Visualização">
+                    <button class="${modoSlots === 'quadro' ? 'on' : ''}" onclick="setModoSlots('quadro')">🗓️ Quadro</button>
+                    <button class="${modoSlots === 'lista' ? 'on' : ''}" onclick="setModoSlots('lista')">☰ Lista</button>
+                </div>
+                <span class="gq-dica">${modoSlots === 'quadro'
+                    ? 'Clique num horário vazio para cadastrar ou numa aula para editar. Horário novo ou fim de semana: "+ Adicionar Slot".'
+                    : 'Lista de todos os slots da versão.'}</span>
+            </div>`;
+        if (!v.slots.length) {
+            return toolbar + `<p style="color:var(--text-muted);font-size:0.85rem;padding:0.5rem 0;">Sem slots nesta versão. Use "+ Adicionar Slot" para cadastrar o primeiro horário.</p>`;
+        }
+        return toolbar + (modoSlots === 'lista' ? renderListaSlots(v) : renderQuadroSlots(v));
+    }
+
+    function renderListaSlots(v) {
+        const ordenados = v.slots.slice().sort((a, b) =>
+            a.dia_semana - b.dia_semana || String(a.horario_inicio).localeCompare(String(b.horario_inicio)));
+        return `<div style="overflow-x:auto;">
+            <table class="slot-table">
+                <thead><tr>
+                    <th>Dia</th><th>Horário</th><th>Disciplina</th>
+                    <th>Estúdio</th><th>Canal</th><th>Tipo</th>
+                    <th>Ações</th>
+                </tr></thead>
+                <tbody>${ordenados.map(s => `<tr>
+                    <td>${escG(s.dia_semana_label)}</td>
+                    <td>${s.horario_inicio} às ${s.horario_fim}</td>
+                    <td>${escG(s.disciplina_nome || '—')}</td>
+                    <td>${escG(s.estudio_nome || '—')}</td>
+                    <td>${escG(s.canal_nome || '—')}</td>
+                    <td><span class="badge ${s.tipo_slot==='aula'?'badge-blue':'badge-yellow'}" style="font-size:0.6rem;">${escG(s.tipo_slot)}</span></td>
+                    <td style="white-space:nowrap;">
+                        <button class="btn-icon" onclick="editSlot('${s.id}', ${v.id})" title="Editar slot">✏️</button>
+                        <button class="btn-icon danger" onclick="deleteSlot('${s.id}', ${v.id})" title="Remover slot">✕</button>
+                    </td>
+                </tr>`).join('')}</tbody>
+            </table></div>`;
+    }
+
+    function renderQuadroSlots(v) {
+        // Linhas: cada faixa de horário distinta da versão, em ordem
+        const faixas = [];
+        const vistas = new Set();
+        v.slots.forEach(s => {
+            const chave = `${s.horario_inicio}|${s.horario_fim}`;
+            if (!vistas.has(chave)) { vistas.add(chave); faixas.push({ inicio: s.horario_inicio, fim: s.horario_fim, chave }); }
+        });
+        faixas.sort((a, b) => String(a.inicio).localeCompare(String(b.inicio)) || String(a.fim).localeCompare(String(b.fim)));
+
+        // Segunda a sexta sempre; sábado e domingo só quando a versão tem aula neles
+        // (para cadastrar no fim de semana, use "+ Adicionar Slot")
+        const dias = [0, 1, 2, 3, 4].concat([5, 6].filter(d => v.slots.some(s => s.dia_semana === d)));
+        const head = `<tr><th class="gq-h">Horário</th>${dias.map(d => `<th>${GQ_DIAS[d]}</th>`).join('')}</tr>`;
+        const body = faixas.map(f => {
+            const celulas = dias.map(dia => {
+                const doDia = v.slots.filter(s => s.dia_semana === dia && `${s.horario_inicio}|${s.horario_fim}` === f.chave);
+                const cards = doDia.map(s => {
+                    const local = [s.estudio_nome, s.canal_nome].filter(Boolean).join(' · ');
+                    const grav = s.tipo_slot && s.tipo_slot !== 'aula';
+                    return `<div class="gq-slot${grav ? ' grav' : ''}" role="button" tabindex="0"
+                                title="Editar este slot"
+                                onclick="editSlot('${s.id}', ${v.id})"
+                                onkeydown="if(event.key==='Enter'){editSlot('${s.id}', ${v.id})}">
+                            <b>${escG(s.disciplina_nome || 'Sem disciplina')}</b>
+                            <small>${escG(local || 'Sem estúdio')}${grav ? ' · ' + escG(s.tipo_slot) : ''}</small>
+                            <span class="gq-x" title="Remover slot" onclick="event.stopPropagation(); deleteSlot('${s.id}', ${v.id})">✕</span>
+                        </div>`;
+                }).join('');
+                const add = doDia.length ? '' :
+                    `<button class="gq-add" title="Cadastrar ${GQ_DIAS[dia]} ${f.inicio}–${f.fim}"
+                        onclick="openSlotModal(${v.id}, null, {dia: ${dia}, inicio: '${f.inicio}', fim: '${f.fim}'})">+</button>`;
+                return `<td>${cards}${add}</td>`;
+            }).join('');
+            return `<tr><td class="gq-h">${f.inicio} às ${f.fim}</td>${celulas}</tr>`;
+        }).join('');
+        return `<div class="gq-wrap"><table class="gq"><thead>${head}</thead><tbody>${body}</tbody></table></div>`;
+    }
+
+    function toggleSlots(versaoId) {
+        const el = document.getElementById(`slots-${versaoId}`);
+        if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ─── Grades: Ações ─────────────────────────────────────────────────
+
+    async function ativarDraftVersao() {
+        if (!currentGradeTurmaId || !currentDraftVersaoId) return;
+        await ativarVersaoId(currentGradeTurmaId, currentDraftVersaoId);
+    }
+
+    async function ativarVersaoId(turmaId, versaoId) {
+        if (!confirm('Ativar esta versão de grade? A versão ativa anterior será inativada. Relatórios anteriores não são afetados.')) return;
+        const res = await fetch(`/api/v1/turmas/${turmaId}/grade-versao/${versaoId}/ativar`, {
+            method: 'PATCH', headers: { 'Authorization': `Bearer ${getToken()}` }
+        });
+        if (res.ok) {
+            showToast('Versão ativada com sucesso!', 'success');
+            loadGradeVersoes();
+            loadTurmas();
+        } else {
+            const d = await res.json();
+            const detail = d.detail;
+            if (detail && typeof detail === 'object' && detail.conflitos) {
+                const msgs = detail.conflitos.map(c =>
+                    `• ${c.slot_dia} ${c.slot_horario}: conflito com "${c.turma}" (${c.recurso_conflitante})`
+                ).join('\n');
+                showToast(`⚠️ ${detail.message}\n${msgs}`, 'error');
+            } else {
+                showToast(typeof detail === 'string' ? detail : 'Erro ao ativar', 'error');
+            }
+        }
+    }
+
+    async function criarNovaVersao() {
+        if (!currentGradeTurmaId) return;
+        const res = await fetch(`/api/v1/turmas/${currentGradeTurmaId}/grade-versao`, {
+            method: 'POST', headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' }
+        });
+        if (res.ok) { showToast('Nova versão criada! Adicione os slots e ative.', 'success'); loadGradeVersoes(); }
+        else { const d = await res.json(); showToast(d.detail || 'Erro ao criar versão', 'error'); }
+    }
+
+    // ─── Slot Modal ────────────────────────────────────────────────────
+
+    async function openSlotModal(versaoId, slotData, prefill) {
+        // Reset form
+        document.getElementById('slot-id').value = '';
+        document.getElementById('slot-versao-id').value = versaoId;
+        document.getElementById('slot-turma-id-hidden').value = currentGradeTurmaId;
+        document.getElementById('slot-modal-title').textContent = slotData ? 'Editar Slot' : 'Novo Slot';
+        document.getElementById('slot-conflict-alert').style.display = 'none';
+
+        // Reset days
+        document.querySelectorAll('.day-check').forEach(cb => cb.checked = false);
+        document.getElementById('slot-inicio').value = '';
+        document.getElementById('slot-fim').value = '';
+        document.getElementById('slot-tipo').value = 'aula';
+
+        // Load estudios into slot form
+        const esEl = document.getElementById('slot-estudio');
+        esEl.innerHTML = '<option value="">Sem estúdio vinculado</option>' +
+            allEstudios.map(e => {
+                const hr = e.funciona_24h ? '24h' : `${e.horario_inicio||''}-${e.horario_fim||''}`;
+                return `<option value="${e.id}">${e.nome} (${hr})</option>`;
+            }).join('');
+
+        // Load canais into slot form
+        const cEl = document.getElementById('slot-canal');
+        cEl.innerHTML = '<option value="">Sem canal vinculado</option>' +
+            allCanais.map(c => `<option value="${c.id}">${c.nome} (Ch.${c.numero})</option>`).join('');
+
+        // Load disciplinas into slot form
+        await loadAllDisciplinasForSelect();
+        const dEl = document.getElementById('slot-disciplina');
+        dEl.innerHTML = '<option value="">Sem disciplina definida</option>' +
+            allDisciplinas.map(d => `<option value="${d.id}">${d.nome}</option>`).join('');
+
+        if (slotData) {
+            document.getElementById('slot-id').value = slotData.id;
+            const diaCheck = document.querySelector(`.day-check[value="${slotData.dia_semana}"]`);
+            if (diaCheck) diaCheck.checked = true;
+            document.getElementById('slot-inicio').value = slotData.horario_inicio;
+            document.getElementById('slot-fim').value = slotData.horario_fim;
+            if (slotData.estudio_id) esEl.value = slotData.estudio_id;
+            if (slotData.canal_iptv_id) cEl.value = slotData.canal_iptv_id;
+            if (slotData.disciplina_id) dEl.value = slotData.disciplina_id;
+            document.getElementById('slot-tipo').value = slotData.tipo_slot || 'aula';
+        } else if (prefill) {
+            // Clique numa célula vazia do quadro: já vem com o dia e o horário daquela linha
+            if (prefill.dia !== undefined && prefill.dia !== null) {
+                const diaCheck = document.querySelector(`.day-check[value="${prefill.dia}"]`);
+                if (diaCheck) diaCheck.checked = true;
+            }
+            if (prefill.inicio) document.getElementById('slot-inicio').value = prefill.inicio;
+            if (prefill.fim) document.getElementById('slot-fim').value = prefill.fim;
+        }
+
+        document.getElementById('slot-overlay').classList.add('open');
+        document.getElementById('slot-modal').style.display = 'block';
+        updateEstudioInfo();
+    }
+
+    function closeSlotModal() {
+        document.getElementById('slot-overlay').classList.remove('open');
+        document.getElementById('slot-modal').style.display = 'none';
+    }
+
+    function updateEstudioInfo() {
+        const estudioId = parseInt(document.getElementById('slot-estudio').value);
+        const infoEl = document.getElementById('slot-estudio-info');
+        if (!estudioId) { infoEl.textContent = ''; return; }
+        const est = allEstudios.find(e => e.id === estudioId);
+        if (est) {
+            infoEl.textContent = est.funciona_24h ? 'Disponível 24 horas' : `Disponível: ${est.horario_inicio} – ${est.horario_fim}`;
+        }
+    }
+
+    // Verificação de choque removida do modal de slot — ocorre apenas na ativação (ver backend)
+    function checkSlotConflict() {}
+
+    async function saveSlot() {
+        const versaoId = parseInt(document.getElementById('slot-versao-id').value);
+        const turmaId = document.getElementById('slot-turma-id-hidden').value;
+        const slotId = document.getElementById('slot-id').value;
+        const dias = Array.from(document.querySelectorAll('.day-check:checked')).map(cb => parseInt(cb.value));
+        const inicio = document.getElementById('slot-inicio').value;
+        const fim = document.getElementById('slot-fim').value;
+        const estudioId = parseInt(document.getElementById('slot-estudio').value) || null;
+        const canalId = parseInt(document.getElementById('slot-canal').value) || null;
+        const disciplinaId = document.getElementById('slot-disciplina').value || null;
+        const tipo = document.getElementById('slot-tipo').value;
+
+        if (!dias.length) { showToast('Selecione ao menos um dia da semana.', 'error'); return; }
+        if (!inicio || !fim) { showToast('Informe o horário de início e fim.', 'error'); return; }
+
+        // Se a versão for ativa, avisa o usuário antes de salvar
+        const versao = currentVersionsData.find(v => v.id === versaoId);
+        if (versao && versao.is_active) {
+            if (!confirm('⚠️ ATENÇÃO: Esta é a versão ATIVA da turma. Alterações nesta grade entrarão em vigor imediatamente em tempo real. Deseja prosseguir?')) {
+                return;
+            }
+        }
+
+        // If editing a single slot (has ID), update via delete+create for now
+        // If new, create one slot per selected day
+        try {
+            for (const dia of dias) {
+                const body = {
+                    dia_semana: dia,
+                    horario_inicio: inicio,
+                    horario_fim: fim,
+                    estudio_id: estudioId,
+                    canal_iptv_id: canalId,
+                    disciplina_id: disciplinaId,
+                    tipo_slot: tipo,
+                };
+
+                if (slotId && dias.length === 1) {
+                    // Edit: delete old + create new (API doesn't have PATCH slot)
+                    await fetch(`/api/v1/turmas/${turmaId}/grade-versao/${versaoId}/slots/${slotId}`, {
+                        method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` }
+                    });
+                }
+
+                const res = await fetch(`/api/v1/turmas/${turmaId}/grade-versao/${versaoId}/slots`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                if (!res.ok) {
+                    const d = await res.json();
+                    const detail = d.detail;
+                    const msg = typeof detail === 'object' ? (detail.message || JSON.stringify(detail)) : detail;
+                    throw new Error(msg || 'Erro ao salvar slot');
+                }
+            }
+            showToast(`${dias.length} slot(s) salvo(s) com sucesso!`, 'success');
+            closeSlotModal();
+            loadGradeVersoes();
+        } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    async function deleteSlot(slotId, versaoId) {
+        const versao = currentVersionsData.find(v => v.id === versaoId);
+        const isActive = versao ? versao.is_active : false;
+        let confirmMsg = 'Remover este slot da grade?';
+        if (isActive) {
+            confirmMsg = '⚠️ ATENÇÃO: Esta é a versão ATIVA da turma. Remover este slot afetará a grade em tempo real imediatamente. Deseja realmente remover?';
+        }
+        if (!confirm(confirmMsg)) return;
+
+        const turmaId = currentGradeTurmaId;
+        try {
+            const res = await fetch(`/api/v1/turmas/${turmaId}/grade-versao/${versaoId}/slots/${slotId}`, {
+                method: 'DELETE', headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.ok || res.status === 204) {
+                showToast('Slot removido.', 'success');
+                loadGradeVersoes();
+            } else {
+                const d = await res.json();
+                showToast(d.detail || 'Erro ao remover', 'error');
+            }
+        } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Clonar Turma ─────────────────────────────────────────────────
+
+    async function abrirModalClonar(preSelecionarId = null) {
+        document.getElementById('clonar-nome').value = '';
+        document.getElementById('clonar-nomenclatura').value = '';
+        document.getElementById('clonar-source-info').textContent = '';
+
+        // Carregar todas as turmas (ativas e inativas) no select
+        try {
+            const res = await fetch('/api/v1/turmas/?incluir_inativos=true', {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (res.ok) {
+                const turmas = await res.json();
+                const sel = document.getElementById('clonar-source-select');
+                sel.innerHTML = '<option value="">Selecione a turma a copiar...</option>' +
+                    turmas.map(t => {
+                        const label = `${t.nome} — ${t.turno}${!t.is_active ? ' [DESATIVADA]' : ''}`;
+                        return `<option value="${t.id}">${label}</option>`;
+                    }).join('');
+                if (preSelecionarId) {
+                    sel.value = preSelecionarId;
+                    const found = turmas.find(t => t.id === preSelecionarId);
+                    if (found) {
+                        const slots = found.num_versoes !== undefined ? found.num_versoes : '';
+                        document.getElementById('clonar-source-info').textContent =
+                            `${found.nome} — ${found.turno}${found.serie_modulo ? ' / ' + found.serie_modulo : ''}`;
+                    }
+                }
+            }
+        } catch(e) {}
+
+        document.getElementById('clonar-overlay').classList.add('open');
+        document.getElementById('clonar-modal').style.display = 'block';
+    }
+
+    function closeClonarModal() {
+        document.getElementById('clonar-overlay').classList.remove('open');
+        document.getElementById('clonar-modal').style.display = 'none';
+    }
+
+    async function executarClonar() {
+        const sourceId = document.getElementById('clonar-source-select').value;
+        const nome = document.getElementById('clonar-nome').value.trim();
+        const nomenclatura = document.getElementById('clonar-nomenclatura').value.trim();
+        if (!sourceId) { showToast('Selecione a turma de origem.', 'error'); return; }
+        if (!nome) { showToast('Informe o nome da nova turma.', 'error'); return; }
+        try {
+            const res = await fetch(`/api/v1/turmas/${sourceId}/clonar`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome, nomenclatura_padrao: nomenclatura || null })
+            });
+            if (!res.ok) { const d = await res.json(); throw new Error(d.detail || 'Erro ao clonar'); }
+            const data = await res.json();
+            showToast(data.message, 'success');
+            closeClonarModal();
+            loadTurmas();
+            loadGradeTurmas();
+        } catch(e) { showToast(e.message, 'error'); }
+    }
+
+    // ─── Editar Slot ──────────────────────────────────────────────────
+
+    function editSlot(slotId, versaoId) {
+        const versao = currentVersionsData.find(v => v.id === versaoId);
+        if (!versao) { showToast('Versão não encontrada.', 'error'); return; }
+        const slot = versao.slots.find(s => s.id === slotId);
+        if (!slot) { showToast('Slot não encontrado.', 'error'); return; }
+        openSlotModal(versaoId, slot);
+    }
+</script>
+{% endblock %}

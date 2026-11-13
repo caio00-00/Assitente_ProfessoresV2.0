@@ -1,0 +1,434 @@
+{% extends "base.html" %}
+{% block title %}Configurações — Canal Educação{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-ajustes"/></svg> Configurações</h1>
+        <p class="page-subtitle">Estúdios, canais IPTV e horários das aulas</p>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="tabs" style="margin-bottom: 1.5rem;">
+    <button class="tab-btn active" onclick="switchTab('estudios')" id="tab-estudios">🏢 Estúdios</button>
+    <button class="tab-btn" onclick="switchTab('canais')" id="tab-canais">📡 Canais IPTV</button>
+    <button class="tab-btn" onclick="switchTab('slots')" id="tab-slots">🕐 Slots de Horário</button>
+</div>
+
+<!-- ═══ Estúdios ═══ -->
+<div class="card" id="panel-estudios">
+    <div class="card-header">
+        <h3 class="card-title">🏢 Estúdios</h3>
+        <button class="btn btn-primary btn-sm" onclick="openModal('estudio')">+ Novo Estúdio</button>
+    </div>
+    <div id="estudios-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Canais IPTV ═══ -->
+<div class="card" id="panel-canais" style="display:none;">
+    <div class="card-header">
+        <h3 class="card-title">📡 Canais IPTV</h3>
+        <button class="btn btn-primary btn-sm" onclick="openModal('canal')">+ Novo Canal</button>
+    </div>
+    <div id="canais-table"><div class="spinner"></div></div>
+</div>
+
+<!-- ═══ Slots de Horário ═══ -->
+<div class="card" id="panel-slots" style="display:none;">
+    <div class="card-header">
+        <h3 class="card-title">🕐 Slots de Horário</h3>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+            <select id="slot-turno-filter" class="form-select" style="width:200px;" onchange="loadSlots()">
+                <option value="">Todos os turnos</option>
+                <option value="manha">Manhã</option>
+                <option value="tarde">Tarde</option>
+                <option value="noite">Noite</option>
+                <option value="madrugada">Madrugada</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="openModal('slot')">+ Novo Slot</button>
+        </div>
+    </div>
+    <div id="slots-table"><div class="spinner"></div></div>
+</div>
+
+<!-- Modal overlay -->
+<div class="drawer-overlay" id="modal-overlay" onclick="closeModal()"></div>
+
+<!-- Modal panel -->
+<div id="modal-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card);border:1px solid var(--border-color);border-radius:12px;padding:2rem;width:420px;max-width:95vw;z-index:1001;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
+        <h3 id="modal-title" style="margin:0;font-size:1.1rem;font-weight:600;">Novo Item</h3>
+        <button onclick="closeModal()" class="drawer-close">✕</button>
+    </div>
+    <div id="modal-body"></div>
+</div>
+
+<style>
+    #modal-overlay.open {
+        display: block !important;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const authHeaders = () => ({ 'Authorization': `Bearer ${getToken()}`, 'Content-Type': 'application/json' });
+
+document.addEventListener('DOMContentLoaded', () => {
+    if (!getToken()) { window.location.href = '/'; return; }
+    if (typeof loadUserProfile === 'function') loadUserProfile();
+    loadEstudios();
+});
+
+function switchTab(tab) {
+    ['estudios', 'canais', 'slots'].forEach(t => {
+        const panel = document.getElementById(`panel-${t}`);
+        const btn = document.getElementById(`tab-${t}`);
+        if (panel) panel.style.display = t === tab ? 'block' : 'none';
+        if (btn) btn.classList.toggle('active', t === tab);
+    });
+    if (tab === 'estudios') loadEstudios();
+    else if (tab === 'canais') loadCanais();
+    else if (tab === 'slots') loadSlots();
+}
+
+function openModal(type, data) {
+    document.getElementById('modal-overlay').classList.add('open');
+    document.getElementById('modal-panel').style.display = 'block';
+    if (type === 'estudio') renderEstudioForm(data);
+    else if (type === 'canal') renderCanalForm(data);
+    else if (type === 'slot') renderSlotForm(data);
+}
+
+function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+    document.getElementById('modal-panel').style.display = 'none';
+}
+
+function calcDur(ini, fim) {
+    const [h1, m1] = ini.split(':').map(Number);
+    const [h2, m2] = fim.split(':').map(Number);
+    return (h2 * 60 + m2) - (h1 * 60 + m1);
+}
+
+// ── Estúdios ────────────────────────────────────────────────────────
+async function loadEstudios() {
+    const el = document.getElementById('estudios-table');
+    el.innerHTML = '<div class="spinner"></div>';
+    try {
+        const res = await fetch('/api/v1/configuracoes/estudios', { headers: authHeaders() });
+        if (!res.ok) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar estúdios.</p></div>'; return; }
+        const data = await res.json();
+        if (!data.length) {
+            el.innerHTML = '<div class="empty-state"><div class="icon">🏢</div><p>Nenhum estúdio cadastrado.</p></div>';
+            return;
+        }
+        const rows = data.map(e => `
+            <tr style="${!e.ativo ? 'opacity:0.5;' : ''}">
+                <td>${e.id}</td>
+                <td><strong>${e.nome}</strong></td>
+                <td>${e.funciona_24h ? '—' : `${e.horario_inicio} às ${e.horario_fim}`}</td>
+                <td>${e.funciona_24h ? '<span class="badge badge-blue">Sim</span>' : '—'}</td>
+                <td><span class="badge ${e.ativo ? 'badge-green' : 'badge-red'}">${e.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                <td style="display:flex;gap:0.25rem;">
+                    <button class="btn btn-secondary btn-sm" onclick='editEstudio(${JSON.stringify(e)})'>✏️</button>
+                    ${e.ativo ? `<button class="btn btn-sm" style="color:var(--status-red);" onclick="desativarEstudio(${e.id})">Desativar</button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+        el.innerHTML = `<div class="table-container"><table>
+            <thead><tr><th>ID</th><th>Nome</th><th>Horário</th><th>24h</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+    } catch(e) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar.</p></div>'; console.error(e); }
+}
+
+function renderEstudioForm(e) {
+    document.getElementById('modal-title').textContent = e ? 'Editar Estúdio' : 'Novo Estúdio';
+    document.getElementById('modal-body').innerHTML = `
+    <form onsubmit="saveEstudio(event,${e ? e.id : 'null'})">
+        <div class="form-group">
+            <label class="form-label">Nome *</label>
+            <input class="form-input" id="e-nome" value="${e ? e.nome : ''}" required placeholder="Ex: Estúdio A">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;cursor:pointer;font-size:0.85rem;">
+            <input type="checkbox" id="e-24h" onchange="toggle24h()" ${e && e.funciona_24h ? 'checked' : ''}> Funciona 24h
+        </label>
+        <div id="e-horarios" ${e && e.funciona_24h ? 'style="display:none"' : ''}>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Horário Início</label>
+                    <input type="time" class="form-input" id="e-ini" value="${e ? (e.horario_inicio || '07:00') : '07:00'}">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário Fim</label>
+                    <input type="time" class="form-input" id="e-fim" value="${e ? (e.horario_fim || '23:00') : '23:00'}">
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2">Salvar</button>
+        </div>
+    </form>`;
+}
+
+function toggle24h() {
+    const checked = document.getElementById('e-24h').checked;
+    document.getElementById('e-horarios').style.display = checked ? 'none' : 'block';
+}
+
+async function saveEstudio(ev, id) {
+    ev.preventDefault();
+    const body = {
+        nome: document.getElementById('e-nome').value,
+        horario_inicio: document.getElementById('e-ini') ? document.getElementById('e-ini').value : '00:00',
+        horario_fim: document.getElementById('e-fim') ? document.getElementById('e-fim').value : '23:59',
+        funciona_24h: document.getElementById('e-24h').checked,
+    };
+    try {
+        const res = await fetch(
+            id ? `/api/v1/configuracoes/estudios/${id}` : '/api/v1/configuracoes/estudios',
+            { method: id ? 'PATCH' : 'POST', headers: authHeaders(), body: JSON.stringify(body) }
+        );
+        if (res.ok) {
+            closeModal();
+            loadEstudios();
+            if (typeof showToast === 'function') showToast('Estúdio salvo com sucesso!', 'success');
+        } else {
+            const d = await res.json();
+            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar', 'error');
+            else alert(d.detail || 'Erro ao salvar.');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+
+function editEstudio(e) { openModal('estudio', e); }
+
+async function desativarEstudio(id) {
+    if (!confirm('Desativar este estúdio? Grades existentes não serão afetadas.')) return;
+    try {
+        const res = await fetch(`/api/v1/configuracoes/estudios/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok || res.status === 204) {
+            loadEstudios();
+            if (typeof showToast === 'function') showToast('Estúdio desativado.', 'success');
+        } else {
+            if (typeof showToast === 'function') showToast('Erro ao desativar.', 'error');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+
+// ── Canais IPTV ─────────────────────────────────────────────────────
+async function loadCanais() {
+    const el = document.getElementById('canais-table');
+    el.innerHTML = '<div class="spinner"></div>';
+    try {
+        const res = await fetch('/api/v1/configuracoes/canais-iptv', { headers: authHeaders() });
+        if (!res.ok) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar canais.</p></div>'; return; }
+        const data = await res.json();
+        if (!data.length) {
+            el.innerHTML = '<div class="empty-state"><div class="icon">📡</div><p>Nenhum canal cadastrado.</p></div>';
+            return;
+        }
+        const rows = data.map(c => `
+            <tr style="${!c.ativo ? 'opacity:0.5;' : ''}">
+                <td><strong>${c.numero}</strong></td>
+                <td>${c.nome}</td>
+                <td><span class="badge ${c.ativo ? 'badge-green' : 'badge-red'}">${c.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                <td style="display:flex;gap:0.25rem;">
+                    <button class="btn btn-secondary btn-sm" onclick='editCanal(${JSON.stringify(c)})'>✏️</button>
+                    ${c.ativo ? `<button class="btn btn-sm" style="color:var(--status-red);" onclick="desativarCanal(${c.id})">Desativar</button>` : ''}
+                </td>
+            </tr>
+        `).join('');
+        el.innerHTML = `<div class="table-container"><table>
+            <thead><tr><th>Nº</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+    } catch(e) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar.</p></div>'; console.error(e); }
+}
+
+function renderCanalForm(c) {
+    document.getElementById('modal-title').textContent = c ? 'Editar Canal' : 'Novo Canal IPTV';
+    document.getElementById('modal-body').innerHTML = `
+    <form onsubmit="saveCanal(event,${c ? c.id : 'null'})">
+        <div class="form-group">
+            <label class="form-label">Nome *</label>
+            <input class="form-input" id="c-nome" value="${c ? c.nome : ''}" required placeholder="Ex: Canal 1 Educação">
+        </div>
+        <div class="form-group">
+            <label class="form-label">Número do Canal *</label>
+            <input type="number" class="form-input" id="c-num" value="${c ? c.numero : ''}" required min="1" placeholder="Ex: 15">
+            <small style="color:var(--text-muted);font-size:0.7rem;">O número deve ser único.</small>
+        </div>
+        <div style="display:flex;gap:0.75rem;margin-top:1.5rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2">Salvar</button>
+        </div>
+    </form>`;
+}
+
+async function saveCanal(ev, id) {
+    ev.preventDefault();
+    const body = {
+        nome: document.getElementById('c-nome').value,
+        numero: parseInt(document.getElementById('c-num').value),
+    };
+    try {
+        const res = await fetch(
+            id ? `/api/v1/configuracoes/canais-iptv/${id}` : '/api/v1/configuracoes/canais-iptv',
+            { method: id ? 'PATCH' : 'POST', headers: authHeaders(), body: JSON.stringify(body) }
+        );
+        if (res.ok) {
+            closeModal();
+            loadCanais();
+            if (typeof showToast === 'function') showToast('Canal salvo com sucesso!', 'success');
+        } else {
+            const d = await res.json();
+            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar', 'error');
+            else alert(d.detail || 'Erro ao salvar.');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+
+function editCanal(c) { openModal('canal', c); }
+
+async function desativarCanal(id) {
+    if (!confirm('Desativar este canal?')) return;
+    try {
+        const res = await fetch(`/api/v1/configuracoes/canais-iptv/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok || res.status === 204) {
+            loadCanais();
+            if (typeof showToast === 'function') showToast('Canal desativado.', 'success');
+        } else {
+            if (typeof showToast === 'function') showToast('Erro ao desativar.', 'error');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+
+// ── Slots de Horário ─────────────────────────────────────────────────
+async function loadSlots() {
+    const turno = document.getElementById('slot-turno-filter').value;
+    const url = '/api/v1/configuracoes/slots-horario' + (turno ? `?turno=${turno}` : '');
+    const el = document.getElementById('slots-table');
+    el.innerHTML = '<div class="spinner"></div>';
+    try {
+        const res = await fetch(url, { headers: authHeaders() });
+        if (!res.ok) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar slots.</p></div>'; return; }
+        const data = await res.json();
+        if (!data.length) {
+            el.innerHTML = '<div class="empty-state"><div class="icon">🕐</div><p>Nenhum slot cadastrado.</p></div>';
+            return;
+        }
+        const turnoLabel = { manha: 'Manhã', tarde: 'Tarde', noite: 'Noite', madrugada: 'Madrugada' };
+        const rows = data.map(s => {
+            const dur = s.horario_inicio && s.horario_fim ? calcDur(s.horario_inicio, s.horario_fim) : '—';
+            return `<tr style="${!s.ativo ? 'opacity:0.5;' : ''}">
+                <td><span class="badge badge-blue">${turnoLabel[s.turno] || s.turno}</span></td>
+                <td>${s.ordem}º</td>
+                <td>${s.horario_inicio}</td>
+                <td>${s.horario_fim}</td>
+                <td>${dur !== '—' ? `${dur} min` : '—'}</td>
+                <td><span class="badge ${s.ativo ? 'badge-green' : 'badge-red'}">${s.ativo ? 'Ativo' : 'Inativo'}</span></td>
+                <td style="display:flex;gap:0.25rem;">
+                    <button class="btn btn-secondary btn-sm" onclick='editSlot(${JSON.stringify(s)})'>✏️</button>
+                    ${s.ativo ? `<button class="btn btn-sm" style="color:var(--status-red);" onclick="desativarSlot(${s.id})">Desativar</button>` : ''}
+                </td>
+            </tr>`;
+        }).join('');
+        el.innerHTML = `<div class="table-container"><table>
+            <thead><tr><th>Turno</th><th>Ordem</th><th>Início</th><th>Fim</th><th>Duração</th><th>Status</th><th>Ações</th></tr></thead>
+            <tbody>${rows}</tbody>
+        </table></div>`;
+    } catch(e) { el.innerHTML = '<div class="empty-state"><p>Erro ao carregar.</p></div>'; console.error(e); }
+}
+
+function renderSlotForm(s) {
+    document.getElementById('modal-title').textContent = s ? 'Editar Slot' : 'Novo Slot de Horário';
+    document.getElementById('modal-body').innerHTML = `
+    <form onsubmit="saveSlot(event,${s ? s.id : 'null'})">
+        <div class="form-group">
+            <label class="form-label">Turno *</label>
+            <select class="form-select" id="s-turno" required>
+                <option value="manha" ${s && s.turno === 'manha' ? 'selected' : ''}>Manhã (05:00–12:00)</option>
+                <option value="tarde" ${s && s.turno === 'tarde' ? 'selected' : ''}>Tarde (12:00–18:00)</option>
+                <option value="noite" ${s && s.turno === 'noite' ? 'selected' : ''}>Noite (18:00–00:00)</option>
+                <option value="madrugada" ${s && s.turno === 'madrugada' ? 'selected' : ''}>Madrugada (00:00–05:00)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Ordem (posição na exibição) *</label>
+            <input type="number" class="form-input" id="s-ordem" value="${s ? s.ordem : 1}" min="1" required>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">Início *</label>
+                <input type="time" class="form-input" id="s-ini" value="${s ? s.horario_inicio : ''}" required oninput="updateDurPreview()">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Fim *</label>
+                <input type="time" class="form-input" id="s-fim" value="${s ? s.horario_fim : ''}" required oninput="updateDurPreview()">
+            </div>
+        </div>
+        <p id="dur-preview" style="font-size:0.8rem;color:var(--text-muted);margin-top:-0.5rem;min-height:1.2em;"></p>
+        <div style="display:flex;gap:0.75rem;margin-top:1rem;">
+            <button type="button" class="btn btn-secondary" style="flex:1" onclick="closeModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:2">Salvar</button>
+        </div>
+    </form>`;
+    // Trigger preview if editing
+    if (s && s.horario_inicio && s.horario_fim) updateDurPreview();
+}
+
+function updateDurPreview() {
+    const ini = document.getElementById('s-ini') ? document.getElementById('s-ini').value : '';
+    const fim = document.getElementById('s-fim') ? document.getElementById('s-fim').value : '';
+    const el = document.getElementById('dur-preview');
+    if (el && ini && fim) {
+        const d = calcDur(ini, fim);
+        el.textContent = d > 0 ? `Duração: ${d} minutos` : 'Horário inválido (fim deve ser após início)';
+    }
+}
+
+async function saveSlot(ev, id) {
+    ev.preventDefault();
+    const body = {
+        turno: document.getElementById('s-turno').value,
+        ordem: parseInt(document.getElementById('s-ordem').value),
+        horario_inicio: document.getElementById('s-ini').value,
+        horario_fim: document.getElementById('s-fim').value,
+    };
+    try {
+        const res = await fetch(
+            id ? `/api/v1/configuracoes/slots-horario/${id}` : '/api/v1/configuracoes/slots-horario',
+            { method: id ? 'PATCH' : 'POST', headers: authHeaders(), body: JSON.stringify(body) }
+        );
+        if (res.ok) {
+            closeModal();
+            loadSlots();
+            if (typeof showToast === 'function') showToast('Slot salvo com sucesso!', 'success');
+        } else {
+            const d = await res.json();
+            if (typeof showToast === 'function') showToast(d.detail || 'Erro ao salvar slot', 'error');
+            else alert(d.detail || 'Erro.');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+
+function editSlot(s) { openModal('slot', s); }
+
+async function desativarSlot(id) {
+    if (!confirm('Desativar este slot?')) return;
+    try {
+        const res = await fetch(`/api/v1/configuracoes/slots-horario/${id}`, { method: 'DELETE', headers: authHeaders() });
+        if (res.ok || res.status === 204) {
+            loadSlots();
+            if (typeof showToast === 'function') showToast('Slot desativado.', 'success');
+        } else {
+            if (typeof showToast === 'function') showToast('Erro ao desativar.', 'error');
+        }
+    } catch(e) { if (typeof showToast === 'function') showToast('Erro de conexão', 'error'); }
+}
+</script>
+{% endblock %}

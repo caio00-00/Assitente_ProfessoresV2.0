@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Visão geral — Canal Educação{% endblock %}
+
+{% block content %}
+<style>
+    /* ===== Badges de Status (mesma paleta de Relatórios & Auditoria / Grade Horária) ===== */
+    .badge-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0.3rem 0.7rem;
+        border-radius: 20px;
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #fff;
+        white-space: nowrap;
+    }
+    .badge-status-rascunho { background: linear-gradient(135deg, #94a3b8, #64748b); }
+    .badge-status-aguardando {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35);
+    }
+    .badge-status-validado { background: linear-gradient(135deg, #34d399, #059669); }
+    .badge-status-cancelado { background: linear-gradient(135deg, #fca5a5, #ef4444); }
+</style>
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-painel"/></svg> Visão geral</h1>
+        <p class="page-subtitle">Números das aulas, dos relatórios e do que está pendente</p>
+    </div>
+    <div class="ws-status" id="ws-indicator" style="display:none;">
+        <span class="dot"></span>
+        <span id="ws-count">0</span> online
+    </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" id="stats-grid">
+    <div class="stat-card stat-com-icone">
+        <div class="stat-icone stat-azul"><svg class="ico"><use href="#i-documento"/></svg></div>
+        <div>
+            <div class="stat-value" id="stat-reports">—</div>
+            <div class="stat-label">Relatórios de hoje</div>
+        </div>
+    </div>
+    <div class="stat-card stat-com-icone">
+        <div class="stat-icone stat-verde"><svg class="ico"><use href="#i-check"/></svg></div>
+        <div>
+            <div class="stat-value" id="stat-finalized">—</div>
+            <div class="stat-label">Finalizados</div>
+        </div>
+    </div>
+    <div class="stat-card stat-com-icone">
+        <div class="stat-icone stat-amarelo"><svg class="ico"><use href="#i-lapis"/></svg></div>
+        <div>
+            <div class="stat-value" id="stat-drafts">—</div>
+            <div class="stat-label">Rascunhos</div>
+        </div>
+    </div>
+    <div class="stat-card stat-com-icone">
+        <div class="stat-icone stat-roxo"><svg class="ico"><use href="#i-usuarios"/></svg></div>
+        <div>
+            <div class="stat-value" id="stat-turmas">—</div>
+            <div class="stat-label">Turmas ativas</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Reports -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><svg class="ico"><use href="#i-historico"/></svg> Últimos relatórios</h3>
+    </div>
+    <div id="recent-reports">
+        <div class="spinner"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ===== Config central de status (fluxo de validação) — mesma paleta do resto do sistema =====
+    const STATUS_CONFIG = {
+        RASCUNHO:             { label: 'Rascunho',              icon: icone('lapis', 'ico-sm'), cls: 'badge-status-rascunho' },
+        AGUARDANDO_VALIDACAO: { label: 'Aguardando validação',  icon: icone('relogio', 'ico-sm'), cls: 'badge-status-aguardando' },
+        VALIDADO:             { label: 'Validado',              icon: icone('check', 'ico-sm'), cls: 'badge-status-validado' },
+        CANCELADO:            { label: 'Cancelado',             icon: icone('bloqueado', 'ico-sm'), cls: 'badge-status-cancelado' },
+        // Legado: relatórios finalizados antes do fluxo de validação existir.
+        FINALIZADO:           { label: 'Finalizado',            icon: icone('relogio', 'ico-sm'), cls: 'badge-status-aguardando' },
+    };
+
+    function statusBadgeHtml(status) {
+        const cfg = STATUS_CONFIG[status] || { label: status || 'N/A', icon: icone('vazio', 'ico-sm'), cls: 'badge-status-rascunho' };
+        return `<span class="badge-status ${cfg.cls}">${cfg.icon} ${cfg.label}</span>`;
+    }
+
+    // Status que representam um relatório já finalizado/em fila (nome de arquivo já gerado)
+    const STATUS_COM_NOME_GERADO = ['AGUARDANDO_VALIDACAO', 'VALIDADO', 'FINALIZADO'];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        if (!token) { window.location.href = '/'; return; }
+
+        // Load user profile
+        loadUserProfile();
+
+        // Load stats via CQRS endpoint (TASK 05)
+        try {
+            const headers = { 'Authorization': `Bearer ${token}` };
+
+            // Stats — endpoint dedicado que faz COUNT no banco
+            const statsRes = await fetch('/api/v1/reports/stats', { headers });
+            if (statsRes.ok) {
+                const stats = await statsRes.json();
+                document.getElementById('stat-reports').textContent = stats.total_today;
+                document.getElementById('stat-finalized').textContent = stats.finalized;
+                document.getElementById('stat-drafts').textContent = stats.drafts;
+            }
+
+            // Recent reports — carrega apenas 10 para exibição
+            const reportsRes = await fetch('/api/v1/reports/?limit=10&sort_by=data_aula&sort_order=desc', { headers });
+            if (reportsRes.ok) {
+                const data = await reportsRes.json();
+                const reports = data.items || [];
+
+                const container = document.getElementById('recent-reports');
+                if (reports.length === 0) {
+                    container.innerHTML = `
+                        <div class="empty-state">
+                            <div class="icon">📋</div>
+                            <p>Nenhum relatório registado ainda.</p>
+                        </div>`;
+                } else {
+                    const rows = reports.map(r => {
+                        // Formatar data para pt-BR (TASK 26 parcial)
+                        let dataFormatada = r.data_aula;
+                        try {
+                            const d = new Date(r.data_aula + 'T00:00:00');
+                            dataFormatada = d.toLocaleDateString('pt-BR');
+                        } catch(e) {}
+
+                        return `
+                        <tr>
+                            <td>${dataFormatada}</td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                ${STATUS_COM_NOME_GERADO.includes(r.status) && r.nome_ficheiro_gerado ? r.nome_ficheiro_gerado : r.conteudo_ministrado}
+                            </td>
+                            <td>${r.creator_name || 'Desconhecido'}</td>
+                            <td>${statusBadgeHtml(r.status)}</td>
+                        </tr>
+                    `}).join('');
+
+                    container.innerHTML = `
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>DATA</th>
+                                        <th>ARQUIVO</th>
+                                        <th>USUÁRIO</th>
+                                        <th>STATUS</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>`;
+                }
+            }
+
+            // Turmas count
+            const turmasRes = await fetch('/api/v1/turmas/', { headers });
+            if (turmasRes.ok) {
+                const turmas = await turmasRes.json();
+                document.getElementById('stat-turmas').textContent = turmas.length;
+            }
+        } catch (err) {
+            console.error('Dashboard load error:', err);
+        }
+    });
+</script>
+{% endblock %}

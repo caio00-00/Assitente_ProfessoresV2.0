@@ -1,0 +1,31 @@
+# v4 — versões travadas com faixa segura. Antes do v4 várias libs não tinham
+# versão máxima e um build novo podia trazer quebra (ex.: pypdf 7 quebrou o PDF
+# do diretor de imagem). Atualize de forma consciente, rodando os testes.
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+gunicorn>=21.2,<24
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
+pydantic>=2.5,<3
+pydantic-settings>=2.7,<3
+pydantic[email]
+python-multipart==0.0.6
+bcrypt==4.1.2
+python-jose[cryptography]==3.3.0
+celery==5.3.6
+redis==5.0.1
+google-api-python-client==2.116.0
+google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.0
+jinja2>=3.1,<4
+websockets>=12.0,<18
+alembic>=1.13,<2
+aiosmtplib>=3.0,<6
+openpyxl>=3.1,<4
+pandas>=2.0,<4
+xhtml2pdf>=0.2.15,<0.3   # PDF do Relatório do Diretor de Imagem (pure-Python)
+pypdf>=4.0,<8            # timbrado em todas as páginas do PDF do Diretor de Imagem
+# --- testes ---
+pytest>=8.0,<10
+httpx>=0.26,<0.28.0
+pytest-asyncio>=0.23,<2

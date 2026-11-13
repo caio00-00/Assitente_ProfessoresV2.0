@@ -1,0 +1,65 @@
+# --- SEGURANÇA (CRÍTICO) ---
+
+credentials.json
+credentials*.json
+# Credenciais e anotações do Dokploy / VPS
+dokploy-cred.txt
+dokploy-cred*
+.env
+.env.*
+!.env.example
+#secrets.json
+*.db
+
+venv/
+__pycache__/
+
+# --- PYTHON ---
+
+pycache/
+*.py[cod]
+*$py.class
+.venv
+venv/
+ENV/
+.pytest_cache/
+
+# --- DOCKER & DATABASE ---
+
+.docker/
+
+# Exclui os dados reais do banco de dados se estiverem mapeados localmente
+postgres_data/
+postgres_data_final/
+
+# --- SISTEMA ---
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+celerybeat-schedule
+
+# Playwright MCP (arquivos temporários de automação de browser)
+.playwright-mcp/
+
+# Screenshots e respostas de testes manuais
+tmp/
+
+# --- DADOS ---
+backup_assistente_20260419.sql
+backup_ajustado.sql
+backup_final.sql
+backup_final_v2.sql
+
+# Exclui o CSV de horários se ele contiver dados sensíveis,
+# ou mantenha se for apenas um modelo de teste.
+# data/horario.csv (Removido para permitir ETL no deploy)
+
+# v4: dumps do HML trazidos para teste local (contêm dados reais antes de embaralhar)
+scripts/dados_hml/*.dump
+scripts/dados_hml/*.sql
+scripts/dados_hml/*.sql.gz
+!scripts/dados_hml/anonimizar.sql

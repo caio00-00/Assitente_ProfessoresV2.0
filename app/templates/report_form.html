@@ -1,0 +1,2263 @@
+{% extends "base.html" %}
+{% block title %}Relatório de Aula — Canal Educação{% endblock %}
+
+{% block head %}
+<style>
+    /* Responsive Form Refactor CSS */
+    .form-container {
+        width: 100%;
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 0 1rem;
+        box-sizing: border-box;
+    }
+    @media (min-width: 768px) { .form-container { padding: 0 1.5rem; } }
+    @media (min-width: 1024px) { .form-container { padding: 0; } }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+    }
+    @media (min-width: 600px) {
+        .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+        .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .form-row.cols-4 { grid-template-columns: 1fr 1fr; }
+        .form-row.cols-prof { grid-template-columns: 1fr 1fr; }
+        .form-row.cols-yt { grid-template-columns: 1fr 2fr; }
+    }
+    @media (min-width: 900px) {
+        .form-row.cols-4 { grid-template-columns: repeat(4, 1fr); }
+        .form-row.cols-prof { grid-template-columns: 2fr 1fr 1fr; }
+    }
+    /* Informação que vem da grade/Agenda: texto alinhado com os campos, sem cara de campo */
+    .rf-info { font-size: 0.85rem; color: var(--text-secondary); min-height: 44px; display: flex; align-items: center;
+               padding: 0 0.75rem; border: 1px dashed var(--border-color); border-radius: 8px; margin: 0; }
+    .rf-hint { font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0; }
+
+    input.form-input, select.form-select, textarea.form-textarea, button.btn {
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 44px;
+    }
+    .form-actions {
+        display: flex; gap: 0.75rem; flex-wrap: wrap;
+    }
+    .form-actions .btn {
+        flex: 1; min-width: 140px;
+    }
+
+    .progress-inner {
+        max-width: 960px;
+        margin: 0 auto;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    @media (max-width: 479px) { .progress-label { display: none; } }
+
+    .card { padding: 1rem; margin-bottom: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; }
+    @media (min-width: 600px) { .card { padding: 1.5rem; } }
+
+    .conditional-field {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.35s ease;
+    }
+    .conditional-field.visible {
+        max-height: 800px;
+    }
+
+    .autocomplete-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        max-height: 250px;
+        overflow-y: auto;
+        z-index: 1000;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    .autocomplete-item {
+        padding: 10px 14px;
+        cursor: pointer;
+        font-size: 0.85rem;
+        border-bottom: 1px solid var(--border-subtle);
+        transition: all 0.2s ease;
+    }
+    .autocomplete-item:last-child {
+        border-bottom: none;
+    }
+    .autocomplete-item:hover {
+        background: var(--bg-hover);
+        color: var(--status-green);
+        padding-left: 20px;
+        border-left: 3px solid var(--status-green);
+    }
+    .autocomplete-item strong {
+        color: var(--status-green);
+    }
+    .autocomplete-item:hover strong {
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-documento"/></svg> Relatório de aula</h1>
+        <p class="page-subtitle">Preenchido pelo assistente: o que aconteceu na aula, do jeito que foi ao ar</p>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" id="btnVoltarGrade" onclick="confirmExit()">← Voltar à Grade</button>
+</div>
+
+<!-- TASK 10: Sticky Progress Bar -->
+<div id="sticky-progress-bar" style="position: sticky; top: 0; z-index: 100; background: var(--bg-card); border-bottom: 1px solid var(--border-color); padding: 0.5rem 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+    <div class="progress-inner">
+        <span class="progress-label" style="font-size: 0.75rem; color: var(--text-muted); white-space: nowrap;">Preenchimento:</span>
+        <div style="flex: 1; height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden;">
+            <div id="progress-fill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #f59e0b, #22c55e); border-radius: 3px; transition: width 0.3s ease;"></div>
+        </div>
+        <span id="progress-percent" style="font-size: 0.7rem; color: var(--text-muted); min-width: 30px;">0%</span>
+        <span id="last-save-time" style="font-size: 0.65rem; color: var(--text-muted); white-space: nowrap;"></span>
+        <button type="button" class="btn btn-sm" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff; font-size: 0.75rem; padding: 0.3rem 0.75rem; width: auto; min-height: auto;" onclick="submitReport()">💾 Rascunho</button>
+    </div>
+</div>
+
+<div class="form-container">
+    <form id="report-form" onsubmit="submitReport(event)">
+        <!-- CARD 1 — Contexto Operacional (vem da grade/Agenda: travado sem aviso) -->
+        <div class="card">
+            <div class="form-section-title">📌 Contexto da aula</div>
+            <div class="form-row cols-4">
+                <div class="form-group">
+                    <label class="form-label">Data da aula</label>
+                    <input type="date" id="data_aula" class="form-input" required min="2020-01-01" max="2099-12-31" pattern="\d{4}-\d{2}-\d{2}" onchange="updateNaming()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Turno</label>
+                    <select id="turno" class="form-select" required onchange="updateNaming()">
+                        <option value="">Selecione...</option>
+                        <option value="Manhã">Manhã</option>
+                        <option value="Tarde">Tarde</option>
+                        <option value="Noite">Noite</option>
+                        <option value="FDS manhã">FDS manhã</option>
+                        <option value="FDS tarde">FDS tarde</option>
+                        <option value="FDS noite">FDS noite</option>
+                        <option value="Outro">Outro</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Horário da aula</label>
+                    <select id="horario_aula" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        <option>1º Horário</option>
+                        <option>2º Horário</option>
+                        <option>3º Horário</option>
+                        <option>4º Horário</option>
+                        <option>5º Horário</option>
+                        <option>6º Horário</option>
+                        <option>7º Horário</option>
+                        <option>8º Horário</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Estúdio</label>
+                    <select id="estudio" class="form-select" required>
+                        <option value="">Carregando estúdios...</option>
+                    </select>
+                </div>
+            </div>
+            <p id="estudio-agenda-hint" class="rf-hint" style="display:none;"></p>
+                <div class="form-group" style="display:none;"><!-- Reunião out/2026: "Regular" saiu; o tipo de aula já diz -->
+                    <label class="form-label">Regular</label>
+                    <select id="regular" class="form-select" onchange="toggleFormLogic()">
+                        <option value="Sim">Sim</option>
+                        <option value="Não">Não</option>
+                    </select>
+                </div>
+
+            <div class="form-row cols-2" id="grade-fields" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Turma</label>
+                    <div style="position: relative;">
+                        <input type="text" id="turma_busca" class="form-input" list="turmas_datalist" autocomplete="off" placeholder="Digite para buscar a turma..." oninput="onTurmaBuscaInput()" onchange="onTurmaBuscaChange()">
+                        <datalist id="turmas_datalist"></datalist>
+                    </div>
+                    <select id="turma_id" class="form-select" style="display:none;" onchange="onTurmaChange(); updateNaming()">
+                        <option value="">Carregando...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Disciplina</label>
+                    <select id="disciplina_id" class="form-select" disabled onchange="onDisciplinaSelect()">
+                        <option value="">Selecione turma primeiro...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-row cols-prof" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Professor(a)</label>
+                <div style="position: relative;">
+                    <input type="text" id="professor_busca" class="form-input" list="professores_datalist" autocomplete="off" placeholder="Selecione a disciplina primeiro..." disabled oninput="onProfessorBuscaInput()" onchange="onProfessorBuscaChange()">
+                    <datalist id="professores_datalist"></datalist>
+                </div>
+                <select id="professor_id" class="form-select" style="display:none;" disabled onchange="atualizarSubstitutos()">
+                    <option value="">Selecione disciplina primeiro...</option>
+                </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Canal</label>
+                    <p id="canal-info" class="rf-info">—</p>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Diretor de imagem</label>
+                    <p id="diretor-escalado-hint" class="rf-info">Definido pela escala do diretor-chefe ao escolher a aula.</p>
+                </div>
+            </div>
+
+            <div class="form-group" id="professor_legacy_container" style="display: none; margin-top: 1rem;">
+                <label class="form-label">Professor (registro anterior)</label>
+                <input type="text" id="professor_legacy_nome" class="form-input" readonly disabled style="opacity: 0.75;">
+                <p style="font-size: 0.75rem; color: var(--status-yellow); margin-top: 0.35rem;">Selecione um professor cadastrado acima.</p>
+            </div>
+
+            <div class="form-group" id="numero-aula-field" style="display: none; margin-top: 1rem;">
+                <label class="form-label" style="color: var(--status-yellow);">Nº da Aula <span style="font-size: 0.75rem;">⚠️ Obrigatório para turmas TÉCNICO</span></label>
+                <input type="text" id="numero_aula" class="form-input" placeholder="Ex: 01, 02, 10, 100" maxlength="4" inputmode="numeric" pattern="\d{2,4}" oninput="sanitizeNumeroAula(this); updateNaming();" autocomplete="off">
+            </div>
+
+            <!-- Campos da Aula Avulsa -->
+            <div id="avulsa-fields" style="display: none; margin-top: 1rem;">
+                <div class="form-row cols-2">
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label class="form-label">Ticket Number</label>
+                        <input type="text" id="ticket_number" class="form-input" placeholder="Ex: TCK-1234">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Horário Início</label>
+                        <input type="time" id="start_time" class="form-input">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Horário Fim</label>
+                        <input type="time" id="end_time" class="form-input">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 2 — Detalhes da Execução -->
+        <div class="card">
+            <div class="form-section-title">🎬 Detalhes da Execução</div>
+            <div class="form-row cols-2">
+                <div class="form-group">
+                    <label class="form-label">Tipo de Aula</label>
+                    <select id="tipo_aula" class="form-select" required>
+                        <option value="">Selecione...</option>
+                        <option>Manutenção de estúdio</option>
+                        <option>Planejamento Pedagógico</option>
+                        <option>Videoconferência</option>
+                        <option>Gravação estúdio</option>
+                        <option>UAPI</option>
+                        <option>Transmissão ao vivo</option>
+                        <option>Gravação externa</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display:none;"><!-- Reunião out/2026: canal vem da grade/Agenda, não é escolhido aqui -->
+                    <label class="form-label">Canal Utilizado</label>
+                    <select id="canal_utilizado" class="form-select">
+                        <option value="">Carregando canais...</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reposição?</label>
+                    <select id="reposicao" class="form-select" onchange="toggleReposicao()">
+                        <option value="">Não</option>
+                        <option value="SIM">Sim</option>
+                    </select>
+                    <input type="hidden" id="solicitante_antecipacao">
+                </div>
+                <div class="form-group" id="grupo-chamado-antecipacao" style="display: none;">
+                    <label class="form-label">Gravação antecipada</label>
+                    <p id="antecipacao-agenda-info" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.6rem;">Quem informa se é pedido da SEDUC (e o chamado) é o diretor-chefe, na Agenda.</p>
+                    <input type="hidden" id="chamado_antecipacao_input">
+                </div>
+            </div>
+
+            <!-- Mês de Execução × Mês de Referência (Caso 2 & Item 9 - Gravação de Estúdio) -->
+            <div id="secao-mes-referencia" style="display: none; margin-top: 1rem; border: 1px dashed var(--border-subtle); border-radius: 10px; padding: 1rem; background: rgba(79, 70, 229, 0.03);">
+                <div class="form-section-title" style="margin-bottom: 0.75rem;">📅 Data da gravação</div>
+                <div class="form-row cols-2">
+                    <div class="form-group">
+                        <label class="form-label" id="label-data-execucao">Data da gravação</label>
+                        <input type="date" id="data_execucao_real" class="form-input" onchange="atualizarIndicativoReposicao()">
+                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Dia em que a aula foi gravada/transmitida de fato. É o mês desta data que vale no relatório/faturamento (ex.: aula de 30/10 gravada em 03/11 entra em novembro). A data da aula na grade é a do topo do formulário.</p>
+                        <input type="hidden" id="data_referencia_aula">
+                    </div>
+                </div>
+                <div id="indicativo-reposicao-badge" style="display: none; margin-top: 0.75rem; padding: 0.5rem 0.75rem; border-radius: 6px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); font-size: 0.85rem; color: #166534;">
+                    📌 <strong>Indicativo gerado:</strong> <span id="indicativo-reposicao-texto"></span>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 1rem; display:none;"><!-- Reunião out/2026: vem da escala do diretor-chefe -->
+                <label class="form-label">Diretor de Imagem</label>
+                <select id="diretor_imagem_id" class="form-select">
+                    <option value="">Nenhum / Não aplicável</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label" id="label-conteudo">Conteúdo Ministrado (máx. <span id="char-limit-display">100</span> chars)</label>
+                <input type="text" id="conteudo_ministrado" class="form-input" maxlength="100" placeholder="Descreva o conteúdo..." required oninput="updateNaming()">
+                <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+                    <span style="font-size: 0.7rem; color: var(--text-muted);"><span id="char-count">0</span>/<span id="char-limit-counter">100</span> caracteres</span>
+                    <span id="warning-geminada" style="font-size: 0.65rem; color: var(--status-yellow);">⚠️ Use P1/P2/P3 em aulas geminadas</span>
+                </div>
+                <div id="drive-suggestions-container" style="margin-top: 0.5rem; display: flex; flex-wrap: wrap; gap: 0.5rem;"></div>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Habilidades BNCC / Currículo Piauí <span style="font-size: 0.7rem; color: var(--status-yellow);">⚠️ Obrigatório para finalizar</span></label>
+                <textarea id="bncc_habilidades" class="form-textarea" rows="4" placeholder="Copie e cole aqui as habilidades BNCC ou do Currículo Piauí trabalhadas nesta aula..."></textarea>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Escolas Participantes <span style="font-size: 0.7rem; color: var(--text-muted);">(Pressione Enter para adicionar)</span></label>
+                <input type="text" id="escolas_input" class="form-input" placeholder="Digite a GRE/Escola..." onkeypress="handleEscolasKeyPress(event)">
+                <div id="escolas_tags" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;"></div>
+            </div>
+            
+            <div class="form-row cols-2" id="interacoes-fields" style="margin-top: 1rem;">
+                <div class="form-group">
+                    <label class="form-label">Interação Professor-Aluno</label>
+                    <select id="interacao_professor_aluno" class="form-select" onchange="toggleConditional('interacao')">
+                        <option value="Não">Não</option>
+                        <option value="Chat">Chat</option>
+                        <option value="Videoconferência">Videoconferência</option>
+                        <option value="Chat e vídeo">Chat e vídeo</option>
+                        <option value="Outras">Outras</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Atividade Prática</label>
+                    <select id="atividade_pratica" class="form-select">
+                        <option value="">Nenhuma</option>
+                        <option>Exercício teórico</option>
+                        <option>Exercício prático</option>
+                        <option>Dinâmica</option>
+                        <option>Debates</option>
+                    </select>
+                </div>
+            </div>
+            <div id="field-interacao-outras" class="conditional-field">
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Descreva a Interação</label>
+                    <input type="text" id="interacao_outras_desc" class="form-input" placeholder="Descreva a interação...">
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 3 — Recursos e Materiais -->
+        <div class="card">
+            <div class="form-section-title">📦 Recursos e Materiais</div>
+            <div class="form-group">
+                <label class="form-label">Recursos Utilizados</label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="Slides" class="recurso-check"> Slides
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="vídeo" class="recurso-check"> vídeo
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="chroma key" class="recurso-check"> chroma key
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="animação" class="recurso-check"> animação
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="alpha" class="recurso-check"> alpha
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="Internet" class="recurso-check"> Internet
+                    </label>
+                    <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 4px; color: var(--text-secondary);">
+                        <input type="checkbox" value="Outro" class="recurso-check" onchange="toggleConditional('recurso')"> Outro
+                    </label>
+                </div>
+            </div>
+            <div id="field-recurso-outro" class="conditional-field">
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Descreva o Recurso</label>
+                    <input type="text" id="recursos_outro_desc" class="form-input" placeholder="Qual recurso?">
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Problema com Material</label>
+                <select id="problema_material" class="form-select" onchange="toggleFormLogic()">
+                    <option value="Não">Não</option>
+                    <option>Sim</option>
+                </select>
+            </div>
+            <div id="field-problema-detalhes" class="conditional-field">
+                <div style="background: var(--bg-secondary); padding: 1rem; border-radius: 6px; margin-top: 1rem; border: 1px solid var(--border-color);">
+                    <h4 style="font-size: 0.85rem; margin-bottom: 0.5rem;">Materiais Problemáticos</h4>
+                    <div class="form-row cols-2" style="align-items: end;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <input type="text" id="prob_mat_nome" class="form-input" style="font-size: 0.8rem; height: 32px; min-height: 32px;" placeholder="Qual material? (Ex: Apostila)">
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                                <input type="text" id="prob_mat_desc" class="form-input" style="font-size: 0.8rem; height: 32px; min-height: 32px;" placeholder="Qual o problema?">
+                            </div>
+                            <button type="button" class="btn btn-secondary btn-sm" style="height: 32px; min-height: 32px; width: 32px;" onclick="addProblemaMaterial()">+</button>
+                        </div>
+                    </div>
+                    <div id="problemas_tags" style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CARD 4 — Ocorrências Operacionais -->
+        <div class="card">
+            <div class="form-section-title">⚠️ Ocorrências Operacionais</div>
+            <div class="form-row cols-2">
+                <div class="form-group">
+                    <label class="form-label">Houve substituição?</label>
+                    <select id="teve_substituicao" class="form-select" onchange="toggleConditional('substituicao')">
+                        <option value="false">Não</option>
+                        <option value="true">Sim</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Houve atraso?</label>
+                    <select id="teve_atraso" class="form-select" onchange="toggleConditional('atraso')">
+                        <option value="false">Não</option>
+                        <option value="true">Sim</option>
+                    </select>
+                </div>
+            </div>
+            <div id="field-substituicao" class="conditional-field">
+                <div class="form-group" style="margin-top: 1rem;">
+                    <label class="form-label">Professor Substituto</label>
+                    <div style="position: relative;">
+                        <input type="text" id="substituto_busca" class="form-input" list="substitutos_datalist" autocomplete="off" placeholder="Digite para buscar substituto..." oninput="onSubstitutoBuscaInput()" onchange="onSubstitutoBuscaChange()">
+                        <datalist id="substitutos_datalist"></datalist>
+                    </div>
+                    <select id="professor_substituto_id" class="form-select" style="display:none;">
+                        <option value="">Selecione...</option>
+                    </select>
+                </div>
+                <div class="form-group" id="substituto_legacy_container" style="display: none; margin-top: 1rem;">
+                    <label class="form-label">Substituto (registro anterior)</label>
+                    <input type="text" id="substituto_legacy_nome" class="form-input" readonly disabled style="opacity: 0.75;">
+                    <p style="font-size: 0.75rem; color: var(--status-yellow); margin-top: 0.35rem;">Selecione um professor cadastrado acima.</p>
+                </div>
+            </div>
+            <div id="field-atraso" class="conditional-field">
+                <div class="form-row cols-2" style="margin-top: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label">Tempo de Atraso <span style="font-size: 0.75rem; color: var(--text-muted);">(HH:MM)</span></label>
+                        <input type="text" id="minutos_atraso" class="form-input" placeholder="00:00" maxlength="5">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Observação do Atraso</label>
+                        <input type="text" id="observacao_atraso" class="form-input" placeholder="Justificativa do atraso">
+                    </div>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 1rem;">
+                <label class="form-label">Observações Gerais</label>
+                <textarea id="observacoes" class="form-textarea" placeholder="Notas gerais sobre a execução (opcional)..."></textarea>
+            </div>
+        </div>
+
+        <!-- CARD 5 — Informações de Gravação -->
+        <div class="card" id="section-gravacao">
+            <div class="form-section-title">🎥 Informações de Gravação</div>
+            <div class="form-row cols-yt">
+            <div class="form-group">
+                <label class="form-label">Necessita edição?</label>
+                <select id="needs_editing" class="form-select">
+                    <option value="false">Não</option>
+                    <option value="true">Sim</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Link do YouTube <span style="font-size: 0.7rem; color: var(--status-yellow);">⚠️ Obrigatório para finalizar</span></label>
+                <input type="url" id="youtube_link" class="form-input" placeholder="https://youtube.com/watch?v=..." pattern="https?://(www\.)?(youtube\.com|youtu\.be)/.+" title="Insira um link válido do YouTube (youtube.com ou youtu.be)">
+                <span id="youtube-validation-msg" style="font-size: 0.7rem; color: var(--status-red); display: none;">⚠️ Link deve ser do YouTube (youtube.com ou youtu.be)</span>
+            </div>
+            </div>
+        </div>
+
+        <!-- Naming Engine Preview (§5.2 Crítico) -->
+        <div class="naming-preview" id="naming-preview" style="margin-bottom: 1.5rem;">
+            <span style="color: var(--text-muted); font-size: 0.7rem;">PREVIEW DO FICHEIRO GERADO</span><br>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 0.25rem;">
+                <span id="naming-output" style="word-break: break-all; font-weight: 500;">Preencha os campos acima...</span>
+                <button type="button" class="btn btn-sm" style="background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); white-space: nowrap; font-size: 0.75rem; width: auto; min-height: auto;" onclick="copyFileName('naming-output', this)">
+                    📋 Copiar
+                </button>
+            </div>
+        </div>
+
+        <!-- Actions Footer -->
+        <div class="form-actions" style="margin-bottom: 2rem;">
+            <button type="submit" class="btn" style="background: linear-gradient(135deg, #f59e0b, #d97706); color: #fff;">
+                💾 Salvar Rascunho
+            </button>
+            <button type="button" class="btn btn-primary" onclick="finalizarReport()">
+                ✅ Finalizar
+            </button>
+        </div>
+    </form>
+</div>
+
+
+
+<!-- Success Modal -->
+<div class="drawer-overlay" id="success-overlay"></div>
+<div class="drawer" id="success-drawer">
+    <div class="drawer-header">
+        <h3 style="color: var(--status-green);">✅ Relatório Finalizado!</h3>
+    </div>
+    <div style="padding: 1.5rem; text-align: center;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+        <p style="margin-bottom: 1rem; color: var(--text-secondary);">
+            O relatório foi salvo e a nomenclatura foi gerada. O vídeo será sincronizado em breve.
+        </p>
+        <div style="background: var(--bg-hover); padding: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); margin-bottom: 1.5rem; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+            <div>
+                <span style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase;">Nome do arquivo</span><br>
+                <span id="success-filename" style="font-size: 0.85rem; font-weight: 500; word-break: break-all; color: var(--status-green);">N/A</span>
+            </div>
+            <button type="button" class="btn btn-sm" style="background: var(--bg-card); color: var(--text-color); border: 1px solid var(--border-color); white-space: nowrap; font-size: 0.75rem;" onclick="copyFileName('success-filename', this)">
+                📋 Copiar
+            </button>
+        </div>
+        <div style="display: grid; gap: 0.75rem;">
+            <a id="success-drive-link" href="#" target="_blank" class="btn btn-primary btn-full" style="background: #3b82f6;">
+                📂 Abrir Pasta do Drive
+            </a>
+            <a id="success-pdf-link" href="#" target="_blank" class="btn btn-secondary btn-full" style="display: none; background-color: #4b5563; justify-content: center; align-items: center;">
+                📄 Abrir Slide (PDF)
+            </a>
+            <button class="btn btn-primary btn-full" onclick="returnToGrade()">
+                ← Voltar à Grade
+            </button>
+            <button class="btn btn-secondary btn-full" onclick="window.location.href='/inicio'">
+                Ir para o Início
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Login Modal for 401 recovery -->
+<div class="drawer-overlay" id="login-modal-overlay" style="z-index: 1001;"></div>
+<div class="drawer" id="login-modal" style="z-index: 1002; max-width: 400px; height: auto; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); visibility: hidden; opacity: 0; transition: all 0.3s ease;">
+    <div class="drawer-header">
+        <h3 style="color: var(--status-yellow);">🔐 Sessão Expirada</h3>
+    </div>
+    <div style="padding: 1.5rem;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+            Sua sessão expirou por segurança. Para não perder os dados preenchidos, faça login novamente abaixo.
+        </p>
+        <form id="reauth-form" onsubmit="handleReauth(event)">
+            <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" id="reauth-email" class="form-input" required placeholder="seu@email.com">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Senha</label>
+                <input type="password" id="reauth-password" class="form-input" required placeholder="••••••••">
+            </div>
+            <div id="reauth-error" style="color: var(--status-red); font-size: 0.75rem; margin-bottom: 1rem; display: none;">
+                Email ou senha incorretos.
+            </div>
+            <button type="submit" class="btn btn-primary btn-full" id="reauth-btn">
+                Entrar e Continuar
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let turmasData = [];
+    let lastSavedId = null;
+    let isEditing = false;
+    let escolasParticipantes = [];
+    let problematicMaterials = [];
+    let isDirty = false; // TASK 10: Track unsaved changes
+    let pendingAction = null; // Para repetir a ação após login
+
+    // TASK 10: Beforeunload warning
+    window.addEventListener('beforeunload', (e) => {
+        if (isDirty) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // TASK 10: Confirm exit
+    function confirmExit() {
+        if (isDirty) {
+            if (confirm('Você tem alterações não salvas. Tem certeza que deseja sair?')) {
+                isDirty = false;
+                returnToGrade();
+            }
+        } else {
+            returnToGrade();
+        }
+    }
+
+    // TASK 16: Return to grade preserving filters
+    function returnToGrade() {
+        isDirty = false;
+        const gradeFilters = sessionStorage.getItem('grade_filters');
+        if (gradeFilters) {
+            window.location.href = '/grade' + gradeFilters;
+        } else {
+            window.location.href = '/grade';
+        }
+    }
+
+    // TASK 10: Progress bar calculation
+    function updateProgressBar() {
+        const fields = [
+            'data_aula', 'turno', 'estudio', 'turma_id', 'disciplina_id',
+            'tipo_aula', 'canal_utilizado', 'conteudo_ministrado', 'horario_aula'
+        ];
+        let filled = 0;
+        fields.forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.value && el.value.trim() !== '') filled++;
+        });
+        const percent = Math.round((filled / fields.length) * 100);
+        document.getElementById('progress-fill').style.width = percent + '%';
+        document.getElementById('progress-percent').textContent = percent + '%';
+    }
+
+    // Tag arrays management
+    function handleEscolasKeyPress(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const val = e.target.value.trim();
+            if (val && !escolasParticipantes.includes(val)) {
+                escolasParticipantes.push(val);
+                renderEscolasTags();
+            }
+            e.target.value = '';
+        }
+    }
+
+    function removeEscola(index) {
+        escolasParticipantes.splice(index, 1);
+        renderEscolasTags();
+    }
+
+    function renderEscolasTags() {
+        const container = document.getElementById('escolas_tags');
+        container.innerHTML = '';
+        escolasParticipantes.forEach((esc, idx) => {
+            container.innerHTML += `<span style="background: var(--bg-hover); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 4px;">${esc} <span style="cursor: pointer; opacity: 0.5;" onclick="removeEscola(${idx})">✖</span></span>`;
+        });
+    }
+
+    // BNCC logic removed (Task 06)
+
+    function addProblemaMaterial() {
+        const mat = document.getElementById('prob_mat_nome').value.trim();
+        const desc = document.getElementById('prob_mat_desc').value.trim();
+        if (mat && desc) {
+            problematicMaterials.push({ material: mat, descricao: desc });
+            renderProblemasTags();
+            document.getElementById('prob_mat_nome').value = '';
+            document.getElementById('prob_mat_desc').value = '';
+        }
+    }
+
+    function removeProblema(index) {
+        problematicMaterials.splice(index, 1);
+        renderProblemasTags();
+    }
+
+    function renderProblemasTags() {
+        const container = document.getElementById('problemas_tags');
+        container.innerHTML = '';
+        problematicMaterials.forEach((p, idx) => {
+            container.innerHTML += `<div style="background: var(--bg-card); border: 1px solid var(--border-color); padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                <span><strong>${p.material}:</strong> ${p.descricao}</span>
+                <span style="cursor: pointer; opacity: 0.5;" onclick="removeProblema(${idx})">✖</span>
+            </div>`;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        if (!token) { window.location.href = '/'; return; }
+        {
+            const p0 = new URLSearchParams(window.location.search);
+            if (!p0.get('report_id') && !p0.get('turma')) {
+                // "Nova Aula" saiu: o relatório é aberto pela aula na Grade Horária
+                showToast('Para lançar um relatório, clique na aula na Grade Horária.', 'info');
+                setTimeout(() => window.location.replace('/grade'), 1200);
+                return;
+            }
+        }
+        loadUserProfile();
+
+        // 1. Data load first
+        await Promise.all([
+            loadTurmas(),
+            loadAllProfessores(),
+            loadDiretores(),
+            loadEstudios(),
+            loadCanaisIptv()
+        ]);
+
+        // 2. Pre-fill from URL params
+        const params = new URLSearchParams(window.location.search);
+
+        // Data Aula
+        if (params.get('data')) document.getElementById('data_aula').value = params.get('data');
+
+        // Estúdio
+        if (params.get('estudio')) document.getElementById('estudio').value = params.get('estudio');
+
+        // Horário (Dynamic handling)
+        const hora = params.get('horario');
+        if (hora) {
+            const selHorario = document.getElementById('horario_aula');
+            // Check if option exists
+            let exists = Array.from(selHorario.options).some(opt => opt.value === hora);
+            
+            if (exists) {
+                selHorario.value = hora;
+            } else if (hora.includes('às') && params.get('agenda')) {
+                // Aula marcada na Agenda fora da grade (antecipada, reposição…): o horário é a faixa
+                selHorario.insertAdjacentHTML('beforeend', `<option value="${hora}">${hora}</option>`);
+                selHorario.value = hora;
+                const parts = hora.split('às');
+                document.getElementById('start_time').value = parts[0].trim();
+                document.getElementById('end_time').value = parts[1].trim();
+            } else if (hora.includes('às')) {
+                // Horário específico da grade (ex: "07:30 às 08:20")
+                const parts = hora.split('às');
+                if (parts.length === 2) {
+                    document.getElementById('start_time').value = parts[0].trim();
+                    document.getElementById('end_time').value = parts[1].trim();
+                }
+            } else if (hora.toLowerCase() === 'gravação') {
+                document.getElementById('tipo_aula').value = 'Gravação estúdio';
+            }
+
+            // Detect turno from time
+            if (hora.toLowerCase() !== 'gravação') {
+                const h = parseInt(hora.split(':')[0]);
+                if (h < 12) document.getElementById('turno').value = 'Manhã';
+                else if (h < 18) document.getElementById('turno').value = 'Tarde';
+                else document.getElementById('turno').value = 'Noite';
+            }
+        }
+
+        // Turma & Disciplina (Cascading after data is loaded)
+        const preTurma = params.get('turma');
+        if (preTurma) {
+            const selTurma = document.getElementById('turma_id');
+            selTurma.value = preTurma;
+            await onTurmaChange(params.get('disciplina'));
+
+            const preDisc = params.get('disciplina');
+            if (preDisc) {
+                const selDisc = document.getElementById('disciplina_id');
+                selDisc.value = preDisc;
+                await onDisciplinaChange();
+                
+                const preProf = params.get('professor');
+                if (preProf && preProf !== 'null' && preProf !== 'undefined') {
+                    const selProf = document.getElementById('professor_id');
+                    if (Array.from(selProf.options).some(opt => opt.value === preProf)) {
+                        selProf.value = preProf;
+                        atualizarSubstitutos();
+                    }
+                }
+            }
+            sincronizarTurmaBusca();
+            sincronizarProfessorBusca();
+        }
+
+        // 3. Load existing report if ID is present
+        const reportId = params.get('report_id');
+        if (reportId) {
+            isEditing = true;
+            lastSavedId = reportId;
+            await loadExistingReport(reportId);
+        }
+
+        // Dados da aula vindos da grade: travados (o assistente só confirma)
+        travarDadosDaGrade();
+
+        // 4. Estúdio vem da Agenda de Estúdios (relatório novo de aula da grade)
+        ['data_aula', 'turno', 'turma_id', 'disciplina_id', 'horario_aula', 'start_time', 'regular'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', atualizarEstudioPelaAgenda);
+        });
+        atualizarEstudioPelaAgenda();
+
+        updateNaming();
+        updateProgressBar(); // TASK 10
+
+        // Character counter
+        const conteudo = document.getElementById('conteudo_ministrado');
+        conteudo.addEventListener('input', () => {
+            document.getElementById('char-count').textContent = conteudo.value.length;
+        });
+
+        // Setup conditional fields listeners
+        document.getElementById('tipo_aula').addEventListener('change', toggleFormLogic);
+        toggleFormLogic();
+
+        // TASK 10: Track dirty state + progress bar on any input change
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('change', () => { isDirty = true; updateProgressBar(); });
+            el.addEventListener('input', () => { isDirty = true; updateProgressBar(); });
+        });
+
+        // TASK 13: HH:MM Mask for Atraso
+        const inputAtraso = document.getElementById('minutos_atraso');
+        inputAtraso.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '');
+            if (v.length > 4) v = v.substring(0, 4);
+            
+            if (v.length > 2) {
+                e.target.value = v.substring(0, 2) + ":" + v.substring(2);
+            } else {
+                e.target.value = v;
+            }
+
+            // Se valor for preenchido, torna observação obrigatória
+            const obs = document.getElementById('observacao_atraso');
+            if (e.target.value.length === 5 && e.target.value !== "00:00") {
+                obs.required = true;
+            } else {
+                obs.required = false;
+            }
+        });
+        
+        // Trigger para sugestões do Drive
+        document.getElementById('data_aula').addEventListener('change', fetchDriveSuggestions);
+    });
+
+    async function loadTurmas() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/turmas/', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                turmasData = await res.json();
+                const sel = document.getElementById('turma_id');
+                const dl = document.getElementById('turmas_datalist');
+                sel.innerHTML = '<option value="">Selecione a turma...</option>';
+                if (dl) dl.innerHTML = '';
+                turmasData.forEach(t => {
+                    const dispName = t.nomenclatura_padrao || t.nome;
+                    const fullLabel = `${t.serie_modulo} - ${t.turno} - ${dispName}`;
+                    sel.innerHTML += `<option value="${t.id}" data-modalidade="${t.modalidade}" data-serie="${t.serie_modulo}" data-nomenclatura="${dispName}">${fullLabel}</option>`;
+                    if (dl) dl.innerHTML += `<option value="${fullLabel}"></option>`;
+                });
+                sincronizarTurmaBusca();
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadDiretores() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/reports/lookup/diretores', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const diretores = await res.json();
+                const sel = document.getElementById('diretor_imagem_id');
+                sel.innerHTML = '<option value="">Selecione o diretor...</option>';
+                diretores.forEach(d => {
+                    sel.innerHTML += `<option value="${d.id}">${d.nome}</option>`;
+                });
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    async function loadEstudios() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/configuracoes/estudios', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const estudios = await res.json();
+                const sel = document.getElementById('estudio');
+                sel.innerHTML = '<option value="">Selecione o estúdio...</option>';
+                estudios.forEach(e => {
+                    sel.innerHTML += `<option value="${e.nome}">${e.nome}</option>`;
+                });
+                sel.innerHTML += '<option value="Externo">Externo</option>';
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // ─── Estúdio definido pela Agenda de Estúdios (diretor-chefe) ───
+    // Em relatório novo de aula da grade, o estúdio não é mais escolhido pelo
+    // assistente: vem da grade/Agenda (inclusive remanejamento do dia), com o
+    // mesmo nome do cadastro de estúdios — o mesmo texto que o diretor de imagem
+    // usa, para o Consolidado continuar pareando os relatórios.
+    let seqEstudioAgenda = 0;
+    /** Campo preenchido pela Agenda (diretor-chefe): travado para não divergir. */
+    function travarCampoAgenda(el, travado) {
+        if (!el) return;
+        if (travado) {
+            el.dataset.daAgenda = '1';
+            if (el.tagName === 'SELECT') el.disabled = true; else el.readOnly = true;
+        } else if (el.dataset.daAgenda) {
+            delete el.dataset.daAgenda;
+            if (el.tagName === 'SELECT') el.disabled = false; else el.readOnly = false;
+            el.title = '';
+        }
+    }
+    function garantirOpcao(sel, valor, rotulo) {
+        if (sel && valor && !Array.from(sel.options).some(o => o.value === valor)) {
+            sel.insertAdjacentHTML('beforeend', `<option value="${String(valor).replace(/"/g, '&quot;')}">${String(rotulo || valor).replace(/</g, '&lt;')}</option>`);
+        }
+    }
+    function aplicarDadosDaAgenda(r) {
+        // Diretor de imagem escalado no estúdio e turno
+        const selDir = document.getElementById('diretor_imagem_id');
+        const dirHint = document.getElementById('diretor-escalado-hint');
+        if (r.diretor_imagem_id && selDir) {
+            garantirOpcao(selDir, r.diretor_imagem_id, r.diretor_nome);
+            selDir.value = r.diretor_imagem_id;
+            travarCampoAgenda(selDir, true);
+            if (dirHint) dirHint.textContent = `🎥 Escalado pelo diretor-chefe: ${r.diretor_nome}`;
+        } else {
+            travarCampoAgenda(selDir, false);
+            if (dirHint) dirHint.textContent = 'Nenhum diretor escalado nesse estúdio e turno.';
+        }
+        // Canal (SEDUC PI…) da grade ou do remanejamento/agendamento do dia
+        const selCanal = document.getElementById('canal_utilizado');
+        if (r.canal && selCanal) {
+            garantirOpcao(selCanal, r.canal);
+            selCanal.value = r.canal;
+            travarCampoAgenda(selCanal, true);
+        } else travarCampoAgenda(selCanal, false);
+        mostrarCanalInfo();
+        // Horário de início e fim
+        const ini = document.getElementById('start_time'), fim = document.getElementById('end_time');
+        if (r.inicio && ini) { ini.value = r.inicio; travarCampoAgenda(ini, true); }
+        if (r.fim && fim) { fim.value = r.fim; travarCampoAgenda(fim, true); }
+        // Antecipação: aula da grade no próprio dia = não; aula marcada na Agenda = o que o chefe informou
+        const ant = document.getElementById('solicitante_antecipacao');
+        SOLICITANTE_AGENDA = null;
+        EXIBICAO_AGENDA = r.exibicao_antecipada || null;
+        if (ant) {
+            if (EXIBICAO_AGENDA) {
+                // Exibição de aula gravada antes (o chefe ligou a gravação a esta aula na Agenda)
+                SOLICITANTE_AGENDA = EXIBICAO_AGENDA.solicitante || null;
+                ant.value = 'SIM';
+                travarCampoAgenda(ant, true);
+            } else if (!r.tipo_agenda) {
+                ant.value = '';
+                travarCampoAgenda(ant, false);
+            } else if (r.solicitante_antecipacao) {
+                SOLICITANTE_AGENDA = r.solicitante_antecipacao;
+                ant.value = 'SIM';
+                travarCampoAgenda(ant, true);
+            }
+            if (typeof toggleAntecipacaoLogic === 'function') toggleAntecipacaoLogic();
+        }
+        // Reposição marcada na Agenda pelo diretor-chefe para esta aula: já vem preenchida e travada
+        REPOSICAO_AGENDA = r.reposicao_agendada || null;
+        const selRep = document.getElementById('reposicao');
+        if (selRep) {
+            if (REPOSICAO_AGENDA) {
+                selRep.value = 'SIM';
+                travarCampoAgenda(selRep, true);
+                const ex = document.getElementById('data_execucao_real');
+                ex.value = REPOSICAO_AGENDA.data_gravacao;
+                travarCampoAgenda(ex, true);
+                if (REPOSICAO_AGENDA.estudio_gravacao) {
+                    const est = document.getElementById('estudio');
+                    garantirOpcao(est, REPOSICAO_AGENDA.estudio_gravacao);
+                    est.value = REPOSICAO_AGENDA.estudio_gravacao;
+                }
+            } else {
+                travarCampoAgenda(selRep, false);
+                travarCampoAgenda(document.getElementById('data_execucao_real'), false);
+            }
+            toggleReposicao();
+        }
+        aplicarProfessorExibicao();
+        // Chamado informado pelo chefe
+        const tk = document.getElementById('ticket_number');
+        if (r.chamado && tk && !tk.value) tk.value = r.chamado;
+        const chAnt = document.getElementById('chamado_antecipacao_input');
+        if (r.chamado && chAnt && !chAnt.value) chAnt.value = r.chamado;
+    }
+    function travarLinkDaAgenda(link) {
+        const yt = document.getElementById('youtube_link');
+        if (!yt) return;
+        if (link) yt.value = link;
+        if (link || DADOS_DA_GRADE_TRAVADOS) {
+            // Aula da grade: o link vem do que o diretor-chefe cadastrou na Agenda e não é digitado aqui
+            yt.readOnly = true;
+            yt.dataset.daAgenda = '1';
+        } else if (yt.dataset.daAgenda) {
+            yt.readOnly = false;
+            delete yt.dataset.daAgenda;
+        }
+    }
+    function liberarEstudio(msg, cor) {
+        travarLinkDaAgenda(null);
+        REPOSICAO_AGENDA = null;
+        ['diretor_imagem_id', 'canal_utilizado', 'start_time', 'end_time', 'solicitante_antecipacao', 'reposicao', 'data_execucao_real']
+            .forEach(id => travarCampoAgenda(document.getElementById(id), false));
+        const sel = document.getElementById('estudio');
+        const hint = document.getElementById('estudio-agenda-hint');
+        sel.disabled = false;
+        sel.title = '';
+        if (msg) { hint.textContent = msg; hint.style.color = cor || 'var(--text-muted)'; hint.style.display = 'block'; }
+        else hint.style.display = 'none';
+    }
+    async function atualizarEstudioPelaAgenda() {
+        if (isEditing) { liberarEstudio(''); return; }   // relatório já salvo: mantém o estúdio gravado
+        const regular = document.getElementById('regular').value !== 'Não';
+        const turma = document.getElementById('turma_id').value;
+        const data = document.getElementById('data_aula').value;
+        const horario = document.getElementById('horario_aula').value;
+        const inicio = document.getElementById('start_time').value;
+        if (!regular || !turma || !data || (!horario && !inicio)) { liberarEstudio(''); return; }
+        const p = new URLSearchParams({ turma_id: turma, data });
+        if (horario) p.set('horario', horario); else p.set('inicio', inicio);
+        const turno = document.getElementById('turno').value;
+        if (turno) p.set('turno', turno);
+        const disc = document.getElementById('disciplina_id').value;
+        if (disc) p.set('disciplina_id', disc);
+        // Aberto pela lista "Aulas marcadas na Agenda" da grade: usa o agendamento dessa aula
+        const agendaId = new URLSearchParams(window.location.search).get('agenda');
+        if (agendaId && horario && horario.includes('às')) p.set('agendamento_id', agendaId);
+        const seq = ++seqEstudioAgenda;
+        try {
+            const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+            const res = await fetch(`/api/v1/agenda-estudios/estudio-da-aula?${p}`, { headers: { 'Authorization': `Bearer ${token}` } });
+            if (seq !== seqEstudioAgenda) return;
+            if (!res.ok) { liberarEstudio(''); return; }
+            const r = await res.json();
+            if (seq !== seqEstudioAgenda) return;
+            if (!r.encontrado) {
+                liberarEstudio('Aula não encontrada na Agenda de Estúdios para esse horário — selecione o estúdio.', 'var(--status-yellow)');
+                return;
+            }
+            const sel = document.getElementById('estudio');
+            if (!Array.from(sel.options).some(o => o.value === r.estudio)) {
+                sel.insertAdjacentHTML('beforeend', `<option value="${r.estudio.replace(/"/g, '&quot;')}">${r.estudio.replace(/</g, '&lt;')}</option>`);
+            }
+            sel.value = r.estudio;
+            sel.disabled = true;
+            sel.title = 'Definido pela Agenda de Estúdios (diretor-chefe)';
+            const hint = document.getElementById('estudio-agenda-hint');
+            let msg = `🎬 Definido pela Agenda de Estúdios (diretor-chefe)${r.disciplina ? ' · ' + r.disciplina : ''} · ${r.inicio}–${r.fim}`;
+            if (r.remanejada) msg += ` · remanejada neste dia: ${r.estudio_grade} → ${r.estudio}`;
+            hint.style.color = 'var(--text-muted)';
+            if (r.cancelada) { msg += ' · ⚠️ aula marcada como cancelada neste dia na Agenda'; hint.style.color = 'var(--status-yellow)'; }
+            hint.textContent = msg;
+            hint.style.display = 'block';
+            // Tudo o que o diretor-chefe definiu na Agenda entra no relatório
+            aplicarDadosDaAgenda(r);
+            if (r.tipo_agenda_label) msg += ` · ${r.tipo_agenda_label}`;
+            hint.textContent = msg;
+            if (r.antecipada) aplicarAntecipacaoDaAgenda(r);
+            // Link do YouTube do dia, informado pelo diretor-chefe para o estúdio e turno: travado
+            travarLinkDaAgenda(r.youtube_link);
+        } catch (e) {
+            if (seq === seqEstudioAgenda) liberarEstudio('');
+        }
+    }
+
+    async function loadCanaisIptv() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/configuracoes/canais-iptv', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const canais = await res.json();
+                const sel = document.getElementById('canal_utilizado');
+                sel.innerHTML = '<option value="">Selecione o canal...</option>';
+                canais.forEach(c => {
+                    sel.innerHTML += `<option value="${c.nome}">${c.nome} (Ch.${c.numero})</option>`;
+                });
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // Disciplinas: com turma escolhida, só as da grade da turma na data da aula.
+    // Só mostra todas quando a turma não tem disciplina na grade ou quando a
+    // disciplina de um relatório já salvo não está na grade atual.
+    async function buscarDisciplinas(turmaId) {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const dataAula = document.getElementById('data_aula')?.value;
+        const url = turmaId
+            ? `/api/v1/reports/lookup/disciplinas?turma_id=${encodeURIComponent(turmaId)}${dataAula ? `&data=${dataAula}` : ''}`
+            : '/api/v1/reports/lookup/disciplinas';
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+        return res.ok ? res.json() : [];
+    }
+
+    async function carregarDisciplinas(disciplinaDesejada) {
+        const turmaId = document.getElementById('turma_id').value;
+        let discs = [];
+        let daTurma = false;
+        if (turmaId) {
+            discs = await buscarDisciplinas(turmaId);
+            daTurma = discs.length > 0;
+            if (daTurma && disciplinaDesejada && !discs.some(d => d.id === disciplinaDesejada)) {
+                daTurma = false;
+            }
+        }
+        if (!daTurma) discs = await buscarDisciplinas(null);
+
+        const sel = document.getElementById('disciplina_id');
+        let html = '<option value="">Selecione a disciplina...</option>';
+        discs.forEach(d => { html += `<option value="${d.id}">${d.nome}</option>`; });
+        sel.innerHTML = html;
+        sel.dataset.daTurma = daTurma ? '1' : '';
+        // TASK 11: Unlock disciplina after turma is selected (aula aberta pela grade: continua travada)
+        sel.disabled = DADOS_DA_GRADE_TRAVADOS;
+    }
+
+    // Reunião (out/2026): turma, disciplina, horário e data vêm da grade/Agenda e ficam travados.
+    // O professor continua aberto (pode haver substituição).
+    let DADOS_DA_GRADE_TRAVADOS = false;
+    function travarDadosDaGrade() {
+        if (document.getElementById('regular').value === 'Não') return;  // registro antigo de aula avulsa
+        if (!document.getElementById('turma_id').value || !document.getElementById('disciplina_id').value) return;
+        DADOS_DA_GRADE_TRAVADOS = true;
+        // Só impede a alteração: os dados são puxados automaticamente, sem aviso na tela
+        const busca = document.getElementById('turma_busca');
+        if (busca) { busca.readOnly = true; busca.disabled = true; busca.removeAttribute('list'); }
+        ['turma_id', 'disciplina_id', 'horario_aula', 'turno'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && (id !== 'turno' || el.value)) el.disabled = true;
+        });
+        const data = document.getElementById('data_aula');
+        if (data) data.readOnly = true;
+        const yt = document.getElementById('youtube_link');
+        if (yt) { yt.readOnly = true; yt.dataset.daAgenda = '1'; }
+    }
+
+    async function onDisciplinaSelect() {
+        await onDisciplinaChange();
+        updateNaming();
+    }
+
+    async function onTurmaChange(disciplinaDesejada) {
+        if (typeof disciplinaDesejada !== 'string') disciplinaDesejada = null;
+        try {
+            await carregarDisciplinas(disciplinaDesejada);
+        } catch (e) { console.error(e); }
+
+        // Caminho 2: detecta modalidade e ativa modo TECNICO se aplicavel
+        const turmaSelect = document.getElementById('turma_id');
+        const selectedOption = turmaSelect.options[turmaSelect.selectedIndex];
+        const modalidade = (selectedOption?.dataset?.modalidade || '').toUpperCase();
+        toggleTecnicoMode(modalidade === 'TECNICO');
+
+        fetchDriveSuggestions();
+    }
+
+    async function onDisciplinaChange() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const discId = document.getElementById('disciplina_id').value;
+        if (!discId) return;
+
+        try {
+            const res = await fetch(`/api/v1/reports/lookup/professores-por-disciplina/${discId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const profs = await res.json();
+                const sel = document.getElementById('professor_id');
+                const inpProf = document.getElementById('professor_busca');
+                const dlProf = document.getElementById('professores_datalist');
+                sel.disabled = false;
+                if (dlProf) dlProf.innerHTML = '';
+                if (profs.length === 0) {
+                    sel.innerHTML = '<option value="">Nenhum professor vinculado a esta disciplina</option>';
+                    sel.disabled = true;
+                    if (inpProf) { inpProf.disabled = true; inpProf.placeholder = 'Nenhum professor vinculado'; inpProf.value = ''; }
+                } else {
+                    sel.innerHTML = '<option value="">Selecione o professor...</option>';
+                    if (inpProf) { inpProf.disabled = false; inpProf.placeholder = 'Digite para buscar o professor...'; }
+                    profs.forEach(p => {
+                        sel.innerHTML += `<option value="${p.id}">${p.nome}</option>`;
+                        if (dlProf) dlProf.innerHTML += `<option value="${p.nome}"></option>`;
+                    });
+                }
+                sincronizarProfessorBusca();
+
+                // Substituto: professores da disciplina primeiro, sem o titular
+                professoresDaDisciplina = profs;
+                atualizarSubstitutos();
+                aplicarProfessorExibicao();
+            }
+        } catch (e) { console.error(e); }
+        fetchDriveSuggestions();
+    }
+
+    async function loadAllProfessores() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch('/api/v1/reports/lookup/professores', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                todosProfessores = await res.json();
+                atualizarSubstitutos();
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    // Professor substituto: só os professores vinculados à disciplina,
+    // sem o professor titular já escolhido no campo Professor(a).
+    let todosProfessores = [];
+    let professoresDaDisciplina = [];
+
+    function atualizarSubstitutos() {
+        const selSub = document.getElementById('professor_substituto_id');
+        const inpSub = document.getElementById('substituto_busca');
+        const dlSub = document.getElementById('substitutos_datalist');
+        if (!selSub) return;
+        const titular = document.getElementById('professor_id').value;
+        const atual = selSub.value;
+        const esc = (t) => String(t || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        const opcoes = professoresDaDisciplina.filter(p => p.id !== titular);
+
+        let html;
+        if (dlSub) dlSub.innerHTML = '';
+        if (!document.getElementById('disciplina_id').value) {
+            html = '<option value="">Selecione a disciplina primeiro...</option>';
+            if (inpSub) { inpSub.disabled = true; inpSub.placeholder = 'Selecione a disciplina primeiro...'; inpSub.value = ''; }
+        } else if (!opcoes.length) {
+            html = '<option value="">Nenhum outro professor vinculado a esta disciplina</option>';
+            if (inpSub) { inpSub.disabled = true; inpSub.placeholder = 'Nenhum outro professor vinculado'; inpSub.value = ''; }
+        } else {
+            html = '<option value="">Selecione...</option>' +
+                opcoes.map(p => `<option value="${p.id}">${esc(p.nome)}</option>`).join('');
+            if (inpSub) { inpSub.disabled = false; inpSub.placeholder = 'Digite para buscar substituto...'; }
+            if (dlSub) {
+                opcoes.forEach(p => { dlSub.innerHTML += `<option value="${p.nome}"></option>`; });
+            }
+        }
+        selSub.innerHTML = html;
+        if (atual && atual !== titular && Array.from(selSub.options).some(o => o.value === atual)) {
+            selSub.value = atual;
+        }
+        sincronizarSubstitutoBusca();
+    }
+
+    // ─── Sincronização de Autocomplete (Turma e Professores) ───
+    function sincronizarTurmaBusca() {
+        const sel = document.getElementById('turma_id');
+        const inp = document.getElementById('turma_busca');
+        if (!sel || !inp) return;
+        const opt = sel.options[sel.selectedIndex];
+        if (opt && opt.value) {
+            inp.value = opt.textContent;
+        } else if (!sel.value) {
+            inp.value = '';
+        }
+    }
+
+    function onTurmaBuscaInput() {
+        const inp = document.getElementById('turma_busca');
+        const sel = document.getElementById('turma_id');
+        if (!inp || !sel) return;
+        const val = inp.value.trim().toLowerCase();
+        const opt = Array.from(sel.options).find(o =>
+            o.textContent.toLowerCase() === val ||
+            (o.dataset.nomenclatura && o.dataset.nomenclatura.toLowerCase() === val)
+        );
+        if (opt && opt.value) {
+            if (sel.value !== opt.value) {
+                sel.value = opt.value;
+                onTurmaChange();
+                updateNaming();
+            }
+        } else if (!val) {
+            if (sel.value !== '') {
+                sel.value = '';
+                onTurmaChange();
+                updateNaming();
+            }
+        }
+    }
+
+    function onTurmaBuscaChange() {
+        onTurmaBuscaInput();
+        sincronizarTurmaBusca();
+    }
+
+    function sincronizarProfessorBusca() {
+        const sel = document.getElementById('professor_id');
+        const inp = document.getElementById('professor_busca');
+        if (!sel || !inp) return;
+        const opt = sel.options[sel.selectedIndex];
+        if (opt && opt.value) {
+            inp.value = opt.textContent;
+        } else if (!sel.value) {
+            inp.value = '';
+        }
+    }
+
+    function onProfessorBuscaInput() {
+        const inp = document.getElementById('professor_busca');
+        const sel = document.getElementById('professor_id');
+        if (!inp || !sel) return;
+        const val = inp.value.trim().toLowerCase();
+        const opt = Array.from(sel.options).find(o => o.textContent.toLowerCase() === val);
+        if (opt && opt.value) {
+            if (sel.value !== opt.value) {
+                sel.value = opt.value;
+                atualizarSubstitutos();
+            }
+        } else if (!val) {
+            if (sel.value !== '') {
+                sel.value = '';
+                atualizarSubstitutos();
+            }
+        }
+    }
+
+    function onProfessorBuscaChange() {
+        onProfessorBuscaInput();
+        sincronizarProfessorBusca();
+    }
+
+    function sincronizarSubstitutoBusca() {
+        const sel = document.getElementById('professor_substituto_id');
+        const inp = document.getElementById('substituto_busca');
+        if (!sel || !inp) return;
+        const opt = sel.options[sel.selectedIndex];
+        if (opt && opt.value) {
+            inp.value = opt.textContent;
+        } else if (!sel.value) {
+            inp.value = '';
+        }
+    }
+
+    function onSubstitutoBuscaInput() {
+        const inp = document.getElementById('substituto_busca');
+        const sel = document.getElementById('professor_substituto_id');
+        if (!inp || !sel) return;
+        const val = inp.value.trim().toLowerCase();
+        const opt = Array.from(sel.options).find(o => o.textContent.toLowerCase() === val);
+        if (opt && opt.value) {
+            sel.value = opt.value;
+        } else if (!val) {
+            sel.value = '';
+        }
+    }
+
+    function onSubstitutoBuscaChange() {
+        onSubstitutoBuscaInput();
+        sincronizarSubstitutoBusca();
+    }
+
+    async function loadExistingReport(reportId) {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/${reportId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const r = await res.json();
+                
+                // Set metadata states
+                document.getElementById('data_aula').value = r.data_aula;
+                document.getElementById('turno').value = r.turno;
+                document.getElementById('estudio').value = r.estudio;
+                document.getElementById('horario_aula').value = r.horario_aula;
+                document.getElementById('regular').value = r.regular;
+                
+                // Set Turma & Discipline (ensure options are loaded)
+                document.getElementById('turma_id').value = r.turma_id;
+                await onTurmaChange(r.disciplina_id);
+                document.getElementById('disciplina_id').value = r.disciplina_id;
+                await onDisciplinaChange();
+                document.getElementById('professor_id').value = r.professor_id;
+                atualizarSubstitutos();
+                if (r.professor_substituto_id) {
+                    document.getElementById('professor_substituto_id').value = r.professor_substituto_id;
+                }
+                sincronizarTurmaBusca();
+                sincronizarProfessorBusca();
+                sincronizarSubstitutoBusca();
+
+                // Execution Details
+                document.getElementById('tipo_aula').value = r.tipo_aula;
+                document.getElementById('canal_utilizado').value = r.canal_utilizado;
+                if (r.canal_utilizado && document.getElementById('canal_utilizado').value !== r.canal_utilizado) {
+                    garantirOpcao(document.getElementById('canal_utilizado'), r.canal_utilizado);
+                    document.getElementById('canal_utilizado').value = r.canal_utilizado;
+                }
+                mostrarCanalInfo();
+
+                // Parse reverso para TECNICO
+                const tSelect = document.getElementById('turma_id');
+                const tOption = tSelect.options[tSelect.selectedIndex];
+                const modUpper = (tOption?.dataset?.modalidade || '').toUpperCase();
+
+                if (modUpper === 'TECNICO') {
+                    const match = r.conteudo_ministrado.match(/^AULA\s+(\d{2})\s+(.+)$/i);
+                    if (match) {
+                        document.getElementById('numero_aula').value = match[1];
+                        document.getElementById('conteudo_ministrado').value = match[2];
+                    } else {
+                        document.getElementById('conteudo_ministrado').value = r.conteudo_ministrado;
+                        if (typeof showToast === 'function') {
+                            showToast("Não foi possível interpretar o conteúdo salvo. Preencha manualmente.", "error");
+                        }
+                    }
+                } else {
+                    document.getElementById('conteudo_ministrado').value = r.conteudo_ministrado;
+                }
+                document.getElementById('interacao_professor_aluno').value = r.interacao_professor_aluno;
+                document.getElementById('interacao_outras_desc').value = r.interacao_outras_desc || '';
+                document.getElementById('atividade_pratica').value = r.atividade_pratica || '';
+                document.getElementById('observacoes').value = r.observacoes || '';
+
+                // Recursion / Materials
+                if (r.tipo_recursos_utilizados) {
+                    r.tipo_recursos_utilizados.forEach(val => {
+                        const cb = document.querySelector(`.recurso-check[value="${val}"]`);
+                        if (cb) cb.checked = true;
+                    });
+                }
+                document.getElementById('recursos_outro_desc').value = r.recursos_outro_desc || '';
+                document.getElementById('problema_material').value = r.problema_material;
+                const fieldProbOutro = document.getElementById('problema_material_outro_desc');
+                if (fieldProbOutro) fieldProbOutro.value = r.problema_material_outro_desc || '';
+
+                // New Fields
+                if (r.escolas_participantes) {
+                    escolasParticipantes = r.escolas_participantes;
+                    renderEscolasTags();
+                }
+                if (r.problematic_materials) {
+                    problematicMaterials = r.problematic_materials;
+                    renderProblemasTags();
+                }
+                if (r.bncc_habilidades) {
+                    document.getElementById('bncc_habilidades').value = r.bncc_habilidades;
+                }
+                if (r.diretor_imagem_id) {
+                    document.getElementById('diretor_imagem_id').value = r.diretor_imagem_id;
+                }
+                if (!r.professor_id && r.professor_nome_externo) {
+                    document.getElementById('professor_legacy_nome').value = r.professor_nome_externo;
+                    document.getElementById('professor_legacy_container').style.display = 'block';
+                }
+                document.getElementById('youtube_link').value = r.youtube_link || '';
+                document.getElementById('needs_editing').value = String(r.needs_editing || false);
+                document.getElementById('ticket_number').value = r.ticket_number || '';
+                if (r.start_time) document.getElementById('start_time').value = r.start_time.substring(0, 5);
+                if (r.end_time) document.getElementById('end_time').value = r.end_time.substring(0, 5);
+                // Caminho 2: restaura numero_aula
+                if (r.numero_aula) {
+                    const numInput = document.getElementById('numero_aula');
+                    if (numInput) numInput.value = r.numero_aula;
+                }
+
+                // Demandas Outubro 2026: Antecipação e Referência
+                if (r.solicitante_antecipacao) {
+                    // SEDUC/PROFESSOR foram definidos na Agenda: o relatório guarda e não deixa mudar aqui
+                    if (['SEDUC', 'PROFESSOR'].includes(r.solicitante_antecipacao)) SOLICITANTE_AGENDA = r.solicitante_antecipacao;
+                    document.getElementById('solicitante_antecipacao').value = 'SIM';
+                    toggleAntecipacaoLogic();
+                    if (r.ticket_number) {
+                        document.getElementById('chamado_antecipacao_input').value = r.ticket_number;
+                    }
+                }
+                if ((r.motivo_referencia || '').startsWith('Exibição da aula gravada antecipadamente em')) {
+                    MOTIVO_EXIBICAO_SALVO = r.motivo_referencia;
+                }
+                if (r.data_execucao_real) {
+                    document.getElementById('data_execucao_real').value = r.data_execucao_real;
+                    if (r.data_aula && r.data_execucao_real > r.data_aula) {
+                        document.getElementById('reposicao').value = 'SIM';
+                        toggleReposicao();
+                    }
+                }
+                if (r.data_referencia_aula) {
+                    document.getElementById('data_referencia_aula').value = r.data_referencia_aula;
+                    atualizarIndicativoReposicao();
+                }
+
+                // Compliance
+                document.getElementById('teve_substituicao').value = String(r.teve_substituicao);
+                if (r.teve_substituicao) {
+                    if (r.professor_substituto_id) {
+                        // Relatório antigo com substituto fora da disciplina: mantém o registro
+                        const selSubst = document.getElementById('professor_substituto_id');
+                        if (!Array.from(selSubst.options).some(o => o.value === r.professor_substituto_id)) {
+                            const prof = todosProfessores.find(p => p.id === r.professor_substituto_id);
+                            const opt = document.createElement('option');
+                            opt.value = r.professor_substituto_id;
+                            opt.textContent = prof ? prof.nome : (r.professor_substituto_nome || 'Professor registrado');
+                            selSubst.appendChild(opt);
+                        }
+                        selSubst.value = r.professor_substituto_id;
+                    } else if (r.professor_substituto_nome_externo) {
+                        document.getElementById('substituto_legacy_nome').value = r.professor_substituto_nome_externo;
+                        document.getElementById('substituto_legacy_container').style.display = 'block';
+                    }
+                }
+                document.getElementById('teve_atraso').value = String(r.teve_atraso);
+                if (r.teve_atraso) {
+                    document.getElementById('minutos_atraso').value = r.minutos_atraso || '';
+                    document.getElementById('observacao_atraso').value = r.observacao_atraso || '';
+                }
+
+                // Initial UI Toggles based on loaded data
+                toggleFormLogic();
+                toggleConditional('interacao');
+                toggleConditional('recurso');
+                toggleConditional('substituicao');
+                toggleConditional('atraso');
+                
+                document.getElementById('char-count').textContent = r.conteudo_ministrado.length;
+            }
+        } catch (e) {
+            console.error('Error loading report:', e);
+            showToast('Erro ao carregar relatório existente.', 'error');
+        }
+    }
+
+    // ─── Caminho 2: Toggle modo TECNICO ─────────────────────────────
+    function toggleTecnicoMode(isTecnico) {
+        const field = document.getElementById('numero-aula-field');
+        const input = document.getElementById('numero_aula');
+        if (field) field.style.display = isTecnico ? 'flex' : 'none';
+        if (input) input.required = isTecnico;
+        
+        const warningGeminada = document.getElementById('warning-geminada');
+        if (warningGeminada) {
+            warningGeminada.style.display = isTecnico ? 'none' : 'inline';
+        }
+        
+        updateNaming();
+    }
+
+    function sanitizeNumeroAula(input) {
+        // 1. Remove qualquer caractere que não seja dígito
+        let val = input.value.replace(/\D/g, '');
+
+        // 2. Limita a 4 dígitos
+        if (val.length > 4) val = val.slice(0, 4);
+
+        // 3. Atualiza o campo com o valor limpo
+        input.value = val;
+    }
+
+    function formatarNumeroAula(val) {
+        // Garante que só há dígitos
+        val = String(val).replace(/\D/g, '');
+
+        // Valor vazio → retorna vazio (campo não preenchido)
+        if (!val) return '';
+
+        // Remove zeros à esquerda desnecessários
+        // "0100" → "100", "01" → "1" antes do padding
+        val = String(parseInt(val, 10));
+
+        // Aplica padding mínimo de 2 dígitos
+        // "1" → "01", "5" → "05", "100" → "100", "1000" → "1000"
+        return val.padStart(2, '0');
+    }
+
+    // ─── Naming Engine Preview (§5.2 Crítico) ───────────────────────
+    function removeAccents(str) {
+        // Desativado para acompanhar a preservação de acentos do Backend
+        return str;
+    }
+
+    function sanitize(str) {
+        let s = removeAccents(str);
+        // 1. Remove caracteres proibidos do Windows (mantém hífen e underscore por enquanto)
+        s = s.replace(/[\\/:*?"<>|]/g, '');
+        // 2. Substitui hífen e underscore por espaço (como no backend naming_engine.py:60)
+        s = s.replace(/[\-_]/g, ' ');
+        // 3. Normaliza espaços
+        s = s.replace(/\s+/g, ' ').trim();
+        return s.toUpperCase();
+    }
+
+    function updateNaming() {
+        const turmaSelect = document.getElementById('turma_id');
+        const selected = turmaSelect.options[turmaSelect.selectedIndex];
+        const nomenclatura = selected?.dataset?.nomenclatura || '';
+        const modalidade = (selected?.dataset?.modalidade || '').toUpperCase();
+        const discSelect = document.getElementById('disciplina_id');
+        const disciplina = discSelect.options[discSelect.selectedIndex]?.text || '';
+        const dataAula = document.getElementById('data_aula').value;
+        const conteudo = document.getElementById('conteudo_ministrado').value;
+
+        // ── MODO TECNICO ────────────────────────────────────────────
+        if (modalidade === 'TECNICO') {
+            const numeroAula = (document.getElementById('numero_aula')?.value || '').trim();
+            const numPadded = formatarNumeroAula(numeroAula);
+            const discUp = disciplina.trim().toUpperCase();
+
+            // Limite dinâmico para TECNICO: 128 - "AULA NN " - disciplina - " " - ".mp4"
+            const prefixoTec = `AULA ${numPadded || '00'} ${discUp}`.trimEnd();
+            const limiteDinamico = Math.max(0, 128 - prefixoTec.length - 1 - 4); // 1 espaço + .mp4
+            const inputConteudo = document.getElementById('conteudo_ministrado');
+            inputConteudo.maxLength = limiteDinamico;
+            inputConteudo.placeholder = `Conteúdo em até ${limiteDinamico} caracteres...`;
+            if (inputConteudo.value.length > limiteDinamico) {
+                inputConteudo.value = inputConteudo.value.substring(0, limiteDinamico);
+            }
+            document.getElementById('char-limit-display').textContent = limiteDinamico;
+            document.getElementById('char-limit-counter').textContent = limiteDinamico;
+            document.getElementById('char-count').textContent = inputConteudo.value.length;
+
+            if (!disciplina || !conteudo) {
+                document.getElementById('naming-output').textContent = 'Preencha Disciplina, Nº da Aula e Conteúdo...';
+                return;
+            }
+            const contSan = sanitize(conteudo);
+            let nomeTec = [prefixoTec, contSan].filter(p => p).join(' ');
+            nomeTec = nomeTec.replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+            document.getElementById('naming-output').textContent = nomeTec ? `${nomeTec}.mp4` : 'Preencha os campos acima...';
+            return;
+        }
+
+        // ── MODO REGULAR / UAPI (comportamento original intacto) ─────
+        // Format date: DD MM YY
+        let dataStr = '';
+        if (dataAula) {
+            const d = new Date(dataAula + 'T00:00:00');
+            dataStr = String(d.getDate()).padStart(2, '0') + ' ' +
+                String(d.getMonth() + 1).padStart(2, '0') + ' ' +
+                String(d.getFullYear()).toString().slice(-2);
+        }
+
+        // Calcula o prefixo (tudo antes do conteúdo)
+        const prefixoParts = [
+            removeAccents(nomenclatura).toUpperCase(),
+            removeAccents(disciplina).toUpperCase(),
+            dataStr,
+        ].filter(p => p);
+        const prefixoCompleto = prefixoParts.join(' ') + (prefixoParts.length > 0 ? ' ' : '');
+
+        // Limite dinâmico: 128 total - prefixo - 4 caracteres do ".mp4"
+        const limiteDinamico = Math.max(0, 128 - prefixoCompleto.length - 4);
+
+        // Atualiza maxlength do input
+        const inputConteudo = document.getElementById('conteudo_ministrado');
+        inputConteudo.maxLength = limiteDinamico;
+        inputConteudo.placeholder = `Descreva o conteúdo em até ${limiteDinamico} caracteres...`;
+
+        // Trunca o valor atual se exceder o novo limite
+        if (inputConteudo.value.length > limiteDinamico) {
+            inputConteudo.value = inputConteudo.value.substring(0, limiteDinamico);
+        }
+
+        // Atualiza label e contadores na UI
+        document.getElementById('char-limit-display').textContent = limiteDinamico;
+        document.getElementById('char-limit-counter').textContent = limiteDinamico;
+        document.getElementById('char-count').textContent = inputConteudo.value.length;
+
+        // Gera o preview do nome completo
+        if (!nomenclatura && !conteudo) {
+            document.getElementById('naming-output').textContent = 'Preencha os campos acima...';
+            return;
+        }
+
+        const allParts = [
+            ...prefixoParts,
+            sanitize(conteudo),
+        ].filter(p => p);
+
+        // APLICAR LIMPEZA FINAL IGUAL AO BACKEND (naming_engine.py:60)
+        let nomeFinal = allParts.join(' ');
+        nomeFinal = nomeFinal.replace(/[\-_]/g, ' '); // Substitui hifens e underscores por espaço
+        nomeFinal = nomeFinal.replace(/\s+/g, ' ').trim(); // Normaliza espaços
+        
+        // Adiciona .mp4 para ficar idêntico ao banco
+        const previewCompleto = nomeFinal ? `${nomeFinal}.mp4` : 'Preencha os campos acima...';
+
+        document.getElementById('naming-output').textContent = previewCompleto;
+    }
+
+    function toggleFormLogic() {
+        const isAvulsa = document.getElementById('regular').value === 'Não';
+        const isGravacao = (document.getElementById('tipo_aula').value || '').toLowerCase().includes('gravação');
+        const hasProblemaMaterial = document.getElementById('problema_material').value === 'Sim';
+
+        // 1. Grade vs Avulsa fields
+        document.getElementById('grade-fields').style.display = isAvulsa ? 'none' : '';
+        document.getElementById('avulsa-fields').classList.toggle('visible', isAvulsa);
+        document.getElementById('interacoes-fields').style.display = isAvulsa ? 'none' : '';
+
+        // Update requirements based on visibility
+        document.getElementById('turma_id').required = !isAvulsa;
+        document.getElementById('disciplina_id').required = !isAvulsa;
+        document.getElementById('professor_id').required = !isAvulsa && !EXIBICAO_AGENDA;
+
+        // Canal vem da grade/Agenda (não é escolhido pelo assistente)
+        document.getElementById('canal_utilizado').required = false;
+        
+        if (isAvulsa) {
+            document.getElementById('ticket_number').focus();
+        }
+        
+        // 2. Section Gravação/YouTube (Sempre visível pois é obrigatório para finalizar)
+        document.getElementById('section-gravacao').classList.add('visible');
+
+        // 3. Problema Específico
+        document.getElementById('field-problema-detalhes').classList.toggle('visible', hasProblemaMaterial);
+
+        // 4. Mês de Execução x Mês de Referência (Item 9 & Caso 2)
+        const solAntecipacao = document.getElementById('solicitante_antecipacao')?.value || '';
+        const ehReposicao = document.getElementById('reposicao')?.value === 'SIM';
+        const secaoRef = document.getElementById('secao-mes-referencia');
+        if (secaoRef) {
+            // Data da gravação: na reposição (gravada ou transmitida) e na gravação antecipada da Agenda
+            const deveMostrar = ehReposicao || (solAntecipacao !== '' && !EXIBICAO_AGENDA);
+            secaoRef.style.display = deveMostrar ? 'block' : 'none';
+            if (deveMostrar) {
+                const dataAulaVal = document.getElementById('data_aula')?.value;
+                const dtExec = document.getElementById('data_execucao_real');
+                if (dtExec && !dtExec.value && dataAulaVal) {
+                    dtExec.value = dataAulaVal;
+                }
+            }
+        }
+    }
+
+    /** Gravação antecipada marcada na Agenda: preenche a antecipação e as datas de execução/referência. */
+    function aplicarAntecipacaoDaAgenda(r) {
+        const sel = document.getElementById('solicitante_antecipacao');
+        if (!sel) return;
+        if (!sel.value && r.solicitante_antecipacao) {
+            SOLICITANTE_AGENDA = r.solicitante_antecipacao;
+            sel.value = 'SIM';
+            toggleAntecipacaoLogic();
+        }
+        const ch = document.getElementById('chamado_antecipacao_input');
+        if (ch && !ch.value && r.chamado) ch.value = r.chamado;
+        const exec = document.getElementById('data_execucao_real');
+        if (exec && !exec.value) exec.value = document.getElementById('data_aula').value;
+        const ref = document.getElementById('data_referencia_aula');
+        if (ref && !ref.value && r.data_referencia) {
+            ref.value = r.data_referencia;
+            if (typeof atualizarIndicativoReposicao === 'function') atualizarIndicativoReposicao();
+        }
+    }
+
+    // Pedido da SEDUC e exibição de aula antecipada: vêm da Agenda (diretor-chefe)
+    let SOLICITANTE_AGENDA = null;
+    let EXIBICAO_AGENDA = null;
+    let MOTIVO_EXIBICAO_SALVO = null;
+    let REPOSICAO_AGENDA = null;
+
+    /** Reposição? Sim → data da gravação obrigatória (depois da data da aula). */
+    function toggleReposicao() {
+        const sim = document.getElementById('reposicao')?.value === 'SIM';
+        const ex = document.getElementById('data_execucao_real');
+        const lbl = document.getElementById('label-data-execucao');
+        if (ex) {
+            ex.required = sim;
+            if (!sim && !ex.dataset.daAgenda && !document.getElementById('solicitante_antecipacao').value) ex.value = '';
+            if (sim && ex.value && ex.value === document.getElementById('data_aula')?.value) ex.value = '';
+        }
+        if (lbl) lbl.innerHTML = sim
+            ? 'Data da gravação/transmissão da reposição <span style="color:var(--status-red);">*</span>'
+            : 'Data da gravação';
+        atualizarIndicativoReposicao();
+        toggleFormLogic();
+    }
+
+    /** Exibição de aula gravada antes: o professor é contado na gravação, aqui fica vazio e travado. */
+    function aplicarProfessorExibicao() {
+        const inp = document.getElementById('professor_busca');
+        const sel = document.getElementById('professor_id');
+        if (!inp || !sel) return;
+        if (EXIBICAO_AGENDA) {
+            sel.value = '';
+            inp.value = '';
+            inp.disabled = true;
+            inp.dataset.exibicao = '1';
+            inp.placeholder = 'Exibição de aula gravada antes — o professor conta na gravação';
+            sel.required = false;
+        } else if (inp.dataset.exibicao) {
+            delete inp.dataset.exibicao;
+            inp.disabled = sel.disabled;
+            inp.placeholder = 'Digite para buscar o professor...';
+        }
+    }
+
+    function reposicaoInvalida() {
+        if (document.getElementById('reposicao')?.value !== 'SIM') return null;
+        const ex = document.getElementById('data_execucao_real')?.value;
+        const aula = document.getElementById('data_aula')?.value;
+        if (!ex) return 'Reposição: informe a data da gravação/transmissão.';
+        if (aula && ex <= aula) return 'Reposição: a data da gravação/transmissão precisa ser depois da data da aula.';
+        return null;
+    }
+
+    function mostrarCanalInfo() {
+        const sel = document.getElementById('canal_utilizado');
+        const info = document.getElementById('canal-info');
+        if (!info) return;
+        info.textContent = (sel && sel.value && sel.value !== 'N/A') ? `📺 ${sel.value}` : 'Sem canal IPTV informado na grade/Agenda';
+    }
+
+    function toggleAntecipacaoLogic() {
+        const sol = document.getElementById('solicitante_antecipacao')?.value || '';
+        const grp = document.getElementById('grupo-chamado-antecipacao');
+        const info = document.getElementById('antecipacao-agenda-info');
+        if (grp) grp.style.display = sol ? 'block' : 'none';
+        if (info) {
+            let txt = 'Quem informa se é pedido da SEDUC (e o chamado) é o diretor-chefe, na Agenda.';
+            if (SOLICITANTE_AGENDA === 'SEDUC') txt = '✅ Pedido da SEDUC (definido pelo diretor-chefe na Agenda) — cobra gravação + exibição.';
+            else if (SOLICITANTE_AGENDA === 'PROFESSOR') txt = 'Pedido do Canal Educação / professor (definido pelo diretor-chefe) — cobra só a exibição.';
+            if (EXIBICAO_AGENDA) txt = `📼 Exibição da aula gravada em ${formatarDataBr(EXIBICAO_AGENDA.data_gravacao)}. ` + txt;
+            info.textContent = txt;
+        }
+        toggleFormLogic();
+    }
+
+    function formatarDataBr(isoDate) {
+        if (!isoDate) return '';
+        const parts = String(isoDate).split('-');
+        if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+        return isoDate;
+    }
+
+    /** Indicativo automático: gravação depois da aula = reposição; antes = antecipada. */
+    function atualizarIndicativoReposicao() {
+        const badge = document.getElementById('indicativo-reposicao-badge');
+        const texto = document.getElementById('indicativo-reposicao-texto');
+        const ref = document.getElementById('data_referencia_aula');
+        const dataAula = document.getElementById('data_aula')?.value;
+        const exec = document.getElementById('data_execucao_real')?.value;
+        let txt = '';
+        if (exec && dataAula && exec !== dataAula) {
+            ref.value = dataAula;
+            txt = exec > dataAula
+                ? `Gravação por reposição/falta, referente à aula do dia ${formatarDataBr(dataAula)} — entra no mês de ${exec.slice(5, 7)}/${exec.slice(0, 4)}`
+                : `Gravação antecipada da aula do dia ${formatarDataBr(dataAula)}`;
+        } else if (ref && ref.value && ref.value !== dataAula) {
+            txt = ref.value > (exec || dataAula)
+                ? `Gravação antecipada da aula do dia ${formatarDataBr(ref.value)}`
+                : `Gravação por reposição/falta, referente à aula do dia ${formatarDataBr(ref.value)}`;
+        } else if (ref) {
+            ref.value = '';
+        }
+        if (texto) texto.textContent = txt;
+        if (badge) badge.style.display = txt ? 'block' : 'none';
+    }
+
+    // Conditional field toggling
+    function toggleConditional(type) {
+        if (type === 'interacao') {
+            const val = document.getElementById('interacao_professor_aluno').value;
+            document.getElementById('field-interacao-outras').classList.toggle('visible', val === 'Outras');
+        }
+        if (type === 'recurso') {
+            const checked = document.querySelector('.recurso-check[value="Outro"]').checked;
+            document.getElementById('field-recurso-outro').classList.toggle('visible', checked);
+            document.getElementById('recursos_outro_desc').required = checked;
+        }
+        if (type === 'substituicao') {
+            const val = document.getElementById('teve_substituicao').value === 'true';
+            document.getElementById('field-substituicao').classList.toggle('visible', val);
+        }
+        if (type === 'atraso') {
+            const val = document.getElementById('teve_atraso').value === 'true';
+            document.getElementById('field-atraso').classList.toggle('visible', val);
+        }
+    }
+
+    function buildReportBody() {
+        const recursos = [];
+        document.querySelectorAll('.recurso-check:checked').forEach(cb => recursos.push(cb.value));
+
+        const isAvulsa = document.getElementById('regular').value === 'Não';
+        
+        // Caminho 2: Concatena o número da aula para TECNICO no próprio conteudo_ministrado
+        let conteudoFinal = document.getElementById('conteudo_ministrado').value;
+        const turmaSelect = document.getElementById('turma_id');
+        const selectedOption = turmaSelect.options[turmaSelect.selectedIndex];
+        const modalidade = (selectedOption?.dataset?.modalidade || '').toUpperCase();
+        
+        if (modalidade === 'TECNICO') {
+            const numRaw = document.getElementById('numero_aula')?.value?.trim() || '';
+            const numPadded = formatarNumeroAula(numRaw);
+
+            if (!numPadded) {
+                showToast('Informe o Nº da Aula para turmas TÉCNICO.', 'error');
+                document.getElementById('numero_aula').focus();
+                return;
+            }
+
+            if (numPadded.length > 4) {
+                showToast('O Nº da Aula deve ter no máximo 4 dígitos.', 'error');
+                document.getElementById('numero_aula').focus();
+                return;
+            }
+
+            conteudoFinal = `AULA ${numPadded} ${conteudoFinal}`;
+        }
+        
+        // Antecipação: Sim/Não do assistente; SEDUC/Canal vem da Agenda (diretor-chefe)
+        const antecipada = document.getElementById('solicitante_antecipacao')?.value || '';
+        const solAntecipacao = antecipada ? (SOLICITANTE_AGENDA || 'SIM') : null;
+        const chamadoAntecipacao = document.getElementById('chamado_antecipacao_input')?.value?.trim() || null;
+        const ticketFinal = document.getElementById('ticket_number')?.value || chamadoAntecipacao || null;
+        const dtExecucaoReal = document.getElementById('data_execucao_real')?.value || null;
+        const dtReferenciaAula = document.getElementById('data_referencia_aula')?.value || null;
+        // O servidor monta o indicativo (reposição × antecipada); exibição de aula antecipada vem da Agenda
+        const motivoReferencia = EXIBICAO_AGENDA
+            ? `Exibição da aula gravada antecipadamente em ${formatarDataBr(EXIBICAO_AGENDA.data_gravacao)}`
+            : (MOTIVO_EXIBICAO_SALVO || null);
+
+        return {
+            data_aula: document.getElementById('data_aula').value,
+            turno: document.getElementById('turno').value,
+            estudio: document.getElementById('estudio').value,
+            turma_id: isAvulsa ? null : document.getElementById('turma_id').value,
+            disciplina_id: isAvulsa ? null : document.getElementById('disciplina_id').value,
+            professor_id: (isAvulsa || EXIBICAO_AGENDA) ? null : (document.getElementById('professor_id').value || null),
+            professor_nome_externo: null,
+            horario_aula: document.getElementById('horario_aula').value,
+            regular: document.getElementById('regular').value,
+            tipo_aula: document.getElementById('tipo_aula').value,
+            canal_utilizado: document.getElementById('canal_utilizado').value || 'N/A',
+            conteudo_ministrado: conteudoFinal,
+            interacao_professor_aluno: isAvulsa ? null : document.getElementById('interacao_professor_aluno').value,
+            interacao_outras_desc: isAvulsa ? null : document.getElementById('interacao_outras_desc').value || null,
+            atividade_pratica: isAvulsa ? null : document.getElementById('atividade_pratica').value || null,
+            observacoes: document.getElementById('observacoes').value || null,
+            tipo_recursos_utilizados: recursos.length > 0 ? recursos : null,
+            recursos_outro_desc: document.getElementById('recursos_outro_desc').value || null,
+            problema_material: document.getElementById('problema_material').value,
+            problematic_materials: problematicMaterials.length > 0 ? problematicMaterials : null,
+            escolas_participantes: escolasParticipantes.length > 0 ? escolasParticipantes : null,
+            bncc_habilidades: document.getElementById('bncc_habilidades').value.trim() || null,
+            diretor_imagem_id: document.getElementById('diretor_imagem_id').value || null,
+            youtube_link: document.getElementById('youtube_link').value || null,
+            needs_editing: document.getElementById('needs_editing').value === 'true',
+            ticket_number: ticketFinal,
+            start_time: document.getElementById('start_time').value || null,
+            end_time: document.getElementById('end_time').value || null,
+            teve_substituicao: document.getElementById('teve_substituicao').value === 'true',
+            professor_substituto_id: document.getElementById('professor_substituto_id').value || null,
+            professor_substituto_nome_externo: null,
+            teve_atraso: document.getElementById('teve_atraso').value === 'true',
+            minutos_atraso: String(document.getElementById('minutos_atraso').value || "00:00"),
+            observacao_atraso: document.getElementById('observacao_atraso').value || null,
+            solicitante_antecipacao: solAntecipacao,
+            data_execucao_real: dtExecucaoReal,
+            data_referencia_aula: dtReferenciaAula,
+            motivo_referencia: motivoReferencia,
+        };
+    }
+
+    // --- Auth Recovery Logic ---
+    function showLoginModal(retryFn) {
+        pendingAction = retryFn;
+        document.getElementById('login-modal-overlay').classList.add('open');
+        const modal = document.getElementById('login-modal');
+        modal.style.visibility = 'visible';
+        modal.style.opacity = '1';
+        // Pre-fill email if available
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.email) document.getElementById('reauth-email').value = user.email;
+        document.getElementById('reauth-password').focus();
+    }
+
+    function closeLoginModal() {
+        document.getElementById('login-modal-overlay').classList.remove('open');
+        const modal = document.getElementById('login-modal');
+        modal.style.visibility = 'hidden';
+        modal.style.opacity = '0';
+        document.getElementById('reauth-error').style.display = 'none';
+        document.getElementById('reauth-form').reset();
+    }
+
+    async function handleReauth(e) {
+        e.preventDefault();
+        const email = document.getElementById('reauth-email').value;
+        const password = document.getElementById('reauth-password').value;
+        const btn = document.getElementById('reauth-btn');
+        const errorEl = document.getElementById('reauth-error');
+
+        btn.disabled = true;
+        btn.textContent = 'Autenticando...';
+        errorEl.style.display = 'none';
+
+        try {
+            const formData = new URLSearchParams();
+            formData.append('username', email);
+            formData.append('password', password);
+
+            const res = await fetch('/api/v1/auth/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                localStorage.setItem('access_token', data.access_token);
+                localStorage.setItem('token', data.access_token);
+                showToast('Sessão restaurada! Continuando...', 'success');
+                closeLoginModal();
+                
+                if (pendingAction) {
+                    const fn = pendingAction;
+                    pendingAction = null;
+                    fn(); // Repete a ação original (Save ou Finalize)
+                }
+            } else {
+                errorEl.style.display = 'block';
+                errorEl.textContent = 'Email ou senha incorretos.';
+            }
+        } catch (err) {
+            errorEl.textContent = 'Erro de conexão.';
+            errorEl.style.display = 'block';
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Entrar e Continuar';
+        }
+    }
+
+    async function handleResponse(res, retryFn = null) {
+        if (res.status === 401) {
+            showLoginModal(retryFn);
+            return null;
+        }
+        if (!res.ok) {
+            let errorMsg = 'Erro na operação.';
+            try {
+                const data = await res.json();
+                if (data.detail) {
+                    if (Array.isArray(data.detail)) {
+                        errorMsg = data.detail.map(d => `${d.loc.join('.')}: ${d.msg}`).join(' | ');
+                    } else {
+                        errorMsg = data.detail;
+                    }
+                }
+            } catch (e) {
+                // If not JSON, it might be a server error
+                errorMsg = `Erro do Servidor (Status ${res.status}).`;
+            }
+            throw new Error(errorMsg);
+        }
+        return res.json();
+    }
+
+    async function submitReport(e, shouldRedirect = true) {
+        if (e) e.preventDefault();
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        const body = buildReportBody();
+        if (!body) return;
+
+        try {
+            const url = isEditing ? `/api/v1/reports/${lastSavedId}` : '/api/v1/reports/';
+            const method = isEditing ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+
+            const data = await handleResponse(res, () => submitReport(null, shouldRedirect));
+            if (!data) return; // Aguardando re-autenticação
+            lastSavedId = data.id;
+            isEditing = true; // Garante que próximos salvamentos usem PUT
+            isDirty = false; // TASK 10: Reset dirty flag after save
+            // TASK 10: Update last save timestamp
+            const now = new Date().toLocaleTimeString('pt-BR');
+            document.getElementById('last-save-time').textContent = `Salvo às ${now}`;
+            showToast('Relatório salvo como rascunho!', 'success');
+            
+            if (shouldRedirect) {
+                setTimeout(() => {
+                    returnToGrade();
+                }, 1000);
+            }
+            
+            return data;
+        } catch (err) {
+            showToast(err.message, 'error');
+            throw err;
+        }
+    }
+
+    async function finalizarReport() {
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+
+        const erroRepo = reposicaoInvalida();
+        if (erroRepo) {
+            showToast(erroRepo, 'error');
+            document.getElementById('data_execucao_real').focus();
+            return;
+        }
+
+        // TASK 30: Validação frontend do link YouTube
+        const youtubeLink = document.getElementById('youtube_link').value.trim();
+        const youtubeRegex = /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\/.+/;
+        if (!youtubeLink) {
+            showToast(DADOS_DA_GRADE_TRAVADOS
+                ? 'O diretor-chefe ainda não cadastrou o link do YouTube deste estúdio e turno na Agenda. Peça para ele informar e abra o relatório de novo.'
+                : 'O Link do YouTube é obrigatório para finalizar o relatório.', 'error');
+            document.getElementById('youtube_link').focus();
+            return;
+        }
+        if (!youtubeRegex.test(youtubeLink)) {
+            showToast('O Link do YouTube deve ser um URL válido do youtube.com ou youtu.be.', 'error');
+            document.getElementById('youtube_link').focus();
+            document.getElementById('youtube-validation-msg').style.display = 'block';
+            return;
+        }
+
+        // Task 06: Validação BNCC obrigatória na finalização
+        const bnccHabilidades = document.getElementById('bncc_habilidades').value.trim();
+        if (!bnccHabilidades) {
+            showToast('O campo Habilidades BNCC é obrigatório para finalizar o relatório.', 'error');
+            document.getElementById('bncc_habilidades').focus();
+            return;
+        }
+
+        try {
+            // 1. Always save/update draft first to ensure latest content
+            const draft = await submitReport(null, false);
+            if (!draft) return;
+            const reportId = draft.id;
+
+            // 2. Finalize
+            const res = await fetch(`/api/v1/reports/${reportId}/finalizar`, {
+                method: 'PATCH',
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+
+            const data = await handleResponse(res, () => finalizarReport());
+            if (!data) return; // Aguardando re-autenticação
+            showToast('Relatório finalizado com sucesso!', 'success');
+            
+            // Show success drawer
+            if (data.nome_ficheiro_gerado) {
+                document.getElementById('success-filename').innerText = data.nome_ficheiro_gerado;
+            }
+            if (data.video_folder_link) {
+                document.getElementById('success-drive-link').href = data.video_folder_link;
+            }
+            const pdfBtn = document.getElementById('success-pdf-link');
+            if (data.slide_link) {
+                pdfBtn.href = data.slide_link;
+                pdfBtn.style.display = 'flex';
+            } else {
+                pdfBtn.style.display = 'none';
+            }
+            document.getElementById('success-overlay').classList.add('open');
+            document.getElementById('success-drawer').classList.add('open');
+            
+            // Still redirect after a longer time if they don't click anything? 
+            // Better to let them click.
+        } catch (err) {
+            // Error already toasted by submitReport or here
+            if (err.message) showToast(err.message, 'error');
+        }
+    }
+
+
+
+    function copyFileName(elementId, btn) {
+        let text = document.getElementById(elementId).innerText;
+        // Ignore if it's the placeholder text
+        if (text === "Preencha os campos acima...") return;
+        
+        // Remove .mp4 if it exists for cleaner copying, though naming engine might not include it
+        text = text.replace('.mp4', '').trim();
+        
+        navigator.clipboard.writeText(text).then(() => {
+            const oldHtml = btn.innerHTML;
+            btn.innerHTML = '✅ Copiado!';
+            setTimeout(() => { btn.innerHTML = oldHtml; }, 2000);
+        }).catch(err => {
+            showToast('Erro ao copiar', 'error');
+        });
+    }
+
+    async function fetchDriveSuggestions() {
+        const data_aula = document.getElementById('data_aula').value;
+        const turma_id = document.getElementById('turma_id').value;
+        const disciplina_id = document.getElementById('disciplina_id').value;
+        
+        const container = document.getElementById('drive-suggestions-container');
+        if (!container) return;
+        
+        if (!data_aula || !turma_id || !disciplina_id) {
+            container.innerHTML = '';
+            return;
+        }
+        
+        container.innerHTML = '<span style="font-size: 0.75rem; color: var(--text-muted);">Buscando sugestões reais do Drive... ⏳</span>';
+        
+        const token = localStorage.getItem('token') || localStorage.getItem('access_token');
+        try {
+            const res = await fetch(`/api/v1/reports/drive-suggestions?data_aula=${data_aula}&turma_id=${turma_id}&disciplina_id=${disciplina_id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.suggestions && data.suggestions.length > 0) {
+                    let html = '<span style="font-size: 0.75rem; color: var(--status-green); width: 100%;">💡 Sugestões baseadas nos vídeos do Drive (Clique para preencher):</span>';
+                    data.suggestions.forEach(s => {
+                        html += `<button type="button" class="btn btn-sm btn-secondary" style="font-size: 0.75rem; padding: 2px 8px; border-radius: 12px; background: var(--bg-hover);" onclick="fillConteudo('${s.replace(/'/g, "\\'")}')">${s}</button>`;
+                    });
+                    container.innerHTML = html;
+                } else {
+                    container.innerHTML = '<span style="font-size: 0.75rem; color: var(--status-yellow);">⚠️ Nenhum vídeo correspondente encontrado no Drive para esta data e turma ainda.</span>';
+                }
+            } else {
+                container.innerHTML = '';
+            }
+        } catch (e) {
+            container.innerHTML = '';
+        }
+    }
+    
+    window.fillConteudo = function(text) {
+        const el = document.getElementById('conteudo_ministrado');
+        el.value = text;
+        updateNaming();
+        // Dispara evento para o contador de caracteres
+        el.dispatchEvent(new Event('input'));
+    }
+</script>
+{% endblock %}

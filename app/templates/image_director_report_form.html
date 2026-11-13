@@ -1,0 +1,2244 @@
+{% extends "base.html" %}
+{% block title %}Relatório de imagem — Canal Educação{% endblock %}
+
+{% block head %}
+<style>
+    .form-container { width: 100%; max-width: 960px; margin: 0 auto; padding: 0 1rem; box-sizing: border-box; }
+    @media (min-width: 768px) { .form-container { padding: 0 1.5rem; } }
+    @media (min-width: 1024px) { .form-container { padding: 0; } }
+    .form-row { display: grid; grid-template-columns: 1fr; gap: 1rem; }
+    @media (min-width: 600px) {
+        .form-row.cols-2 { grid-template-columns: 1fr 1fr; }
+        .form-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .form-row.cols-4, .form-row.cols-dph { grid-template-columns: 1fr 1fr; }
+    }
+    @media (min-width: 900px) {
+        .form-row.cols-4 { grid-template-columns: 1.3fr 1fr 1fr 1fr; }
+        .form-row.cols-dph { grid-template-columns: 1fr 1fr 0.8fr; }
+    }
+    .form-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
+    .form-actions .btn { flex: 1; min-width: 180px; }
+    input.form-input, select.form-select, textarea.form-textarea, button.btn { width: 100%; box-sizing: border-box; min-height: 44px; }
+    .card { padding: 1rem; margin-bottom: 1.5rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 8px; }
+    @media (min-width: 600px) { .card { padding: 1.5rem; } }
+    .lesson-card { border-left: 4px solid var(--status-green); position: relative; }
+    .lesson-card .remove-lesson { position: absolute; top: 0.75rem; right: 0.75rem; }
+    .lesson-suggestion { padding: 0.5rem 0.75rem; border: 1px dashed var(--border-color); border-radius: 6px; margin-bottom: 0.5rem; cursor: pointer; font-size: 0.85rem; }
+    .lesson-suggestion:hover { background: var(--bg-hover); border-color: var(--status-green); }
+    .sim-nao-row { display: flex; justify-content: space-between; align-items: center; padding: 0.4rem 0; border-bottom: 1px solid var(--border-subtle); gap: 1rem; }
+    .sim-nao-row:last-child { border-bottom: none; }
+    .sim-nao-row label { font-size: 0.85rem; flex: 1; }
+    .sim-nao-toggle { display: flex; gap: 0.4rem; }
+    .sim-nao-toggle button { padding: 0.3rem 0.9rem; border-radius: 6px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 0.8rem; min-height: auto; width: auto; }
+    .sim-nao-toggle button.active-sim { background: var(--status-green, #10b981); color: #fff; border-color: var(--status-green, #10b981); }
+    .sim-nao-toggle button.active-nao { background: var(--status-red, #ef4444); color: #fff; border-color: var(--status-red, #ef4444); }
+    .justificativa-obrigatoria { margin-top: 0.4rem; }
+    .justificativa-obrigatoria label { font-size: 0.78rem; color: var(--status-red, #ef4444); font-weight: 600; }
+    .locked-field { display: flex; align-items: center; min-height: 44px; padding: 0 0.75rem; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-hover); color: var(--text-secondary); font-size: 0.9rem; }
+    .combo-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+    /* ===== Badges de Status (padronizado com o fluxo de validação do Relatório de Aula) ===== */
+    .badge-status {
+        display: inline-flex; align-items: center; gap: 0.3rem;
+        padding: 0.3rem 0.7rem; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+        color: #fff; white-space: nowrap;
+    }
+    .badge-status-rascunho { background: linear-gradient(135deg, #94a3b8, #64748b); }
+    .badge-status-aguardando { background: linear-gradient(135deg, #fbbf24, #f59e0b); box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.35); }
+    .badge-status-validado { background: linear-gradient(135deg, #34d399, #059669); }
+    .badge-status-cancelado { background: linear-gradient(135deg, #fca5a5, #ef4444); }
+    .badge-status-correcao {
+        background: linear-gradient(135deg, #fbbf24, #d97706); color: #1f2937;
+        animation: pulse-correcao 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse-correcao {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(217, 119, 6, 0.45); }
+        50% { box-shadow: 0 0 0 6px rgba(217, 119, 6, 0); }
+    }
+    .notif-correcao-banner {
+        background: linear-gradient(135deg, #fffbeb, #ffedd5);
+        border: 1px solid #fdba74; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;
+    }
+    .notif-correcao-banner strong { color: #92400e; }
+    .notif-correcao-banner p { margin-top: 0.35rem; font-size: 0.85rem; color: #7c2d12; }
+
+    /* Modal de confirmação — NÃO usar .drawer (pointer-events: none bloqueia cliques) */
+    #finalize-confirm-modal {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 1002;
+        width: min(400px, 92vw);
+        height: auto;
+        max-height: 90vh;
+        overflow-y: auto;
+        padding: 1.5rem;
+        border-radius: 12px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-subtle);
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        visibility: hidden;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+    #finalize-confirm-modal.open {
+        visibility: visible;
+        opacity: 1;
+        pointer-events: auto;
+    }
+    #finalize-confirm-overlay {
+        z-index: 1001;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-claquete"/></svg> Relatório de imagem do turno</h1>
+        <p class="page-subtitle">Acompanhamento técnico do turno no estúdio</p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <span id="report-status-badge" style="display:none;"></span>
+        <a href="/diretor-imagem/historico" class="btn btn-secondary btn-sm">🗂️ Histórico</a>
+    </div>
+</div>
+
+<div class="form-container">
+
+    <!-- Banner de correção -->
+    <div class="notif-correcao-banner" id="correcao-banner" style="display:none;">
+        <strong>🔁 Devolvido para correção</strong>
+        <p id="correcao-texto"></p>
+    </div>
+
+    <!-- CARD 1 — Contexto Operacional -->
+    <div class="card">
+        <div class="form-section-title">📌 Contexto Operacional</div>
+        <div id="aviso-sem-vinculo" style="display:none; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:0.85rem 1rem; margin-bottom:1rem;">
+            <strong style="color:#991b1b;">⚠️ Sua conta não está vinculada a um cadastro de Diretor de Imagem.</strong>
+            <p style="margin-top:0.35rem; font-size:0.85rem; color:#7f1d1d;">Peça para o Diretor-Chefe vincular seu usuário em <strong>Usuários e acessos → Diretores de Imagem</strong> antes de lançar o relatório.</p>
+        </div>
+        <div class="form-row cols-4">
+            <div class="form-group" id="grupo-diretor">
+                <label class="form-label">Diretor de imagem</label>
+                <select id="diretor_imagem_id" class="form-select" required></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Data da aula</label>
+                <input type="date" id="data_relatorio" class="form-input" required min="2020-01-01" max="2099-12-31">
+            </div>
+            <div class="form-group" id="grupo-turno">
+                <label class="form-label">Turno</label>
+                <select id="turno" class="form-select" required>
+                    <option value="">Selecione...</option>
+                    <option value="Manhã">Manhã</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Noite">Noite</option>
+                    <option value="FDS manhã">FDS manhã</option>
+                    <option value="FDS tarde">FDS tarde</option>
+                    <option value="FDS noite">FDS noite</option>
+                    <option value="Outro">Outro</option>
+                </select>
+            </div>
+            <div class="form-group" id="grupo-estudio">
+                <label class="form-label">Estúdio</label>
+                <select id="estudio" class="form-select" required>
+                    <option value="">Carregando estúdios...</option>
+                </select>
+            </div>
+        </div>
+        <p id="estudio-agenda-hint" style="display:none; font-size: 0.75rem; color: var(--text-muted); margin: 0.5rem 0 0;"></p>
+        <div class="form-row cols-dph" style="margin-top: 1rem;">
+            <div class="form-group" id="grupo-turma" style="display: none;">
+                <label class="form-label">Turma</label>
+                <select id="turma_id" class="form-select" onchange="onTurmaChange()">
+                    <option value="">Carregando...</option>
+                </select>
+            </div>
+            <div class="form-group" id="grupo-disciplina">
+                <label class="form-label">Disciplina</label>
+                <select id="disciplina_id" class="form-select" disabled required onchange="onDisciplinaChange()">
+                    <option value="">Selecione a disciplina...</option>
+                </select>
+            </div>
+            <div class="form-group" id="grupo-professor">
+                <label class="form-label">Professor(a)</label>
+                <select id="professor_id" class="form-select" disabled required>
+                    <option value="">Selecione disciplina primeiro...</option>
+                </select>
+            </div>
+            <div class="form-group" id="grupo-horario">
+                <label class="form-label">Horário da aula</label>
+                <select id="horario_aula" class="form-select" required>
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+        </div>
+        <!-- Evento (sem turma): UETEV, SUGED, departamentos… -->
+        <div id="grupo-evento" style="display:none; margin-top: 1rem; border:1px dashed var(--border-subtle); border-radius:10px; padding:1rem;">
+            <div class="form-section-title" style="margin-bottom:0.75rem;">🎪 Evento</div>
+            <div class="form-row cols-2">
+                <div class="form-group">
+                    <label class="form-label">Nome do evento *</label>
+                    <input type="text" id="evento_nome" class="form-input" maxlength="255" placeholder="Ex: Live de lançamento, Formação de professores">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Departamento / solicitante *</label>
+                    <input type="text" id="evento_departamento" class="form-input" maxlength="200" list="evento-departamentos" placeholder="UETEV, SUGED…">
+                    <datalist id="evento-departamentos">
+                        <option value="UETEV"></option><option value="SUGED"></option><option value="Pedagógico"></option>
+                        <option value="Coordenação"></option><option value="NTI"></option><option value="Comunicação"></option>
+                    </datalist>
+                </div>
+            </div>
+            <div class="form-row cols-3" style="margin-top: 0.75rem;">
+                <div class="form-group">
+                    <label class="form-label">Início *</label>
+                    <input type="time" id="evento_inicio" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Fim *</label>
+                    <input type="time" id="evento_fim" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Nº do chamado *</label>
+                    <input type="text" id="evento_chamado" class="form-input" maxlength="100" placeholder="18097">
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 0.75rem;">
+                <label class="form-label">Responsável / apresentador</label>
+                <input type="text" id="evento_responsavel" class="form-input" maxlength="255" placeholder="Quem conduziu o evento">
+            </div>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:0.5rem;">Detalhe o que foi realizado em <b>Observações Gerais</b>.</p>
+        </div>
+        <input type="hidden" id="serie_modulo_manual" value="">
+        <input type="hidden" id="disciplina_nome_hidden" value="">
+        <input type="hidden" id="professor_nome_hidden" value="">
+    </div>
+
+    <!-- CARD 2 — Informações de Gravação -->
+    <div class="card">
+        <div class="form-section-title">🎥 Informações de Gravação</div>
+        <div class="form-row cols-2">
+        <div class="form-group">
+            <label class="form-label">Link do YouTube <span style="font-size: 0.7rem; color: var(--status-yellow);">⚠️ Obrigatório para finalizar</span></label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="url" id="youtube_link" class="form-input" placeholder="https://youtube.com/watch?v=..." pattern="https?://(www\.)?(youtube\.com|youtu\.be)/.+">
+                <button type="button" class="btn btn-secondary btn-sm" style="width: auto; white-space: nowrap; padding: 0 1rem;" onclick="copiarCampo('youtube_link', 'Link do YouTube copiado!')">📋 Copiar</button>
+            </div>
+            <span id="youtube-validation-msg" style="font-size: 0.7rem; color: var(--status-red); display: none;">⚠️ Link deve ser do YouTube (youtube.com ou youtu.be)</span>
+        </div>
+        <div class="form-group">
+            <label class="form-label">Chave de transmissão (stream key)</label>
+            <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="chave_transmissao" class="form-input" placeholder="xxxx-xxxx-xxxx-xxxx-xxxx">
+                <button type="button" class="btn btn-secondary btn-sm" style="width: auto; white-space: nowrap; padding: 0 1rem;" onclick="copiarCampo('chave_transmissao', 'Chave de transmissão copiada!')">📋 Copiar</button>
+            </div>
+        </div>
+        </div>
+        <p id="transmissao-agenda-hint" style="display:none; font-size: 0.75rem; margin: 0.5rem 0 0;"></p>
+    </div>
+
+    <!-- CARD 3 — Perguntas do relatório (nível "por_relatorio") -->
+    <div class="card" id="card-perguntas-relatorio" style="display:none;">
+        <div class="form-section-title">❓ Perguntas Adicionais do Relatório</div>
+        <div id="perguntas-relatorio-container"></div>
+    </div>
+
+    <!-- CARD 4 — Detalhes Técnicos da Aula -->
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div class="form-section-title" style="margin-bottom: 0;">📚 Detalhes Técnicos da Aula</div>
+            <span id="slot-numero-aula-badge" style="display:none; font-size:0.85rem; font-weight:600; color:var(--accent-primary); padding:0.25rem 0.65rem; border-radius:6px; background:rgba(79,70,229,0.08);"></span>
+            <button type="button" class="btn btn-primary btn-sm" id="btn-add-lesson" style="width: auto;" onclick="addLessonBlank()">+ Adicionar aula</button>
+        </div>
+        <div id="lessons-container" style="margin-top: 1rem;"><p style="color: var(--text-muted); font-size: 0.85rem;">Nenhuma aula adicionada. Clique em <strong>+ Adicionar aula</strong>.</p></div>
+    </div>
+
+    <!-- CARD 4 — Checklist de fechamento -->
+    <div class="card" id="card-fechamento-estudio">
+        <div class="form-section-title">🔧 Fechamento de Estúdio</div>
+        <div id="checklist-container"><p style="color: var(--text-muted); font-size: 0.85rem;">Carregando checklist...</p></div>
+    </div>
+
+    <!-- CARD 5 — Observações gerais -->
+    <div class="card">
+        <div class="form-section-title">📝 Observações Gerais</div>
+        <textarea id="observacoes_gerais" class="form-textarea" rows="3" placeholder="Observações adicionais do turno..."></textarea>
+    </div>
+
+    <div class="form-actions">
+        <button type="button" class="btn btn-secondary" onclick="salvarRelatorio(false)">💾 Salvar Rascunho</button>
+        <button type="button" class="btn btn-primary" onclick="finalizarRelatorio()">✅ Enviar para Validação</button>
+        <button type="button" class="btn btn-secondary" id="btn-baixar-pdf" style="display:none;" onclick="baixarPdf()">⬇️ Baixar PDF</button>
+    </div>
+</div>
+
+<!-- Modal de confirmação antes de finalizar -->
+<div class="drawer-overlay" id="finalize-confirm-overlay" onclick="fecharModalFinalizar()"></div>
+<div id="finalize-confirm-modal" onclick="event.stopPropagation()">
+    <div class="drawer-header" style="margin-bottom: 1rem; padding-bottom: 0.75rem;">
+        <h3 style="color: var(--status-yellow); margin: 0;">⚠️ Confirmar envio para validação</h3>
+    </div>
+    <div>
+        <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1.5rem; line-height: 1.5;">
+            Você confirma que todas as informações estão corretas e deseja enviar este relatório para validação?
+            Após o envio, o relatório ficará aguardando aprovação do Diretor-Chefe.
+        </p>
+        <div id="finalize-error-msg" style="display:none; background:#fef2f2; border:1px solid #fca5a5; border-radius:8px; padding:0.75rem 1rem; margin-bottom:1rem; font-size:0.85rem; color:#991b1b; white-space:pre-wrap;"></div>
+        <div style="display: grid; gap: 0.75rem;">
+            <button type="button" class="btn btn-primary btn-full" id="btn-confirmar-finalizar" onclick="confirmarFinalizacao()">
+                ✅ Sim, Enviar
+            </button>
+            <button type="button" class="btn btn-secondary btn-full" id="btn-cancelar-finalizar" onclick="fecharModalFinalizar()">
+                ← Voltar e Editar
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentReportId = null;
+    let currentReport = null;
+    let checklistItems = [];
+    let questoesRelatorio = [];
+    let questoesPorAula = [];
+    let lessons = [];
+    let lockedFromGrade = false;
+    let lockedParams = {};
+    let reportOrigem = 'grade';
+    let origemAntesDoEvento = null;
+    const EVENTO = '__EVENTO__';
+    const PREFIXO_EVENTO = 'EVENTO · ';
+    let turmasCache = [];
+    let disciplinasCache = [];
+    let professoresCache = [];
+    let professoresPorLesson = {};
+    let isChefeGlobal = false;
+    let ownDiretorImagemId = null;
+    let canaisIptvCache = [];
+
+    function escHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function getFieldValue(id) {
+        const el = document.getElementById(id);
+        return el ? String(el.value || '').trim() : '';
+    }
+
+    function setFieldValue(id, value) {
+        const el = document.getElementById(id);
+        if (el) el.value = value || '';
+    }
+
+    function normalizeTurnoLabel(raw) {
+        if (!raw) return '';
+        const trimmed = String(raw).trim();
+        const upper = trimmed.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (upper === 'INTEGRAL') return '';
+        const map = {
+            MANHA: 'Manhã',
+            TARDE: 'Tarde',
+            NOITE: 'Noite',
+            'FDS MANHA': 'FDS manhã',
+            'FDS TARDE': 'FDS tarde',
+            'FDS NOITE': 'FDS noite',
+        };
+        if (map[upper]) return map[upper];
+        const sel = document.getElementById('turno');
+        if (sel && sel.tagName === 'SELECT') {
+            const found = Array.from(sel.options).find(o =>
+                o.value && o.value.toLowerCase() === trimmed.toLowerCase()
+            );
+            if (found) return found.value;
+        }
+        return trimmed;
+    }
+
+    function inferTurnoFromHorario(horario) {
+        if (!horario || String(horario).toLowerCase() === 'gravação') return '';
+        const m = String(horario).match(/(\d{1,2}):(\d{2})/);
+        if (m) {
+            const h = parseInt(m[1], 10);
+            if (h < 12) return 'Manhã';
+            if (h < 18) return 'Tarde';
+            return 'Noite';
+        }
+        const ord = String(horario).match(/^(\d+)/);
+        if (ord) {
+            const n = parseInt(ord[1], 10);
+            if (n <= 4) return 'Manhã';
+            if (n <= 6) return 'Tarde';
+            return 'Noite';
+        }
+        return '';
+    }
+
+    function getTurmaTipoHorario() {
+        const turmaId = getFieldValue('turma_id') || lockedParams.turma || '';
+        const t = turmasCache.find(x => String(x.id) === String(turmaId));
+        if (!t) return null;
+        const nomenclatura = t.nomenclatura_padrao || t.nome || '';
+        const turno = getFieldValue('turno') || lockedParams.turno || t.turno || '';
+        if (String(t.modalidade || '').toUpperCase().includes('EJA')) return 'EJA';
+        if (String(t.turno || '').toUpperCase().includes('INTEGRAL')) return 'TI';
+        return getTipoPorTurnoHorario(turno, nomenclatura);
+    }
+
+    // Horários das disciplinas por turno/modalidade (grade real da turma no dia)
+    let horarioOptionsState = { key: '', opcoes: [], fonte: '' };
+    let horarioOptionsSeq = 0;
+
+    function horarioContextKey() {
+        const turmaId = getFieldValue('turma_id') || lockedParams.turma || '';
+        const data = getFieldValue('data_relatorio') || lockedParams.data || '';
+        const turno = getFieldValue('turno') || lockedParams.turno || '';
+        return { turmaId, data, turno, key: `${turmaId}|${data}|${turno}` };
+    }
+
+    async function refreshHorarioOptions() {
+        const ctx = horarioContextKey();
+        if (!ctx.turmaId) {
+            horarioOptionsState = { key: ctx.key, opcoes: [], fonte: '' };
+            populateHorarioSelect();
+            return;
+        }
+        if (ctx.key === horarioOptionsState.key) {
+            populateHorarioSelect();
+            return;
+        }
+        const seq = ++horarioOptionsSeq;
+        try {
+            const q = new URLSearchParams({ turma_id: ctx.turmaId });
+            if (ctx.data) q.set('data', ctx.data);
+            if (ctx.turno) q.set('turno', ctx.turno);
+            const res = await apiGet(`/api/v1/image-director/lookup/horarios?${q.toString()}`);
+            if (seq !== horarioOptionsSeq) return;
+            horarioOptionsState = {
+                key: ctx.key,
+                opcoes: (res && res.opcoes) || [],
+                fonte: (res && res.fonte) || '',
+            };
+        } catch (e) {
+            if (seq !== horarioOptionsSeq) return;
+            horarioOptionsState = { key: ctx.key, opcoes: [], fonte: '' };
+        }
+        populateHorarioSelect();
+    }
+
+    function currentHorarioOptions(tipo) {
+        const ctx = horarioContextKey();
+        if (horarioOptionsState.key === ctx.key && horarioOptionsState.opcoes.length) {
+            return horarioOptionsState.opcoes;
+        }
+        // Fallback local: tabela padrão do turno/modalidade (TI tarde = 5º–8º)
+        return horariosPadraoDoTurno(tipo, ctx.turno);
+    }
+
+    function horarioOptionLabel(o) {
+        return o.value;
+    }
+
+    function populateHorarioSelect(preferredValue) {
+        const sel = document.getElementById('horario_aula');
+        if (!sel) return;
+
+        const tipo = getTurmaTipoHorario();
+        const pref = String(
+            preferredValue ?? getFieldValue('horario_aula') ?? lockedParams.horario ?? ''
+        ).trim() || String(lockedParams.horario || '').trim();
+        const normalized = normalizeHorarioAulaValor(pref, tipo);
+
+        sel.innerHTML = '<option value="">Selecione...</option>';
+
+        if (normalized === 'GRAVAÇÃO') {
+            sel.innerHTML += '<option value="GRAVAÇÃO">GRAVAÇÃO</option>';
+            sel.value = 'GRAVAÇÃO';
+            return;
+        }
+
+        const opcoes = currentHorarioOptions(tipo);
+        // Valor vindo da grade como faixa ("13:50 às 14:50") → casa com o nº da aula
+        let prefValue = normalized;
+        if (pref && pref.includes('às')) {
+            const alvo = pref.replace(/\s+/g, ' ').replace(/(\d)às/, '$1 às').trim();
+            const inicioAlvo = alvo.substring(0, 5);
+            const match = opcoes.find(o => o.faixa === alvo) || opcoes.find(o => o.inicio === inicioAlvo);
+            if (match) prefValue = match.value;
+        }
+        const turmaEscolhida = !!(getFieldValue('turma_id') || lockedParams.turma);
+        if (!turmaEscolhida) {
+            sel.innerHTML = '<option value="">Selecione a turma para carregar os horários da grade...</option>';
+        }
+        opcoes.forEach(o => {
+            sel.innerHTML += `<option value="${escHtml(o.value)}">${escHtml(horarioOptionLabel(o))}</option>`;
+        });
+
+        if (prefValue) {
+            const exists = opcoes.some(o => o.value === prefValue);
+            if (!exists) {
+                // Preserva valor salvo que não está na grade atual (ex.: horário antigo)
+                sel.innerHTML += `<option value="${escHtml(prefValue)}">${escHtml(prefValue)} (fora da grade)</option>`;
+            }
+            sel.value = prefValue;
+        }
+    }
+
+    function setHorarioAula(valor) {
+        if (!valor) return;
+        populateHorarioSelect(valor);
+        refreshHorarioOptions();
+    }
+
+    function setTurnoValue(raw) {
+        const normalized = normalizeTurnoLabel(raw);
+        const sel = document.getElementById('turno');
+        if (!sel || sel.tagName !== 'SELECT') {
+            setFieldValue('turno', normalized);
+            return normalized;
+        }
+        const match = Array.from(sel.options).find(o => o.value === normalized);
+        sel.value = match ? normalized : '';
+        if (!sel.value && normalized) {
+            const loose = Array.from(sel.options).find(o =>
+                o.value && o.value.toLowerCase() === String(raw || '').trim().toLowerCase()
+            );
+            if (loose) sel.value = loose.value;
+        }
+        return sel.value || normalized;
+    }
+
+    function resolveTurnoPrefill() {
+        let turnoRaw = lockedParams.turno;
+        if (turnoRaw && String(turnoRaw).trim().toUpperCase() === 'INTEGRAL') turnoRaw = '';
+        if (!turnoRaw && lockedParams.horario) {
+            turnoRaw = inferTurnoFromHorario(lockedParams.horario);
+        }
+        if (!turnoRaw && lockedParams.turma) {
+            const t = turmasCache.find(x => String(x.id) === String(lockedParams.turma));
+            if (t && t.turno && String(t.turno).trim().toUpperCase() !== 'INTEGRAL') {
+                turnoRaw = t.turno;
+            }
+        }
+        if (!turnoRaw) return '';
+        const applied = setTurnoValue(turnoRaw);
+        lockedParams.turno = applied || normalizeTurnoLabel(turnoRaw);
+        return lockedParams.turno;
+    }
+
+    function copiarCampo(elementId, successMsg) {
+        const el = document.getElementById(elementId);
+        if (!el || !el.value || !el.value.trim()) {
+            showToast('Campo vazio para copiar.', 'warning');
+            return;
+        }
+        const text = el.value.trim();
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast(successMsg || 'Copiado para a área de transferência!', 'success');
+            }).catch(() => {
+                el.select();
+                document.execCommand('copy');
+                showToast(successMsg || 'Copiado para a área de transferência!', 'success');
+            });
+        } else {
+            el.select();
+            document.execCommand('copy');
+            showToast(successMsg || 'Copiado para a área de transferência!', 'success');
+        }
+    }
+
+    /**
+     * Link e chave informados pelo diretor-chefe para o estúdio/turno do dia: entram no
+     * relatório e ficam travados (o diretor só copia). Sem informação do chefe, campo livre.
+     */
+    function aplicarTransmissao(ctx) {
+        const yt = document.getElementById('youtube_link');
+        const ch = document.getElementById('chave_transmissao');
+        const hint = document.getElementById('transmissao-agenda-hint');
+        const travar = (el, travado) => {
+            if (!el) return;
+            el.readOnly = travado;
+        };
+        // Aula da grade: link e chave sempre vêm do que o diretor-chefe cadastrou na Agenda
+        // (estúdio + turno do dia) e não são digitados no relatório — só copiar.
+        const daGrade = reportOrigem === 'grade' && !isEvento();
+        const linkAgenda = !!(ctx && ctx.link_da_agenda && ctx.youtube_link);
+        const chaveAgenda = !!(ctx && ctx.chave_da_agenda && ctx.chave_transmissao);
+        if (linkAgenda) setFieldValue('youtube_link', ctx.youtube_link);
+        else if (ctx && ctx.youtube_link && !getFieldValue('youtube_link')) setFieldValue('youtube_link', ctx.youtube_link);
+        if (chaveAgenda) setFieldValue('chave_transmissao', ctx.chave_transmissao);
+        else if (ctx && ctx.chave_transmissao && !getFieldValue('chave_transmissao')) setFieldValue('chave_transmissao', ctx.chave_transmissao);
+        travar(yt, daGrade || linkAgenda);
+        travar(ch, daGrade || chaveAgenda);
+        if (hint) {
+            if (linkAgenda || chaveAgenda) {
+                hint.textContent = '📺 Link e chave informados pelo diretor-chefe para este estúdio e turno. Não precisa preencher: é só copiar.';
+                hint.style.color = 'var(--status-green, #16a34a)';
+            } else if (ctx) {
+                hint.textContent = '📺 O diretor-chefe ainda não informou o link e a chave deste estúdio e turno.';
+                hint.style.color = 'var(--status-yellow, #f59e0b)';
+            }
+            hint.style.display = ctx ? 'block' : 'none';
+        }
+    }
+
+    async function sincronizarTransmissao() {
+        const data = getFieldValue('data_relatorio');
+        const turno = getFieldValue('turno');
+        const estudio = getFieldValue('estudio');
+        if (!data || !turno || !estudio || estudio === 'Externo') return;
+        try {
+            const ctx = await apiGet(`/api/v1/image-director/lookup/contexto-estudio?${new URLSearchParams({ data, turno, estudio })}`);
+            if (ctx) aplicarTransmissao(ctx);
+        } catch (e) { /* sem contexto: mantém os campos como estão */ }
+    }
+
+    async function preencherContextoEstudioAutomatico() {
+        const data = getFieldValue('data_relatorio');
+        const turno = getFieldValue('turno');
+        const estudio = getFieldValue('estudio');
+        if (!data || !turno || !estudio || estudio === 'Externo') return;
+
+        try {
+            const p = new URLSearchParams({ data, turno, estudio });
+            const ctx = await apiGet(`/api/v1/image-director/lookup/contexto-estudio?${p}`);
+            if (!ctx) return;
+
+            // 1. Diretor de Imagem escalado
+            if (ctx.diretor_imagem_id && !getFieldValue('diretor_imagem_id')) {
+                const selDir = document.getElementById('diretor_imagem_id');
+                if (selDir) {
+                    if (!Array.from(selDir.options).some(o => o.value === ctx.diretor_imagem_id)) {
+                        selDir.innerHTML += `<option value="${ctx.diretor_imagem_id}">${escHtml(ctx.diretor_nome || 'Diretor Escalado')}</option>`;
+                    }
+                    selDir.value = ctx.diretor_imagem_id;
+                }
+            }
+
+            // 2. Link do YouTube e Chave de Transmissão: do diretor-chefe (travados) ou sugestão
+            aplicarTransmissao(ctx);
+
+            // 3. Se for evento
+            if (ctx.is_evento) {
+                setFieldValue('turma_id', EVENTO);
+                await onTurmaChange();
+                if (ctx.nome_evento) setFieldValue('evento_nome', ctx.nome_evento);
+                if (ctx.departamento) setFieldValue('evento_departamento', ctx.departamento);
+                if (ctx.responsavel) setFieldValue('evento_responsavel', ctx.responsavel);
+                if (ctx.chamado) setFieldValue('evento_chamado', ctx.chamado);
+                if (ctx.horario_inicio) setFieldValue('evento_inicio', ctx.horario_inicio);
+                if (ctx.horario_fim) setFieldValue('evento_fim', ctx.horario_fim);
+            } else if (ctx.turma_id) {
+                // Preenche dados da grade
+                setFieldValue('turma_id', ctx.turma_id);
+                if (ctx.disciplina_id) {
+                    setFieldValue('disciplina_id', ctx.disciplina_id);
+                    await onDisciplinaChange();
+                }
+                if (ctx.disciplina_nome) setFieldValue('disciplina_nome_hidden', ctx.disciplina_nome);
+                if (ctx.professor_id) setFieldValue('professor_id', ctx.professor_id);
+                if (ctx.professor_nome) setFieldValue('professor_nome_hidden', ctx.professor_nome);
+                if (ctx.horario_aula) setFieldValue('horario_aula', ctx.horario_aula);
+            }
+        } catch (e) {
+            console.warn('Erro ao obter contexto do estúdio:', e);
+        }
+    }
+
+    const STATUS_CONFIG = {
+        RASCUNHO:             { label: 'Rascunho',              icon: icone('lapis', 'ico-sm'), cls: 'badge-status-rascunho' },
+        AGUARDANDO_VALIDACAO: { label: 'Aguardando validação',  icon: icone('relogio', 'ico-sm'), cls: 'badge-status-aguardando' },
+        VALIDADO:             { label: 'Validado',              icon: icone('check', 'ico-sm'), cls: 'badge-status-validado' },
+        CANCELADO:            { label: 'Cancelado',             icon: icone('bloqueado', 'ico-sm'), cls: 'badge-status-cancelado' },
+    };
+
+    function statusBadgeHtml(status, precisaCorrecao) {
+        const cfg = STATUS_CONFIG[status] || { label: status || 'N/A', icon: icone('vazio', 'ico-sm'), cls: 'badge-status-rascunho' };
+        const cls = precisaCorrecao ? 'badge-status-correcao' : cfg.cls;
+        const label = precisaCorrecao ? 'Correção Pendente' : cfg.label;
+        const icon = precisaCorrecao ? icone('devolvido', 'ico-sm') : cfg.icon;
+        return `<span class="badge-status ${cls}">${icon} ${label}</span>`;
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadUserProfile();
+        const user = getUser();
+        isChefeGlobal = !!(user && ['admin', 'gestor', 'diretor_chefe'].includes(user.role));
+
+        const params = new URLSearchParams(window.location.search);
+        const idParam = params.get('id');
+
+        if (params.get('tipo') === 'gravacao_estudio') {
+            reportOrigem = 'gravacao_estudio';
+        }
+        const abrirComoEvento = params.get('tipo') === 'evento';
+
+        if (params.get('locked') === '1') {
+            lockedFromGrade = true;
+            reportOrigem = 'grade';
+            lockedParams = {
+                data: params.get('data') || '',
+                turno: params.get('turno') || '',
+                estudio: params.get('estudio') || '',
+                turma: params.get('turma') || '',
+                horario: params.get('horario') || '',
+                disciplina_id: params.get('disciplina_id') || '',
+                professor_id: params.get('professor_id') || '',
+                disciplina_nome: params.get('disciplina_nome') || '',
+                professor_nome: params.get('professor_nome') || '',
+                class_report_id: params.get('class_report_id') || '',
+                agenda: params.get('agenda') || '',
+            };
+        } else if (!idParam && params.get('tipo') !== 'gravacao_estudio' && !abrirComoEvento) {
+            // "Nova Aula" saiu: relatório de aula só a partir da Grade Horária
+            showToast('Para lançar um relatório de aula, clique na aula na Grade Horária.', 'info');
+            setTimeout(() => window.location.replace('/grade'), 1200);
+            return;
+        }
+
+        const userRole = user && user.role;
+
+        await Promise.all([
+            carregarDiretores(),
+            carregarEstudios(),
+            carregarChecklist(),
+            carregarPerguntas(),
+            carregarTurmas(),
+            carregarDisciplinasProfessores(),
+            carregarCanaisIptv(),
+        ]);
+
+        populateHorarioSelect();
+        ['data_relatorio', 'turno', 'estudio'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('change', () => {
+                refreshHorarioOptions();
+                preencherContextoEstudioAutomatico();
+            });
+        });
+
+        if (lockedFromGrade) {
+            document.getElementById('btn-add-lesson').style.display = 'none';
+        }
+
+        if (!idParam && abrirComoEvento && !lockedFromGrade) {
+            setFieldValue('turma_id', EVENTO);
+            await onTurmaChange();
+            document.querySelector('.page-title').textContent = '🎪 Evento';
+            if (!isChefeGlobal && userRole === 'diretor_imagem') {
+                document.getElementById('data_relatorio').valueAsDate = new Date();
+            }
+        }
+
+        if (idParam) {
+            await carregarRelatorio(idParam);
+        } else if (lockedFromGrade) {
+            await aplicarPrefillDaGrade();
+        } else if (reportOrigem === 'gravacao_estudio') {
+            document.querySelector('.page-title').textContent = '🎬 Gravação de Estúdio';
+            document.querySelector('.page-subtitle').textContent = 'Relatório avulso — não entra no PDF do turno';
+            if (!isChefeGlobal && userRole === 'diretor_imagem') {
+                document.getElementById('data_relatorio').valueAsDate = new Date();
+            }
+        } else {
+            if (!isChefeGlobal && userRole === 'diretor_imagem') {
+                document.getElementById('data_relatorio').valueAsDate = new Date();
+            }
+        }
+    });
+
+    function updateProfessorDatalist(idx) {
+        const datalist = document.getElementById(`professores-list-${idx}`);
+        if (!datalist) return;
+        const pool = professoresPorLesson[idx] || professoresCache;
+        datalist.innerHTML = pool.map(p => `<option value="${escHtml(p.nome)}"></option>`).join('');
+    }
+
+    async function onLessonDisciplinaInput(idx, value) {
+        lessons[idx].disciplina_nome = value;
+        const match = disciplinasCache.find(d => d.nome.toLowerCase() === value.trim().toLowerCase());
+        lessons[idx].disciplina_id = match ? match.id : null;
+        if (match) {
+            professoresPorLesson[idx] = await apiGet(`/api/v1/image-director/lookup/professores-por-disciplina/${match.id}`) || [];
+        } else {
+            professoresPorLesson[idx] = professoresCache.slice();
+        }
+        updateProfessorDatalist(idx);
+    }
+
+    async function onLessonDisciplinaChange(idx, value) {
+        await onLessonDisciplinaInput(idx, value);
+    }
+
+    function onLessonProfessorInput(idx, value) {
+        lessons[idx].professor_nome = value;
+        const pool = professoresPorLesson[idx] || professoresCache;
+        const match = pool.find(p => p.nome.toLowerCase() === value.trim().toLowerCase());
+        lessons[idx].professor_id = match ? match.id : null;
+    }
+
+    function onLessonProfessorChange(idx, value) {
+        onLessonProfessorInput(idx, value);
+    }
+
+    function renderDisciplinaField(l, idx) {
+        if (l.locked_disciplina && l.disciplina_nome) {
+            return `<div class="locked-field">${escHtml(l.disciplina_nome)}</div>`;
+        }
+        return `
+            <input type="text" class="form-input" list="disciplinas-list-${idx}" value="${escHtml(l.disciplina_nome)}"
+                placeholder="Digite ou selecione a disciplina..."
+                oninput="onLessonDisciplinaInput(${idx}, this.value)"
+                onchange="onLessonDisciplinaChange(${idx}, this.value)">
+            <datalist id="disciplinas-list-${idx}">
+                ${disciplinasCache.map(d => `<option value="${escHtml(d.nome)}"></option>`).join('')}
+            </datalist>`;
+    }
+
+    function renderProfessorField(l, idx) {
+        if (l.locked_professor && l.professor_nome) {
+            return `<div class="locked-field">${escHtml(l.professor_nome)}</div>`;
+        }
+        const pool = professoresPorLesson[idx] || professoresCache;
+        return `
+            <input type="text" class="form-input" list="professores-list-${idx}" value="${escHtml(l.professor_nome)}"
+                placeholder="Digite ou selecione o professor..."
+                oninput="onLessonProfessorInput(${idx}, this.value)"
+                onchange="onLessonProfessorChange(${idx}, this.value)">
+            <datalist id="professores-list-${idx}">
+                ${pool.map(p => `<option value="${escHtml(p.nome)}"></option>`).join('')}
+            </datalist>`;
+    }
+
+    function addLessonBlank() {
+        lessons.push({
+            class_report_id: null,
+            disciplina_nome: '', professor_nome: '',
+            disciplina_id: null, professor_id: null,
+            horario_aula: '',
+            canal_utilizado: '',
+            locked_disciplina: false, locked_professor: false,
+            transmissao_ou_gravada: 'Transmissão',
+            precisa_numero_chamado: false,
+            numero_chamado: '',
+            numero_aula: lessons.length + 1,
+            video_corrompido: 'Não', video_corrompido_obs: '',
+            interrupcoes: 'Não',
+            problema_audio: 'Não', problema_audio_obs: '',
+            vinhetas_corretas: 'Sim', vinhetas_corretas_obs: '',
+            creditos_corretos: 'Sim',
+            observacoes: '', respostas_extras: {},
+        });
+        if (isEvento()) {
+            const ev = dadosEvento();
+            const nova = lessons[lessons.length - 1];
+            nova.disciplina_nome = ev.nome;
+            nova.professor_nome = ev.responsavel || ev.departamento;
+        }
+        renderLessons();
+    }
+
+    async function addLessonFromSlot(slot) {
+        const ctx = getHeaderContexto();
+        const numeroAula = slot.numero_aula || await lookupNumeroAulaSlot();
+        lessons.push({
+            class_report_id: slot.class_report_id || ctx.class_report_id || null,
+            disciplina_nome: ctx.disciplina_nome || lockedParams.disciplina_nome || '',
+            professor_nome: nomeProfessorParaAula(ctx),
+            disciplina_id: ctx.disciplina_id || null,
+            professor_id: ctx.professor_id || null,
+            horario_aula: ctx.horario_aula || '',
+            canal_utilizado: slot.canal_utilizado || '',
+            numero_aula: numeroAula,
+            transmissao_ou_gravada: 'Transmissão',
+            precisa_numero_chamado: false,
+            numero_chamado: '',
+            video_corrompido: 'Não', video_corrompido_obs: '',
+            interrupcoes: 'Não',
+            problema_audio: 'Não', problema_audio_obs: '',
+            vinhetas_corretas: 'Sim', vinhetas_corretas_obs: '',
+            creditos_corretos: 'Sim',
+            observacoes: '', respostas_extras: {},
+        });
+        renderLessons();
+        await refreshSlotNumeroAulaBadge(numeroAula);
+    }
+
+    function removeLesson(idx) {
+        lessons.splice(idx, 1);
+        renderLessons();
+    }
+
+    function lessonLabel(l, idx) {
+        const n = l.numero_aula || (idx + 1);
+        return `Aula ${String(n).padStart(2, '0')}`;
+    }
+
+    function togglePrecisaChamado(idx, checked) {
+        lessons[idx].precisa_numero_chamado = checked;
+        if (!checked) lessons[idx].numero_chamado = '';
+        renderLessons();
+    }
+
+    function travarCampoHeader(grupoId, campoId, label, valorExibido, valorReal, hiddenIds = []) {
+        const grupo = document.getElementById(grupoId);
+        let hiddenExtra = hiddenIds.map(h => `<input type="hidden" id="${h.id}" value="${(h.value || '').replace(/"/g, '&quot;')}">`).join('');
+        grupo.innerHTML = `
+            <label class="form-label">${label}</label>
+            <div class="locked-field">${escHtml(valorExibido) || '—'}</div>
+            <input type="hidden" id="${campoId}" value="${(valorReal || '').replace(/"/g, '&quot;')}">
+            ${hiddenExtra}`;
+    }
+
+    async function carregarEstudios() {
+        try {
+            const estudios = await apiGet('/api/v1/configuracoes/estudios') || [];
+            const sel = document.getElementById('estudio');
+            if (!sel || sel.tagName !== 'SELECT') return;
+            const current = sel.value;
+            sel.innerHTML = '<option value="">Selecione o estúdio...</option>';
+            estudios.forEach(e => {
+                sel.innerHTML += `<option value="${escHtml(e.nome)}">${escHtml(e.nome)}</option>`;
+            });
+            sel.innerHTML += '<option value="Externo">Externo</option>';
+            if (current) sel.value = current;
+        } catch (e) { console.error(e); }
+    }
+
+    function isEvento() {
+        return getFieldValue('turma_id') === EVENTO;
+    }
+
+    /** Evento não tem turma/disciplina/professor/horário da grade: mostra os campos próprios. */
+    function aplicarModoEvento(ligado) {
+        ['grupo-disciplina', 'grupo-professor', 'grupo-horario'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = ligado ? 'none' : '';
+        });
+        ['disciplina_id', 'professor_id', 'horario_aula'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.required = !ligado;
+        });
+        document.getElementById('grupo-evento').style.display = ligado ? '' : 'none';
+        if (ligado && reportOrigem !== 'evento') {
+            origemAntesDoEvento = reportOrigem;
+            reportOrigem = 'evento';
+        } else if (!ligado && reportOrigem === 'evento' && !currentReportId) {
+            reportOrigem = origemAntesDoEvento || 'grade';
+        }
+    }
+
+    function dadosEvento() {
+        const ini = getFieldValue('evento_inicio'), fim = getFieldValue('evento_fim');
+        return {
+            nome: getFieldValue('evento_nome'),
+            departamento: getFieldValue('evento_departamento'),
+            responsavel: getFieldValue('evento_responsavel'),
+            inicio: ini, fim,
+            chamado: getFieldValue('evento_chamado'),
+            horario: ini && fim ? `${ini} às ${fim}` : '',
+        };
+    }
+
+    async function onTurmaChange() {
+        const turmaId = getFieldValue('turma_id');
+        aplicarModoEvento(turmaId === EVENTO);
+        if (turmaId === EVENTO) {
+            if (!lessons.length) addLessonBlank();
+            return;
+        }
+        const selDisc = document.getElementById('disciplina_id');
+        const selProf = document.getElementById('professor_id');
+        if (!turmaId) {
+            selDisc.innerHTML = '<option value="">Selecione turma primeiro...</option>';
+            selDisc.disabled = true;
+            selProf.innerHTML = '<option value="">Selecione disciplina primeiro...</option>';
+            selProf.disabled = true;
+            refreshHorarioOptions();
+            return;
+        }
+        try {
+            const discs = await apiGet('/api/v1/image-director/lookup/disciplinas') || [];
+            selDisc.innerHTML = '<option value="">Selecione a disciplina...</option>';
+            discs.forEach(d => {
+                selDisc.innerHTML += `<option value="${d.id}">${escHtml(d.nome)}</option>`;
+            });
+            selDisc.disabled = false;
+            selProf.innerHTML = '<option value="">Selecione disciplina primeiro...</option>';
+            selProf.disabled = true;
+        } catch (e) { console.error(e); }
+        refreshHorarioOptions();
+    }
+
+    async function onDisciplinaChange() {
+        const discId = getFieldValue('disciplina_id');
+        const selDisc = document.getElementById('disciplina_id');
+        const selProf = document.getElementById('professor_id');
+        if (selDisc && selDisc.selectedIndex > 0) {
+            setFieldValue('disciplina_nome_hidden', selDisc.options[selDisc.selectedIndex].text);
+        }
+        if (!discId) {
+            selProf.innerHTML = '<option value="">Selecione disciplina primeiro...</option>';
+            selProf.disabled = true;
+            return;
+        }
+        try {
+            const profs = await apiGet(`/api/v1/image-director/lookup/professores-por-disciplina/${discId}`) || [];
+            if (profs.length === 0) {
+                selProf.innerHTML = '<option value="">Nenhum professor vinculado</option>';
+                selProf.disabled = true;
+            } else {
+                selProf.innerHTML = '<option value="">Selecione o professor...</option>';
+                profs.forEach(p => {
+                    selProf.innerHTML += `<option value="${p.id}">${escHtml(p.nome)}</option>`;
+                });
+                selProf.disabled = false;
+            }
+        } catch (e) { console.error(e); }
+    }
+
+    function getHeaderContexto() {
+        const disciplinaSel = document.getElementById('disciplina_id');
+        const professorSel = document.getElementById('professor_id');
+        let disciplina_id = getFieldValue('disciplina_id') || lockedParams.disciplina_id || null;
+        let professor_id = getFieldValue('professor_id') || lockedParams.professor_id || null;
+        let disciplina_nome = getFieldValue('disciplina_nome_hidden') || lockedParams.disciplina_nome || '';
+        let professor_nome = getFieldValue('professor_nome_hidden') || lockedParams.professor_nome || '';
+        if (disciplinaSel && disciplinaSel.tagName === 'SELECT' && disciplinaSel.selectedIndex > 0) {
+            disciplina_nome = disciplinaSel.options[disciplinaSel.selectedIndex].text;
+        }
+        if (professorSel && professorSel.tagName === 'SELECT' && professorSel.selectedIndex > 0) {
+            professor_nome = professorSel.options[professorSel.selectedIndex].text;
+        }
+        if (disciplina_id && !(disciplina_nome || '').trim()) {
+            const discMatch = disciplinasCache.find(d => String(d.id) === String(disciplina_id));
+            if (discMatch) disciplina_nome = discMatch.nome;
+            if (disciplinaSel && disciplinaSel.tagName === 'SELECT') {
+                const opt = Array.from(disciplinaSel.options).find(o => String(o.value) === String(disciplina_id));
+                if (opt && opt.text) disciplina_nome = opt.text;
+            }
+        }
+        if (professor_id && !(professor_nome || '').trim()) {
+            const profMatch = professoresCache.find(p => String(p.id) === String(professor_id));
+            if (profMatch) professor_nome = profMatch.nome;
+            if (professorSel && professorSel.tagName === 'SELECT') {
+                const opt = Array.from(professorSel.options).find(o => String(o.value) === String(professor_id));
+                if (opt && opt.text) professor_nome = opt.text;
+            }
+        }
+        const horario_aula = (getFieldValue('horario_aula') || lockedParams.horario || '').trim() || null;
+        let professorExterno = professor_id ? null : ((professor_nome || '').trim() || null);
+        if (!professor_id && isPlaceholderProfessor(professorExterno) && lockedParams.professor_nome) {
+            professorExterno = lockedParams.professor_nome.trim();
+        }
+        if (professorExterno && isPlaceholderProfessor(professorExterno)) {
+            professorExterno = null;
+        }
+        if (professor_nome && isPlaceholderProfessor(professor_nome)) {
+            professor_nome = '';
+        }
+        return {
+            disciplina_id: disciplina_id || null,
+            disciplina_nome: (disciplina_nome || '').trim() || null,
+            professor_id: professor_id || null,
+            professor_nome: (professor_nome || '').trim() || null,
+            professor_nome_externo: professorExterno,
+            horario_aula,
+            class_report_id: lockedParams.class_report_id || null,
+        };
+    }
+
+    async function carregarTurmas() {
+        try {
+            const res = await fetch('/api/v1/turmas/', { headers: { 'Authorization': `Bearer ${getToken()}` } });
+            if (res.ok) {
+                turmasCache = await res.json();
+                renderTurmaSelect();
+            }
+        } catch (e) { /* opcional */ }
+    }
+
+    function renderTurmaSelect() {
+        const sel = document.getElementById('turma_id');
+        if (!sel || sel.tagName !== 'SELECT') return;
+        const current = sel.value;
+        sel.innerHTML = '<option value="">Selecione...</option>';
+        turmasCache.forEach(t => {
+            const dispName = t.nomenclatura_padrao || t.nome;
+            const fullLabel = `${t.serie_modulo} - ${t.turno} - ${dispName}`;
+            const modalidade = (t.modalidade || 'REGULAR').replace(/"/g, '');
+            sel.innerHTML += `<option value="${t.id}" data-modalidade="${modalidade}">${escHtml(fullLabel)}</option>`;
+        });
+        if (!lockedFromGrade) sel.innerHTML += `<option value="${EVENTO}">🎪 Evento (sem turma — UETEV, SUGED…)</option>`;
+        if (current) sel.value = current;
+    }
+
+    function filenameFromContentDisposition(res) {
+        const cd = res.headers.get('Content-Disposition') || '';
+        const match = cd.match(/filename="([^"]+)"/);
+        return match ? match[1] : null;
+    }
+
+    async function carregarDisciplinasProfessores() {
+        try {
+            disciplinasCache = await apiGet('/api/v1/image-director/lookup/disciplinas') || [];
+            professoresCache = await apiGet('/api/v1/image-director/lookup/professores') || [];
+        } catch (e) {
+            showToast('Erro ao carregar disciplinas e professores.', 'error');
+        }
+    }
+
+    async function carregarCanaisIptv() {
+        try {
+            canaisIptvCache = await apiGet('/api/v1/configuracoes/canais-iptv') || [];
+        } catch (e) {
+            console.error(e);
+        }
+    }
+
+    /**
+     * Reunião (out/2026): o canal IPTV vem da Agenda (diretor-chefe) e fica travado; se o chefe
+     * não informou, fica vazio (ex.: transmissão só pelo YouTube). Só abre para escolher no
+     * evento pedido pela SEDUC. Relatório que não veio da Agenda continua escolhendo.
+     */
+    function canalTravadoPelaAgenda() {
+        const r = AGENDA_AULA;
+        if (!r) return false;
+        const eventoSeduc = r.tipo_agenda === 'EVENTO' && r.solicitante_antecipacao === 'SEDUC';
+        return !eventoSeduc;
+    }
+
+    function renderCanalSelect(idx, selected) {
+        if (canalTravadoPelaAgenda()) {
+            const canal = (AGENDA_AULA && AGENDA_AULA.canal) || '';
+            lessons[idx].canal_utilizado = canal;
+            return `<div class="locked-field">${canal ? escHtml(canal) : '—'}</div>`;
+        }
+        const opts = ['<option value="">Selecione o canal...</option>'];
+        canaisIptvCache.forEach(c => {
+            const nome = c.nome || '';
+            const sel = selected === nome ? ' selected' : '';
+            opts.push(`<option value="${escHtml(nome)}"${sel}>${escHtml(nome)} (Ch.${c.numero})</option>`);
+        });
+        return `<select class="form-select" onchange="lessons[${idx}].canal_utilizado=this.value">
+            ${opts.join('')}
+        </select>`;
+    }
+
+    function nomeDaTurma(turmaId) {
+        const t = turmasCache.find(x => x.id === turmaId);
+        if (!t) return null;
+        return t.nomenclatura_padrao || t.nome;
+    }
+
+    // ─── Campo travado (só leitura) que ainda expõe .value pro coletarPayload ──
+    // Substitui o <select>/<input> visível por um bloco somente-leitura, mas
+    // mantém um <input type="hidden"> com o MESMO id — assim o restante do
+    // código (coletarPayload, buscarAulasSugeridas etc.) continua lendo
+    // `document.getElementById(id).value` sem qualquer mudança, e não corremos
+    // o risco de o valor não bater com nenhuma <option> do select (ex.: turno
+    // gravado como "MANHÃ" na Turma x "Manhã" no <option> do relatório).
+    function travarCampo(grupoId, campoId, label, valorExibido, valorReal) {
+        const grupo = document.getElementById(grupoId);
+        grupo.innerHTML = `
+            <label class="form-label">${label}</label>
+            <div class="locked-field">${valorExibido || '—'}</div>
+            <input type="hidden" id="${campoId}" value="${(valorReal || '').replace(/"/g, '&quot;')}">`;
+    }
+
+    function isPlaceholderProfessor(nome) {
+        const n = (nome || '').trim().toLowerCase();
+        return !n || n === 'n/a' || n === 'na' || n === '—' || n === '-';
+    }
+
+    function professorEstaInformado(payload, ctx) {
+        if (payload.professor_id) {
+            const nome = (ctx.professor_nome || '').trim();
+            return !!nome && !isPlaceholderProfessor(nome);
+        }
+        const externo = (payload.professor_nome_externo || ctx.professor_nome || lockedParams.professor_nome || '').trim();
+        return !!externo && !isPlaceholderProfessor(externo);
+    }
+
+    function nomeProfessorParaAula(ctx) {
+        const candidatos = [
+            ctx.professor_nome,
+            ctx.professor_nome_externo,
+            lockedParams.professor_nome,
+        ];
+        for (const c of candidatos) {
+            const nome = (c || '').trim();
+            if (nome && !isPlaceholderProfessor(nome)) return nome;
+        }
+        return '';
+    }
+
+    async function ensureLessonFromGradeSlot() {
+        if (!lockedFromGrade || lessons.length > 0) return;
+        await addLessonFromSlot({
+            class_report_id: lockedParams.class_report_id || null,
+            canal_utilizado: (AGENDA_AULA && AGENDA_AULA.canal) || '',
+        });
+        aplicarAulaDaAgendaNasLessons();
+    }
+
+    /** Aula da Agenda: canal, gravada x transmissão e chamado vão para a aula do relatório. */
+    function aplicarAulaDaAgendaNasLessons() {
+        const r = AGENDA_AULA;
+        if (!r || !lessons.length) return;
+        lessons.forEach(l => {
+            if (r.canal && !l.canal_utilizado) l.canal_utilizado = r.canal;
+            if (r.antecipada) {
+                l.transmissao_ou_gravada = 'Aula gravada';
+                l.canal_utilizado = '';
+            }
+            if (r.chamado && !l.numero_chamado) l.numero_chamado = r.chamado;
+            if (!l.professor_nome && r.professor) l.professor_nome = r.professor;
+        });
+        renderLessons();
+    }
+
+    function reaplicarContextoGradeNoFormulario() {
+        if (!lockedFromGrade) return;
+        if (lockedParams.disciplina_id) setFieldValue('disciplina_id', lockedParams.disciplina_id);
+        if (lockedParams.disciplina_nome) setFieldValue('disciplina_nome_hidden', lockedParams.disciplina_nome);
+        if (lockedParams.professor_id && lockedParams.professor_id !== 'null') {
+            setFieldValue('professor_id', lockedParams.professor_id);
+        }
+        if (lockedParams.professor_nome) setFieldValue('professor_nome_hidden', lockedParams.professor_nome);
+        if (lockedParams.horario) setHorarioAula(lockedParams.horario);
+    }
+
+    async function refreshSlotNumeroAulaBadge(numero) {
+        const el = document.getElementById('slot-numero-aula-badge');
+        if (!el || !lockedFromGrade) return;
+        const n = numero != null ? numero : await lookupNumeroAulaSlot();
+        if (n) {
+            el.textContent = `Registrando: AULA ${String(n).padStart(2, '0')}`;
+            el.style.display = 'inline-block';
+        } else {
+            el.style.display = 'none';
+        }
+    }
+
+    async function lookupNumeroAulaSlot() {
+        const turmaId = lockedParams.turma || getFieldValue('turma_id');
+        if (!turmaId || !lockedParams.data) return 1;
+        try {
+            const q = new URLSearchParams({
+                turma_id: turmaId,
+                data: lockedParams.data,
+            });
+            if (lockedParams.horario) q.set('horario_aula', lockedParams.horario);
+            if (lockedParams.class_report_id) q.set('class_report_id', lockedParams.class_report_id);
+            if (lockedParams.turno) q.set('turno', lockedParams.turno);
+            const res = await fetch(`/api/v1/image-director/lookup/numero-aula?${q.toString()}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) return 1;
+            const data = await res.json();
+            return data.numero_aula || 1;
+        } catch (e) {
+            return 1;
+        }
+    }
+
+    async function lookupExistingReportSilent(diretorId) {
+        try {
+            const q = new URLSearchParams({
+                data: lockedParams.data,
+                turno: lockedParams.turno,
+                estudio: lockedParams.estudio,
+                diretor_imagem_id: diretorId,
+            });
+            if (lockedParams.turma) q.set('turma_id', lockedParams.turma);
+            if (lockedParams.horario) q.set('horario_aula', lockedParams.horario);
+            if (lockedParams.class_report_id) q.set('class_report_id', lockedParams.class_report_id);
+            const res = await fetch(`/api/v1/image-director/lookup/existing?${q.toString()}`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (!res.ok) return null;
+            return await res.json();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    /**
+     * O estúdio da aula no dia vem da Agenda de Estúdios (diretor-chefe), igual ao
+     * relatório do assistente: na aula remanejada é o estúdio de destino, não o da grade.
+     * Assim os dois relatórios ficam com o mesmo estúdio e se casam no Consolidado.
+     */
+    let AGENDA_AULA = null;
+    async function aplicarEstudioDaAgenda() {
+        if (!lockedParams.turma || !lockedParams.data || !lockedParams.horario) return;
+        const p = new URLSearchParams({ turma_id: lockedParams.turma, data: lockedParams.data });
+        const h = String(lockedParams.horario);
+        if (/às/.test(h) || /^\s*\d{1,2}:\d{2}/.test(h)) p.set('inicio', h.split('às')[0].trim());
+        else p.set('horario', h);
+        if (lockedParams.turno) p.set('turno', lockedParams.turno);
+        if (lockedParams.disciplina_id) p.set('disciplina_id', lockedParams.disciplina_id);
+        if (lockedParams.agenda) p.set('agendamento_id', lockedParams.agenda);
+        let r = null;
+        try { r = await apiGet(`/api/v1/agenda-estudios/estudio-da-aula?${p}`); } catch (e) { return; }
+        if (!r || !r.encontrado || !r.estudio) return;
+        AGENDA_AULA = r;
+        // Diretor escalado pelo diretor-chefe
+        const selDir = document.getElementById('diretor_imagem_id');
+        if (r.diretor_imagem_id && selDir && selDir.tagName === 'SELECT') {
+            if (!Array.from(selDir.options).some(o => o.value === r.diretor_imagem_id)) {
+                selDir.insertAdjacentHTML('beforeend', `<option value="${escHtml(r.diretor_imagem_id)}">${escHtml(r.diretor_nome || 'Diretor escalado')}</option>`);
+            }
+            selDir.value = r.diretor_imagem_id;
+            selDir.disabled = true;
+            selDir.title = 'Escalado pelo diretor-chefe na Agenda';
+        }
+        const sel = document.getElementById('estudio');
+        if (sel && !Array.from(sel.options).some(o => o.value === r.estudio)) {
+            sel.insertAdjacentHTML('beforeend', `<option value="${escHtml(r.estudio)}">${escHtml(r.estudio)}</option>`);
+        }
+        setFieldValue('estudio', r.estudio);
+        lockedParams.estudio = r.estudio;
+        if (sel) { sel.disabled = true; sel.title = 'Definido pela Agenda de Estúdios (diretor-chefe)'; }
+        const hint = document.getElementById('estudio-agenda-hint');
+        if (hint) {
+            const partes = ['🎬 Definido pela Agenda de Estúdios'];
+            if (r.remanejada) partes.push(`remanejada neste dia: ${r.estudio_grade} → ${r.estudio}`);
+            if (r.horario_faixa) partes.push(r.horario_faixa);
+            if (r.canal) partes.push(r.canal);
+            if (r.diretor_nome) partes.push(`diretor: ${r.diretor_nome}`);
+            if (r.tipo_agenda_label) partes.push(r.tipo_agenda_label + (r.solicitante_antecipacao ? ` (${r.solicitante_antecipacao === 'SEDUC' ? 'pedido da SEDUC' : 'pedido do Canal Educação'})` : ''));
+            else if (r.exibicao_antecipada) partes.push(`📼 exibição da aula gravada em ${String(r.exibicao_antecipada.data_gravacao).split('-').reverse().join('/')}${r.exibicao_antecipada.solicitante === 'SEDUC' ? ' (pedido da SEDUC)' : ''}`);
+            else partes.push('aula regular, não antecipada');
+            if (r.chamado) partes.push(`chamado ${r.chamado}`);
+            hint.textContent = partes.join(' · ');
+            hint.style.display = 'block';
+        }
+        aplicarAulaDaAgendaNasLessons();
+        // Link do YouTube e chave do dia (diretor-chefe) para este estúdio e turno: travados
+        await sincronizarTransmissao();
+    }
+
+    /**
+     * Reunião (out/2026): aula aberta pela grade — data, turno, turma, disciplina e horário
+     * vêm da grade/Agenda e ficam travados. O professor continua aberto (substituição).
+     */
+    function travarCabecalhoDaGrade() {
+        // Aula da grade (aberta pela grade ou relatório já salvo da grade): não altera
+        const daGrade = lockedFromGrade || (reportOrigem === 'grade' && currentReport && currentReport.turma_id);
+        if (!daGrade || isEvento()) return;
+        // Só impede a alteração: os dados são puxados automaticamente, sem aviso na tela
+        const data = document.getElementById('data_relatorio');
+        if (data) data.readOnly = true;
+        ['turno', 'turma_id', 'disciplina_id', 'horario_aula'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.tagName === 'SELECT' && (el.value || id === 'turma_id')) el.disabled = true;
+        });
+    }
+
+    async function aplicarPrefillDaGrade() {
+        if (lockedParams.data) setFieldValue('data_relatorio', lockedParams.data);
+        resolveTurnoPrefill();
+        if (lockedParams.estudio) setFieldValue('estudio', lockedParams.estudio);
+        await aplicarEstudioDaAgenda();
+
+        if (lockedParams.turma) {
+            renderTurmaSelect();
+            setFieldValue('turma_id', lockedParams.turma);
+            await onTurmaChange();
+            const discId = lockedParams.disciplina_id;
+            if (discId) {
+                setFieldValue('disciplina_id', discId);
+                await onDisciplinaChange();
+                const profId = lockedParams.professor_id;
+                if (profId && profId !== 'null' && profId !== 'undefined') {
+                    const selProf = document.getElementById('professor_id');
+                    if (selProf && Array.from(selProf.options).some(o => o.value === profId)) {
+                        selProf.value = profId;
+                    }
+                }
+            }
+            if (lockedParams.disciplina_nome) {
+                setFieldValue('disciplina_nome_hidden', lockedParams.disciplina_nome);
+            }
+            if (lockedParams.professor_nome) {
+                setFieldValue('professor_nome_hidden', lockedParams.professor_nome);
+            }
+        }
+
+        const hora = lockedParams.horario;
+        if (hora) setHorarioAula(hora);
+
+        const diretorId = getFieldValue('diretor_imagem_id');
+        if (diretorId && lockedParams.data && lockedParams.turno && lockedParams.estudio) {
+            const existing = await lookupExistingReportSilent(diretorId);
+            if (existing && existing.id) {
+                showToast('Relatório existente aberto para este slot.', 'info');
+                history.replaceState(null, '', `/diretor-imagem?id=${existing.id}`);
+                await carregarRelatorio(existing.id);
+                reaplicarContextoGradeNoFormulario();
+            }
+        }
+
+        await ensureLessonFromGradeSlot();
+        await refreshSlotNumeroAulaBadge();
+        travarCabecalhoDaGrade();
+    }
+
+    function getDiretorDisplayName(fallbackNome) {
+        const user = getUser();
+        const nomeUsuario = user && user.full_name ? String(user.full_name).trim() : '';
+        return nomeUsuario || fallbackNome || '—';
+    }
+
+    async function carregarDiretores() {
+        const displayName = getDiretorDisplayName();
+        const user = getUser();
+        const podeSelecionarDiretor = user && ['admin', 'gestor', 'diretor_chefe'].includes(user.role);
+        try {
+            if (podeSelecionarDiretor) {
+                const data = await apiGet('/api/v1/image-director/lookup/diretores');
+                const grupo = document.getElementById('grupo-diretor');
+                if (!data || data.length === 0) {
+                    document.getElementById('aviso-sem-vinculo').style.display = 'block';
+                    grupo.innerHTML = `
+                        <label class="form-label">Diretor de Imagem *</label>
+                        <div class="locked-field">Nenhum diretor cadastrado</div>
+                        <input type="hidden" id="diretor_imagem_id" value="">`;
+                    document.querySelectorAll('.form-actions button').forEach(b => b.disabled = true);
+                    return;
+                }
+                grupo.innerHTML = `
+                    <label class="form-label">Diretor de Imagem *</label>
+                    <select id="diretor_imagem_id" class="form-select" required>
+                        <option value="">Selecione o diretor...</option>
+                        ${data.map(d => `<option value="${d.id}">${escHtml(d.nome)}</option>`).join('')}
+                    </select>`;
+                return;
+            }
+
+            const data = await apiGet('/api/v1/image-director/lookup/diretores?proprio=1');
+
+            if (!data || data.length === 0) {
+                document.getElementById('aviso-sem-vinculo').style.display = 'block';
+                travarCampo('grupo-diretor', 'diretor_imagem_id', 'Diretor de Imagem', displayName, '');
+                document.querySelectorAll('.form-actions button').forEach(b => b.disabled = true);
+                return;
+            }
+
+            travarCampo('grupo-diretor', 'diretor_imagem_id', 'Diretor de Imagem', displayName, data[0].id);
+            ownDiretorImagemId = data[0].id;
+        } catch (e) { showToast('Erro ao carregar diretores.', 'error'); }
+    }
+
+    async function carregarChecklist() {
+        checklistItems = await apiGet('/api/v1/image-director/lookup/checklist-items') || [];
+        renderChecklist({});
+    }
+
+    async function carregarPerguntas() {
+        questoesRelatorio = await apiGet('/api/v1/image-director/lookup/questions?nivel=por_relatorio') || [];
+        questoesPorAula = await apiGet('/api/v1/image-director/lookup/questions?nivel=por_aula') || [];
+        renderPerguntasRelatorio({});
+    }
+
+    function renderChecklist(respostasSalvas) {
+        const card = document.getElementById('card-fechamento-estudio');
+        const container = document.getElementById('checklist-container');
+        if (checklistItems.length === 0) {
+            if (card) card.style.display = 'none';
+            return;
+        }
+        if (card) card.style.display = 'block';
+        container.innerHTML = checklistItems.map(item => {
+            const resp = respostasSalvas[item.id];
+            return `
+            <div class="sim-nao-row">
+                <label>${item.nome}</label>
+                <div class="sim-nao-toggle" data-item-id="${item.id}">
+                    <button type="button" class="${resp === true ? 'active-sim' : ''}" onclick="setChecklistResp('${item.id}', true, this)">Sim</button>
+                    <button type="button" class="${resp === false ? 'active-nao' : ''}" onclick="setChecklistResp('${item.id}', false, this)">Não</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function setChecklistResp(itemId, valor, btnEl) {
+        const wrapper = btnEl.closest('.sim-nao-toggle');
+        wrapper.querySelectorAll('button').forEach(b => b.classList.remove('active-sim', 'active-nao'));
+        btnEl.classList.add(valor ? 'active-sim' : 'active-nao');
+        wrapper.dataset.resposta = valor;
+    }
+
+    function renderPerguntasRelatorio(respostasSalvas) {
+        const card = document.getElementById('card-perguntas-relatorio');
+        const container = document.getElementById('perguntas-relatorio-container');
+        if (questoesRelatorio.length === 0) { card.style.display = 'none'; return; }
+        card.style.display = 'block';
+        container.innerHTML = questoesRelatorio.map(q => {
+            const saved = respostasSalvas[q.id];
+            if (q.tipo === 'texto') {
+                return `<div class="form-group"><label class="form-label">${q.texto}${q.obrigatoria ? ' *' : ''}</label>
+                    <textarea class="form-textarea pergunta-relatorio" data-question-id="${q.id}" data-tipo="texto" rows="2">${saved && saved.resposta_texto ? saved.resposta_texto : ''}</textarea></div>`;
+            }
+            return `<div class="sim-nao-row">
+                <label>${q.texto}${q.obrigatoria ? ' *' : ''}</label>
+                <div class="sim-nao-toggle pergunta-relatorio" data-question-id="${q.id}" data-tipo="sim_nao">
+                    <button type="button" class="${saved && saved.resposta_bool === true ? 'active-sim' : ''}" onclick="setPerguntaRelatorio('${q.id}', true, this)">Sim</button>
+                    <button type="button" class="${saved && saved.resposta_bool === false ? 'active-nao' : ''}" onclick="setPerguntaRelatorio('${q.id}', false, this)">Não</button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function setPerguntaRelatorio(qId, valor, btnEl) {
+        const wrapper = btnEl.closest('.sim-nao-toggle');
+        wrapper.querySelectorAll('button').forEach(b => b.classList.remove('active-sim', 'active-nao'));
+        btnEl.classList.add(valor ? 'active-sim' : 'active-nao');
+        wrapper.dataset.resposta = valor;
+    }
+
+    function simNaoToggle(idx, field, valor) {
+        lessons[idx][field] = valor ? 'Sim' : 'Não';
+        renderLessons();
+    }
+
+    function renderLessons() {
+        const container = document.getElementById('lessons-container');
+        if (lessons.length === 0) {
+            const hint = lockedFromGrade
+                ? 'Nenhuma aula vinculada a este slot. Recarregue a página ou preencha os campos e tente enviar novamente.'
+                : 'Nenhuma aula adicionada. Clique em <strong>+ Adicionar aula</strong>.';
+            container.innerHTML = `<p style="color: var(--text-muted); font-size: 0.85rem;">${hint}</p>`;
+            return;
+        }
+        container.innerHTML = lessons.map((l, idx) => `
+            <div class="card lesson-card" style="margin-top: 0.75rem;">
+                ${!lockedFromGrade ? `<button type="button" class="btn btn-danger btn-sm remove-lesson" style="width:auto; min-height:auto; padding: 0.2rem 0.6rem;" onclick="removeLesson(${idx})">✕</button>` : ''}
+                <strong>AULA ${String(l.numero_aula || (idx + 1)).padStart(2, '0')}</strong>
+                <div class="sim-nao-row" style="margin-top: 0.5rem;">
+                    <label>Foi transmissão ou aula gravada?</label>
+                    <div class="sim-nao-toggle">
+                        <button type="button" class="${l.transmissao_ou_gravada === 'Transmissão' ? 'active-sim' : ''}" onclick="lessons[${idx}].transmissao_ou_gravada='Transmissão'; lessons[${idx}].numero_chamado=''; lessons[${idx}].precisa_numero_chamado=false; renderLessons();">Transmissão</button>
+                        <button type="button" class="${l.transmissao_ou_gravada === 'Aula gravada' ? 'active-nao' : ''}" onclick="lessons[${idx}].transmissao_ou_gravada='Aula gravada'; lessons[${idx}].canal_utilizado=''; renderLessons();">Gravada</button>
+                    </div>
+                </div>
+                ${l.transmissao_ou_gravada !== 'Aula gravada' ? `
+                <div class="form-group" style="margin-top: 0.5rem;">
+                    <label class="form-label">Canal IPTV *</label>
+                    ${renderCanalSelect(idx, l.canal_utilizado || '')}
+                </div>` : `
+                <div class="form-group" style="margin-top: 0.5rem;">
+                    <label class="form-label">
+                        <input type="checkbox" ${l.precisa_numero_chamado ? 'checked' : ''}
+                            onchange="togglePrecisaChamado(${idx}, this.checked)">
+                        Precisa informar Nº chamado?
+                    </label>
+                </div>
+                ${l.precisa_numero_chamado ? `
+                <div class="form-group justificativa-obrigatoria" style="margin-top: 0.5rem;">
+                    <label class="form-label">Nº chamado *</label>
+                    <input type="text" class="form-input" inputmode="numeric" pattern="[0-9]*"
+                        value="${escHtml(l.numero_chamado || '')}"
+                        placeholder="Somente números"
+                        oninput="this.value=this.value.replace(/\\D/g,''); lessons[${idx}].numero_chamado=this.value;">
+                </div>` : ''}`}
+                ${simNaoRow('Vídeo corrompido?', idx, 'video_corrompido', l.video_corrompido)}
+                ${l.video_corrompido === 'Sim' ? `
+                <div class="justificativa-obrigatoria">
+                    <label>Descreva o problema do vídeo corrompido *</label>
+                    <textarea class="form-textarea" rows="2" oninput="lessons[${idx}].video_corrompido_obs = this.value" placeholder="Ex.: arquivo travou aos 12min, sem áudio na segunda metade...">${l.video_corrompido_obs || ''}</textarea>
+                </div>` : ''}
+                ${simNaoRow('Interrupções antes ou durante a aula?', idx, 'interrupcoes', l.interrupcoes)}
+                ${simNaoRow('Houve problema de áudio?', idx, 'problema_audio', l.problema_audio)}
+                ${l.problema_audio === 'Sim' ? `
+                <div class="justificativa-obrigatoria">
+                    <label>Descreva o problema de áudio *</label>
+                    <textarea class="form-textarea" rows="2" oninput="lessons[${idx}].problema_audio_obs = this.value" placeholder="Ex.: microfone com ruído, áudio cortando...">${l.problema_audio_obs || ''}</textarea>
+                </div>` : ''}
+                ${simNaoRow('Foram colocadas as vinhetas corretamente?', idx, 'vinhetas_corretas', l.vinhetas_corretas)}
+                ${l.vinhetas_corretas === 'Não' ? `
+                <div class="justificativa-obrigatoria">
+                    <label>Descreva o problema com as vinhetas *</label>
+                    <textarea class="form-textarea" rows="2" oninput="lessons[${idx}].vinhetas_corretas_obs = this.value" placeholder="Ex.: vinheta de abertura incorreta, créditos sem logo...">${l.vinhetas_corretas_obs || ''}</textarea>
+                </div>` : ''}
+                ${simNaoRow('Foram colocados os créditos corretos?', idx, 'creditos_corretos', l.creditos_corretos)}
+                ${questoesPorAula.map(q => perguntaAulaRow(idx, q, l.respostas_extras[q.id])).join('')}
+                <div class="form-group" style="margin-top: 0.5rem;"><label class="form-label">OBS</label>
+                    <textarea class="form-textarea" rows="2" oninput="lessons[${idx}].observacoes = this.value">${l.observacoes || ''}</textarea></div>
+            </div>
+        `).join('');
+    }
+
+    function simNaoRow(label, idx, field, valor) {
+        return `<div class="sim-nao-row">
+            <label>${label}</label>
+            <div class="sim-nao-toggle">
+                <button type="button" class="${valor === 'Sim' ? 'active-sim' : ''}" onclick="simNaoToggle(${idx}, '${field}', true)">Sim</button>
+                <button type="button" class="${valor === 'Não' ? 'active-nao' : ''}" onclick="simNaoToggle(${idx}, '${field}', false)">Não</button>
+            </div>
+        </div>`;
+    }
+
+    function perguntaAulaRow(idx, q, saved) {
+        if (q.tipo === 'texto') {
+            return `<div class="form-group"><label class="form-label">${q.texto}${q.obrigatoria ? ' *' : ''}</label>
+                <textarea class="form-textarea" rows="2" oninput="lessons[${idx}].respostas_extras['${q.id}'] = {question_id: '${q.id}', resposta_texto: this.value}">${saved && saved.resposta_texto ? saved.resposta_texto : ''}</textarea></div>`;
+        }
+        return `<div class="sim-nao-row">
+            <label>${q.texto}${q.obrigatoria ? ' *' : ''}</label>
+            <div class="sim-nao-toggle">
+                <button type="button" class="${saved && saved.resposta_bool === true ? 'active-sim' : ''}" onclick="lessons[${idx}].respostas_extras['${q.id}'] = {question_id: '${q.id}', resposta_bool: true}; renderLessons();">Sim</button>
+                <button type="button" class="${saved && saved.resposta_bool === false ? 'active-nao' : ''}" onclick="lessons[${idx}].respostas_extras['${q.id}'] = {question_id: '${q.id}', resposta_bool: false}; renderLessons();">Não</button>
+            </div>
+        </div>`;
+    }
+
+    function coletarChecklistPayload() {
+        return Array.from(document.querySelectorAll('#checklist-container .sim-nao-toggle')).map(el => ({
+            item_id: el.dataset.itemId,
+            resposta: el.dataset.resposta === undefined ? null : el.dataset.resposta === 'true',
+        })).filter(x => x.item_id);
+    }
+
+    function coletarPerguntasRelatorioPayload() {
+        const out = [];
+        document.querySelectorAll('.pergunta-relatorio').forEach(el => {
+            const qId = el.dataset.questionId;
+            if (el.dataset.tipo === 'texto') {
+                if (el.value.trim()) out.push({ question_id: qId, resposta_texto: el.value.trim() });
+            } else {
+                if (el.dataset.resposta !== undefined) out.push({ question_id: qId, resposta_bool: el.dataset.resposta === 'true' });
+            }
+        });
+        return out;
+    }
+
+    function coletarPayload() {
+        const turmaId = getFieldValue('turma_id');
+        const ctx = getHeaderContexto();
+        const est = getFieldValue('estudio');
+        const tur = getFieldValue('turno');
+        const payload = {
+            diretor_imagem_id: getFieldValue('diretor_imagem_id'),
+            data_relatorio: getFieldValue('data_relatorio'),
+            turno: tur,
+            estudio: est,
+            turma_id: turmaId || null,
+            serie_modulo_manual: turmaId ? null : (est ? `${est} - ${tur || ''}`.trim() : null),
+            disciplina_id: ctx.disciplina_id,
+            disciplina_nome: ctx.disciplina_nome,
+            professor_id: ctx.professor_id,
+            professor_nome_externo: ctx.professor_nome_externo,
+            horario_aula: ctx.horario_aula,
+            regular: 'Sim',
+            ticket_number: null,
+            start_time: null,
+            end_time: null,
+            youtube_link: getFieldValue('youtube_link') || null,
+            chave_transmissao: getFieldValue('chave_transmissao') || null,
+            observacoes_gerais: getFieldValue('observacoes_gerais') || null,
+            origem: reportOrigem,
+            class_report_id: ctx.class_report_id,
+        };
+        if (isEvento()) {
+            const ev = dadosEvento();
+            Object.assign(payload, {
+                turma_id: null,
+                serie_modulo_manual: ev.departamento ? PREFIXO_EVENTO + ev.departamento : null,
+                disciplina_id: null,
+                disciplina_nome: ev.nome || null,
+                professor_id: null,
+                professor_nome_externo: ev.responsavel || null,
+                horario_aula: ev.horario || null,
+                regular: 'Não',
+                ticket_number: ev.chamado || null,
+                start_time: ev.inicio || null,
+                end_time: ev.fim || null,
+                nome_evento: ev.nome || null,
+                departamento_solicitante: ev.departamento || null,
+                responsavel_evento: ev.responsavel || null,
+                origem: 'evento',
+                class_report_id: null,
+            });
+        }
+        return payload;
+    }
+
+    function buildUpdatePayload() {
+        const full = coletarPayload();
+        return {
+            turno: full.turno,
+            estudio: full.estudio,
+            turma_id: full.turma_id,
+            serie_modulo_manual: full.serie_modulo_manual,
+            disciplina_id: full.disciplina_id,
+            disciplina_nome: full.disciplina_nome,
+            professor_id: full.professor_id,
+            professor_nome_externo: full.professor_nome_externo,
+            horario_aula: full.horario_aula,
+            regular: full.regular,
+            youtube_link: full.youtube_link,
+            chave_transmissao: full.chave_transmissao,
+            nome_evento: full.nome_evento,
+            departamento_solicitante: full.departamento_solicitante,
+            responsavel_evento: full.responsavel_evento,
+            observacoes_gerais: full.observacoes_gerais,
+            ...(isEvento() ? {
+                ticket_number: full.ticket_number,
+                start_time: full.start_time,
+                end_time: full.end_time,
+            } : {}),
+        };
+    }
+
+    function isYoutubeValid(url) {
+        const u = (url || '').trim();
+        return u.startsWith('http://') || u.startsWith('https://');
+    }
+
+    function validarCamposObrigatorios(finalizar = false) {
+        const faltando = [];
+        const payload = coletarPayload();
+        const ctx = getHeaderContexto();
+
+        if (!payload.diretor_imagem_id) faltando.push('Diretor de Imagem');
+        if (!payload.data_relatorio) faltando.push('Data da Aula');
+        if (!payload.turno) faltando.push('Turno');
+        if (!payload.estudio) faltando.push('Estúdio');
+        if (isEvento()) {
+            const ev = dadosEvento();
+            if (!ev.nome) faltando.push('Nome do evento');
+            if (!ev.departamento) faltando.push('Departamento / solicitante');
+            if (!ev.inicio || !ev.fim) faltando.push('Início e fim do evento');
+            else if (ev.fim <= ev.inicio) faltando.push('Fim do evento depois do início');
+            if (!ev.chamado) faltando.push('Nº do chamado do evento');
+        } else {
+            if (!payload.turma_id && !payload.estudio) faltando.push('Estúdio');
+            if (!payload.disciplina_id && !payload.disciplina_nome) faltando.push('Disciplina');
+            if (!professorEstaInformado(payload, ctx)) faltando.push('Professor(a)');
+            if (!payload.horario_aula) faltando.push('Horário da Aula');
+        }
+
+        if (finalizar) {
+            if (!payload.youtube_link) {
+                faltando.push('Link do YouTube');
+            } else if (!isYoutubeValid(payload.youtube_link)) {
+                faltando.push('Link do YouTube (URL válida youtube.com ou youtu.be)');
+            }
+        }
+
+        if (finalizar && lessons.length === 0) {
+            faltando.push('Ao menos um bloco técnico de aula');
+        }
+
+        lessons.forEach((l, idx) => {
+            const label = lessonLabel(l, idx);
+            if (l.transmissao_ou_gravada === 'Transmissão') {
+                if (!(l.canal_utilizado || '').trim() && !canalTravadoPelaAgenda()) faltando.push(`${label}: Canal IPTV`);
+            } else if (l.transmissao_ou_gravada === 'Aula gravada' && l.precisa_numero_chamado) {
+                const nc = (l.numero_chamado || '').trim();
+                if (!nc || !/^\d+$/.test(nc)) faltando.push(`${label}: Nº chamado (somente números)`);
+            }
+            if (l.video_corrompido === 'Sim' && !(l.video_corrompido_obs || '').trim()) {
+                faltando.push(`${label}: Descrição do vídeo corrompido`);
+            }
+            if (l.problema_audio === 'Sim' && !(l.problema_audio_obs || '').trim()) {
+                faltando.push(`${label}: Descrição do problema de áudio`);
+            }
+            if (l.vinhetas_corretas === 'Não' && !(l.vinhetas_corretas_obs || '').trim()) {
+                faltando.push(`${label}: Descrição do problema com as vinhetas`);
+            }
+            questoesPorAula.filter(q => q.obrigatoria).forEach(q => {
+                const resp = (l.respostas_extras || {})[q.id];
+                if (q.tipo === 'texto') {
+                    if (!resp || !(resp.resposta_texto || '').trim()) faltando.push(`${label}: ${q.texto}`);
+                } else if (!resp || resp.resposta_bool === undefined) {
+                    faltando.push(`${label}: ${q.texto}`);
+                }
+            });
+        });
+
+        questoesRelatorio.filter(q => q.obrigatoria).forEach(q => {
+            const el = document.querySelector(`.pergunta-relatorio[data-question-id="${q.id}"]`);
+            if (!el) return;
+            if (q.tipo === 'texto') {
+                if (!(el.value || '').trim()) faltando.push(`Pergunta: ${q.texto}`);
+            } else if (el.dataset.resposta === undefined) {
+                faltando.push(`Pergunta: ${q.texto}`);
+            }
+        });
+
+        return faltando;
+    }
+
+    function mostrarCamposFaltando(faltando) {
+        if (!faltando.length) return;
+        showToast('Preencha os campos obrigatórios:\n• ' + faltando.join('\n• '), 'error');
+    }
+
+    function returnToGrade() {
+        const gradeFilters = sessionStorage.getItem('grade_filters');
+        const url = gradeFilters ? '/grade' + gradeFilters : '/grade';
+        window.location.replace(url);
+    }
+
+    let finalizandoEmProgresso = false;
+
+    async function createReportHeader(payload) {
+        const token = getToken();
+        const res = await fetch('/api/v1/image-director/', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        if (res.status === 401) { logout(); return null; }
+        if (res.status === 409) {
+            const diretorId = payload.diretor_imagem_id || getFieldValue('diretor_imagem_id');
+            const existing = await lookupExistingReportSilent(diretorId);
+            if (existing && existing.id) {
+                showToast('Relatório existente para este slot — salvando nele.', 'info');
+                currentReportId = existing.id;
+                history.replaceState(null, '', `/diretor-imagem?id=${currentReportId}`);
+                await apiPatchReport(currentReportId, buildUpdatePayload());
+                return { id: existing.id, existing: true };
+            }
+            const data = await res.json().catch(() => ({}));
+            throw new Error(formatApiDetail(data.detail) || 'Já existe relatório para este slot.');
+        }
+        if (!res.ok) {
+            const data = await res.json();
+            throw new Error(formatApiDetail(data.detail) || `API error: ${res.status}`);
+        }
+        const created = await res.json();
+        return { ...created, existing: false };
+    }
+
+    async function salvarRelatorio(finalizar) {
+        if (finalizar && lockedFromGrade) {
+            await ensureLessonFromGradeSlot();
+        }
+
+        const faltando = validarCamposObrigatorios(finalizar);
+        if (faltando.length) {
+            mostrarCamposFaltando(faltando);
+            return finalizar
+                ? 'Preencha os campos obrigatórios:\n• ' + faltando.join('\n• ')
+                : false;
+        }
+
+        const payload = coletarPayload();
+
+        try {
+            if (!currentReportId) {
+                const created = await createReportHeader(payload);
+                if (!created) {
+                    const msg = 'Sessão expirada. Faça login novamente.';
+                    showToast(msg, 'error');
+                    return finalizar ? msg : false;
+                }
+                if (!created.existing) {
+                    currentReportId = created.id;
+                    history.replaceState(null, '', `/diretor-imagem?id=${currentReportId}`);
+                }
+            } else {
+                await apiPatchReport(currentReportId, buildUpdatePayload());
+            }
+
+            const existentes = await apiGet(`/api/v1/image-director/${currentReportId}`);
+            if (!existentes) {
+                const msg = 'Não foi possível carregar o relatório. Tente novamente.';
+                showToast(msg, 'error');
+                return finalizar ? msg : false;
+            }
+            for (const l of (existentes.lessons || [])) {
+                await apiDeleteRaw(`/api/v1/image-director/${currentReportId}/lessons/${l.id}`);
+            }
+            const novasLessons = [];
+            const ctx = getHeaderContexto();
+            for (let li = 0; li < lessons.length; li++) {
+                const l = lessons[li];
+                const ev = isEvento() ? dadosEvento() : null;
+                const disciplinaNome = (l.disciplina_nome || (ev ? ev.nome : ctx.disciplina_nome) || '').trim();
+                const professorNome = (
+                    l.professor_nome
+                    || (ev ? (ev.responsavel || ev.departamento) : '')
+                    || ctx.professor_nome
+                    || ctx.professor_nome_externo
+                    || lockedParams.professor_nome
+                    || ''
+                ).trim();
+                if (!disciplinaNome || !professorNome || isPlaceholderProfessor(professorNome)) {
+                    const msg = 'Cada aula precisa de disciplina e professor válidos antes de salvar.';
+                    showToast(msg, 'error');
+                    return finalizar ? msg : false;
+                }
+                const body = {
+                    class_report_id: l.class_report_id || ctx.class_report_id || null,
+                    disciplina_nome: disciplinaNome,
+                    professor_nome: professorNome,
+                    canal_utilizado: l.transmissao_ou_gravada === 'Transmissão' ? (l.canal_utilizado || '').trim() : null,
+                    transmissao_ou_gravada: l.transmissao_ou_gravada,
+                    video_corrompido: l.video_corrompido,
+                    video_corrompido_obs: l.video_corrompido_obs || null,
+                    interrupcoes: l.interrupcoes,
+                    problema_audio: l.problema_audio,
+                    problema_audio_obs: l.problema_audio_obs || null,
+                    vinhetas_corretas: l.vinhetas_corretas,
+                    vinhetas_corretas_obs: l.vinhetas_corretas_obs || null,
+                    creditos_corretos: l.creditos_corretos,
+                    observacoes: l.observacoes || null,
+                    numero_chamado: (l.transmissao_ou_gravada === 'Aula gravada' && l.precisa_numero_chamado)
+                        ? (l.numero_chamado || null) : null,
+                    numero_aula: l.numero_aula || (li + 1),
+                };
+                const createdLesson = await apiPost(`/api/v1/image-director/${currentReportId}/lessons`, body);
+                if (!createdLesson) {
+                    const msg = 'Sessão expirada. Faça login novamente.';
+                    showToast(msg, 'error');
+                    return finalizar ? msg : false;
+                }
+                novasLessons.push({ ...createdLesson, respostas_extras: l.respostas_extras });
+            }
+
+            await apiPutRaw(`/api/v1/image-director/${currentReportId}/checklist`, coletarChecklistPayload());
+
+            const respostasExtras = [...coletarPerguntasRelatorioPayload()];
+            novasLessons.forEach(l => {
+                Object.values(l.respostas_extras || {}).forEach(r => respostasExtras.push({ ...r, lesson_id: l.id }));
+            });
+            await apiPutRaw(`/api/v1/image-director/${currentReportId}/answers`, respostasExtras);
+
+            document.getElementById('btn-baixar-pdf').style.display = 'inline-block';
+
+            if (finalizar) {
+                const verificacao = await apiGet(`/api/v1/image-director/${currentReportId}`);
+                if (!verificacao) {
+                    const msg = 'Não foi possível verificar o relatório antes de finalizar.';
+                    showToast(msg, 'error');
+                    return msg;
+                }
+                if (!verificacao.lessons || verificacao.lessons.length === 0) {
+                    const msg = 'Adicione ao menos uma aula antes de finalizar o relatório.';
+                    showToast(msg, 'error');
+                    return msg;
+                }
+
+                const youtubeLink = getFieldValue('youtube_link') || null;
+                const finalized = await apiPost(`/api/v1/image-director/${currentReportId}/finalize`, {
+                    youtube_link: youtubeLink,
+                });
+                if (!finalized) {
+                    const msg = 'Não foi possível finalizar o relatório. Faça login novamente.';
+                    showToast(msg, 'error');
+                    return msg;
+                }
+                if (finalized.status !== 'AGUARDANDO_VALIDACAO') {
+                    const msg = 'O relatório não foi enviado para validação. Tente novamente.';
+                    showToast(msg, 'error');
+                    return msg;
+                }
+                showToast('Relatório enviado para validação! Redirecionando para a grade...', 'success');
+                returnToGrade();
+                return true;
+            }
+
+            showToast('Relatório salvo com sucesso!', 'success');
+            return true;
+        } catch (e) {
+            const msg = e.message || 'Erro ao salvar relatório.';
+            showToast(msg, 'error');
+            return finalizar ? msg : false;
+        }
+    }
+
+    function abrirModalFinalizar() {
+        document.getElementById('finalize-confirm-overlay').classList.add('open');
+        document.getElementById('finalize-confirm-modal').classList.add('open');
+    }
+
+    function fecharModalFinalizar(force = false) {
+        if (finalizandoEmProgresso && !force) return;
+        document.getElementById('finalize-confirm-overlay').classList.remove('open');
+        document.getElementById('finalize-confirm-modal').classList.remove('open');
+        const errEl = document.getElementById('finalize-error-msg');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+    }
+
+    function mostrarErroFinalizacao(mensagem) {
+        const errEl = document.getElementById('finalize-error-msg');
+        if (errEl) {
+            errEl.textContent = mensagem;
+            errEl.style.display = 'block';
+        }
+        showToast(mensagem, 'error');
+    }
+
+    async function confirmarFinalizacao() {
+        const btn = document.getElementById('btn-confirmar-finalizar');
+        const btnVoltar = document.getElementById('btn-cancelar-finalizar');
+        finalizandoEmProgresso = true;
+        btn.disabled = true;
+        btn.textContent = 'Enviando...';
+        if (btnVoltar) btnVoltar.disabled = true;
+        const errEl = document.getElementById('finalize-error-msg');
+        if (errEl) {
+            errEl.style.display = 'none';
+            errEl.textContent = '';
+        }
+        try {
+            // Mesmo fluxo de antes do modal: salvar + finalize em sequência
+            const result = await salvarRelatorio(true);
+            if (result === true) {
+                fecharModalFinalizar(true);
+                return;
+            }
+            if (typeof result === 'string') {
+                mostrarErroFinalizacao(result);
+            }
+        } catch (e) {
+            mostrarErroFinalizacao(e.message || 'Erro ao enviar relatório para validação.');
+        } finally {
+            finalizandoEmProgresso = false;
+            btn.disabled = false;
+            btn.textContent = '✅ Sim, Enviar';
+            if (btnVoltar) btnVoltar.disabled = false;
+        }
+    }
+
+    async function finalizarRelatorio() {
+        if (lockedFromGrade) {
+            await ensureLessonFromGradeSlot();
+        }
+        const faltando = validarCamposObrigatorios(true);
+        if (faltando.length) {
+            mostrarCamposFaltando(faltando);
+            return;
+        }
+        abrirModalFinalizar();
+    }
+
+    async function carregarRelatorio(id) {
+        currentReportId = id;
+        currentReport = await apiGet(`/api/v1/image-director/${id}`);
+        if (!currentReport) return;
+        reportOrigem = currentReport.origem || 'grade';
+        if (currentReport.class_report_id) {
+            lockedParams.class_report_id = currentReport.class_report_id;
+        }
+
+        setFieldValue('data_relatorio', currentReport.data_relatorio);
+        setFieldValue('youtube_link', currentReport.youtube_link || '');
+        setFieldValue('chave_transmissao', currentReport.chave_transmissao || '');
+        setFieldValue('observacoes_gerais', currentReport.observacoes_gerais || '');
+
+        if (reportOrigem === 'evento') {
+            renderTurmaSelect();
+            setFieldValue('turma_id', EVENTO);
+            aplicarModoEvento(true);
+            const dep = (currentReport.serie_modulo_manual || '');
+            setFieldValue('evento_nome', currentReport.disciplina_nome || '');
+            setFieldValue('evento_departamento', dep.startsWith(PREFIXO_EVENTO) ? dep.slice(PREFIXO_EVENTO.length) : dep);
+            setFieldValue('evento_responsavel', currentReport.professor_nome && currentReport.professor_nome !== '—' ? currentReport.professor_nome : '');
+            setFieldValue('evento_inicio', (currentReport.start_time || '').slice(0, 5));
+            setFieldValue('evento_fim', (currentReport.end_time || '').slice(0, 5));
+            setFieldValue('evento_chamado', currentReport.ticket_number || '');
+            document.querySelector('.page-title').textContent = '🎪 Evento';
+        } else if (currentReport.turma_id) {
+            renderTurmaSelect();
+            setFieldValue('turma_id', currentReport.turma_id);
+            await onTurmaChange();
+            if (currentReport.disciplina_id) {
+                setFieldValue('disciplina_id', currentReport.disciplina_id);
+                await onDisciplinaChange();
+                if (currentReport.professor_id) setFieldValue('professor_id', currentReport.professor_id);
+            }
+        }
+        if (currentReport.disciplina_nome) setFieldValue('disciplina_nome_hidden', currentReport.disciplina_nome);
+        if (currentReport.professor_nome && currentReport.professor_nome !== '—') {
+            setFieldValue('professor_nome_hidden', currentReport.professor_nome);
+        }
+        setFieldValue('turno', setTurnoValue(currentReport.turno));
+        setFieldValue('estudio', currentReport.estudio);
+        if (currentReport.horario_aula) {
+            setHorarioAula(currentReport.horario_aula);
+        }
+
+        const user = getUser();
+        const podeSelecionarDiretor = user && ['admin', 'gestor', 'diretor_chefe'].includes(user.role);
+        if (podeSelecionarDiretor) {
+            const data = await apiGet('/api/v1/image-director/lookup/diretores') || [];
+            const grupo = document.getElementById('grupo-diretor');
+            const currentId = String(currentReport.diretor_imagem_id || '');
+            grupo.innerHTML = `
+                <label class="form-label">Diretor de Imagem *</label>
+                <select id="diretor_imagem_id" class="form-select" required>
+                    <option value="">Selecione o diretor...</option>
+                    ${data.map(d => `<option value="${d.id}"${String(d.id) === currentId ? ' selected' : ''}>${escHtml(d.nome)}</option>`).join('')}
+                </select>`;
+        } else {
+            const isOwnReport = ownDiretorImagemId
+                && String(currentReport.diretor_imagem_id) === String(ownDiretorImagemId);
+            const diretorDisplayName = isOwnReport
+                ? getDiretorDisplayName()
+                : (currentReport.diretor_imagem_nome || getDiretorDisplayName());
+            travarCampo(
+                'grupo-diretor',
+                'diretor_imagem_id',
+                'Diretor de Imagem',
+                diretorDisplayName,
+                currentReport.diretor_imagem_id
+            );
+        }
+
+        const badge = document.getElementById('report-status-badge');
+        badge.style.display = 'inline-block';
+        badge.innerHTML = statusBadgeHtml(currentReport.status, currentReport.precisa_correcao);
+
+        const banner = document.getElementById('correcao-banner');
+        if (currentReport.precisa_correcao) {
+            banner.style.display = 'block';
+            document.getElementById('correcao-texto').textContent = currentReport.observacao_coordenacao || 'Sem observação detalhada.';
+        } else {
+            banner.style.display = 'none';
+        }
+
+        const respostasExtrasPorLesson = {};
+        const respostasExtrasRelatorio = {};
+        (currentReport.respostas_extras || []).forEach(r => {
+            if (r.lesson_id) {
+                respostasExtrasPorLesson[r.lesson_id] = respostasExtrasPorLesson[r.lesson_id] || {};
+                respostasExtrasPorLesson[r.lesson_id][r.question_id] = r;
+            } else {
+                respostasExtrasRelatorio[r.question_id] = r;
+            }
+        });
+        renderPerguntasRelatorio(respostasExtrasRelatorio);
+
+        const respostasChecklist = {};
+        (currentReport.checklist_respostas || []).forEach(c => { respostasChecklist[c.item_id] = c.resposta; });
+        renderChecklist(respostasChecklist);
+
+        lessons = await Promise.all((currentReport.lessons || []).map(async (l, idx) => {
+            const discMatch = disciplinasCache.find(d => d.nome.toLowerCase() === (l.disciplina_nome || '').trim().toLowerCase());
+            if (discMatch) {
+                professoresPorLesson[idx] = await apiGet(`/api/v1/image-director/lookup/professores-por-disciplina/${discMatch.id}`) || [];
+            }
+            return {
+                id: l.id,
+                class_report_id: l.class_report_id,
+                disciplina_nome: l.disciplina_nome,
+                professor_nome: l.professor_nome,
+                disciplina_id: discMatch ? discMatch.id : null,
+                professor_id: null,
+                horario_aula: '',
+                locked_disciplina: false,
+                locked_professor: false,
+                transmissao_ou_gravada: l.transmissao_ou_gravada,
+                precisa_numero_chamado: !!(l.numero_chamado),
+                numero_chamado: l.numero_chamado || '',
+                numero_aula: l.numero_aula || (idx + 1),
+                canal_utilizado: l.canal_utilizado || '',
+                video_corrompido: l.video_corrompido,
+                video_corrompido_obs: l.video_corrompido_obs || '',
+                interrupcoes: l.interrupcoes,
+                problema_audio: l.problema_audio,
+                problema_audio_obs: l.problema_audio_obs || '',
+                vinhetas_corretas: l.vinhetas_corretas,
+                vinhetas_corretas_obs: l.vinhetas_corretas_obs || '',
+                creditos_corretos: l.creditos_corretos,
+                observacoes: l.observacoes,
+                respostas_extras: respostasExtrasPorLesson[l.id] || {},
+            };
+        }));
+        renderLessons();
+
+        // Paridade com Relatório de Aula: formulário permanece editável após finalizar.
+        // Só relatórios cancelados ficam bloqueados.
+        if (currentReport.status !== 'RASCUNHO') {
+            document.getElementById('btn-baixar-pdf').style.display = 'inline-block';
+        }
+        if (currentReport.status === 'CANCELADO') {
+            document.querySelectorAll('.form-input, .form-select, .form-textarea, .form-actions button').forEach(el => {
+                if (el.id !== 'btn-baixar-pdf') el.disabled = true;
+            });
+        } else {
+            await sincronizarTransmissao();
+            travarCabecalhoDaGrade();
+        }
+    }
+
+    async function baixarPdf() {
+        if (!currentReportId) return;
+        const token = getToken();
+        const res = await fetch(`/api/v1/image-director/${currentReportId}/pdf`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) { showToast('Erro ao gerar PDF.', 'error'); return; }
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filenameFromContentDisposition(res) || `AULAS_${currentReport ? currentReport.data_relatorio : 'novo'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }
+
+    // ─── Helpers HTTP adicionais (PATCH/PUT/DELETE genéricos) ───────────
+
+    async function apiPatchReport(id, body) {
+        const token = getToken();
+        const res = await fetch(`/api/v1/image-director/${id}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            throw new Error(typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : (d.detail || 'Erro ao salvar cabeçalho.'));
+        }
+        return res.json();
+    }
+
+    async function apiPutRaw(url, body) {
+        const token = getToken();
+        const res = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+            const d = await res.json();
+            throw new Error(typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : (d.detail || 'Erro ao salvar.'));
+        }
+        return res.json();
+    }
+
+    async function apiDeleteRaw(url) {
+        const token = getToken();
+        const res = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        if (!res.ok && res.status !== 404) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(typeof formatApiDetail === 'function' ? formatApiDetail(d.detail) : (d.detail || 'Erro ao remover aula.'));
+        }
+    }
+</script>
+{% endblock %}

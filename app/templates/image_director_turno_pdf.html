@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Relatório do Diretor de Imagem — Turno</title>
+{% include 'includes/idp_pdf_styles.html' %}
+</head>
+<body>
+
+<h1>RELATÓRIO DO DIRETOR DE IMAGEM</h1>
+
+<table class="header-table">
+    <tr>
+        <td class="label">DATA:</td><td>{{ header.data_fmt }}</td>
+        <td class="label">TURNO:</td><td>{{ header.turno }}</td>
+    </tr>
+    <tr>
+        <td class="label">ESTÚDIO:</td><td>{{ header.estudio }}</td>
+        <td class="label">TURMA:</td><td>{{ header.turma_nome }}</td>
+    </tr>
+    <tr>
+        <td class="label">DIRETOR:</td><td colspan="3">{{ header.diretor_nome }}</td>
+    </tr>
+</table>
+
+{% if perguntas_relatorio %}
+<div class="checklist-title">PERGUNTAS ADICIONAIS DO RELATÓRIO</div>
+<table class="detail-table">
+    {% for p in perguntas_relatorio %}
+    <tr><td class="q">{{ p.texto }}</td><td class="a wrap">{{ p.resposta or '—' }}</td></tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% for aula in aulas %}
+<div class="divider"></div>
+<div class="aula-title">AULA {{ '%02d' % aula.numero }}{% if aula.disciplina_nome %} — {{ aula.disciplina_nome }}{% endif %}</div>
+<table class="detail-table">
+    <tr><td class="q">DISCIPLINA:</td><td class="a">{{ aula.disciplina_nome }}</td></tr>
+    <tr><td class="q">PROFESSOR:</td><td class="a">{{ aula.professor_nome }}</td></tr>
+    {% if aula.horario %}<tr><td class="q">HORÁRIO:</td><td class="a">{{ aula.horario }}</td></tr>{% endif %}
+    {% if aula.regular %}<tr><td class="q">REGULAR:</td><td class="a">{{ aula.regular }}</td></tr>{% endif %}
+    {% if aula.canal %}<tr><td class="q">CANAL IPTV:</td><td class="a">{{ aula.canal }}</td></tr>{% endif %}
+</table>
+{% if aula.youtube %}
+<table class="detail-table" style="margin-top: 4px;">
+    <tr><td class="label">LINK YOUTUBE:</td><td colspan="3" class="link-cell">{{ aula.youtube }}</td></tr>
+</table>
+{% endif %}
+{% if aula.detalhes %}
+<table class="detail-table" style="margin-top: 8px;">
+    {% for row in aula.detalhes %}
+    <tr><td class="q">{{ row.q }}</td><td class="a">{{ row.a }}</td></tr>
+    {% endfor %}
+    {% for row in aula.obs_rows %}
+    <tr><td class="q">{{ row.q }}</td><td class="a wrap">{{ row.a }}</td></tr>
+    {% endfor %}
+    {% for p in aula.perguntas_extras %}
+    <tr><td class="q">{{ p.texto }}</td><td class="a wrap">{{ p.resposta or '—' }}</td></tr>
+    {% endfor %}
+</table>
+{% endif %}
+{% if aula.observacoes %}
+<div class="obs-box"><strong>OBS:</strong> {{ aula.observacoes }}</div>
+{% endif %}
+{% endfor %}
+
+<div class="divider"></div>
+
+{% if checklist %}
+<div class="checklist-title">FECHAMENTO DE ESTÚDIO</div>
+<ul class="checklist">
+    {% for c in checklist %}
+    <li>{{ c.nome }}: <strong>{{ c.resposta }}</strong></li>
+    {% endfor %}
+</ul>
+{% endif %}
+
+{% if observacoes_gerais %}
+<div class="checklist-title">OBSERVAÇÕES GERAIS</div>
+<div class="obs-box">{{ observacoes_gerais }}</div>
+{% endif %}
+
+<div class="footer-note">Relatório consolidado do turno — Canal Educação</div>
+
+</body>
+</html>

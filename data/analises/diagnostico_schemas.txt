@@ -1,0 +1,62 @@
+DIAGNÓSTICO DE SCHEMAS - ERRO DE UUID (professor_id)
+====================================================
+
+1. ANÁLISE DO PROBLEMA
+----------------------
+O sistema está apresentando o erro "invalid UUID length 0" no salvamento de relatórios (Aula/ClassReport) porque o formulário no Frontend, quando não tem um professor ou turma preenchidos, frequentemente envia uma string vazia (ex: `"professor_id": ""`).
+
+No arquivo `app/schemas/class_report.py`, a variável `professor_id` está tipada de forma nativa e obrigatória como `UUID`:
+```python
+    turma_id: UUID
+    disciplina_id: UUID
+    professor_id: UUID
+```
+Como o tipo é `UUID`, o Pydantic tenta instanciar a string vazia (`""`) em um objeto `uuid.UUID` interno do Python ANTES de processar a requisição. Como o comprimento de uma string vazia é 0 (e não o formato 8-4-4-4-12 de um UUID real), a aplicação levanta uma exceção dura, devolvendo um Erro 422 não-amigável e travando a interface.
+
+2. MAPEAMENTO DE OBRIGATORIEDADE (`ClassReportCreate` e `ClassReportFinalize`)
+--------------------------------------------------------------------------------
+Em `ClassReportCreate` (equivalente ao AulaCreate e a Payload das Rotas):
+
+*   CAMPOS OBRIGATÓRIOS (Strinctly Required):
+    - `data_aula` (date)
+    - `turno` (str)
+    - `estudio` (str)
+    - `turma_id` (UUID)
+    - `disciplina_id` (UUID)
+    - `professor_id` (UUID)
+    - `horario_aula` (str)
+    - `tipo_aula` (str)
+    - `canal_utilizado` (str)
+    - `conteudo_ministrado` (str)
+
+*   CAMPOS OPCIONAIS E/OU COM DEFAULT:
+    - `regular`, `interacao_professor_aluno`, `problema_material`, `teve_substituicao`, `teve_atraso`, `needs_editing` (Todos contêm um default, logo se omitidos o sistema assume falso/"Não").
+    - `interacao_outras_desc`, `atividade_pratica`, `observacoes`, `tipo_recursos_utilizados`, `recursos_outro_desc`, `problema_material_outro_desc`, `professor_substituto_id`, `minutos_atraso`, `observacao_atraso`, `escolas_participantes`, `diretor_imagem`, `youtube_link`, `ticket_number`, `start_time`, `end_time`, `problematic_materials`, `observacoes_manha` (Todos tipados com `Optional`).
+
+3. CORREÇÃO EXATA SUGERIDA NO PYDANTIC
+--------------------------------------
+Para evitar o travamento, devemos capturar a string vazia antes que ela pule para o parse do tipo `UUID`. Sugerimos inserir o seguinte validador (decorator `mode="before"`) dentro da classe `ClassReportCreate` no arquivo `app/schemas/class_report.py`:
+
+```python
+    from pydantic import field_validator
+    from typing import Any
+
+    @field_validator("turma_id", "disciplina_id", "professor_id", mode="before")
+    @classmethod
+    def require_valid_uuid(cls, v: Any, info) -> Any:
+        # Intercepta string vazia "" ou None devolvendo um erro legível / HTTP 422 customizado
+        if not v or str(v).strip() == "":
+            nome_campo = str(info.field_name).split('_')[0].capitalize()
+            raise ValueError(f"Por favor, selecione um '{nome_campo}' válido.")
+        return v
+
+    @field_validator("professor_substituto_id", mode="before")
+    @classmethod
+    def clean_optional_uuids(cls, v: Any) -> Any:
+        # Permite que uma string vazia convirta de volta para None em campos opcionais
+        if v == "" or str(v).strip() == "":
+            return None
+        return v
+```
+
+**Benefício da Correção:** Com este interceptador, se o backend receber `""`, a conversão nativa de UUID nem entra em cena. O próprio Pydantic acusará erro amigavelmente ("Por favor, selecione um 'Professor' válido"), instruindo o frontend adequadamente e protegendo o banco de dados.
