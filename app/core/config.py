@@ -186,7 +186,6 @@ class Settings(BaseSettings):
 SECRET_KEY_PADRAO = "chave_secreta_provisoria_desenvolvimento"
 
 
-@lru_cache()
 def _normalizar_url_postgres(url: str) -> str:
     """Deixa a URL no formato que o SQLAlchemy + psycopg2 aceitam.
 
@@ -211,6 +210,7 @@ def _normalizar_url_postgres(url: str) -> str:
     return urlunsplit(partes._replace(query=urlencode(params)))
 
 
+@lru_cache()
 def get_settings() -> Settings:
     """Singleton cacheado da configuração."""
     s = Settings()
