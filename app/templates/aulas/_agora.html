@@ -1,0 +1,22 @@
+{# Fragmento: modo Agora — o que está no ar em cada estúdio (htmx: /parciais/aulas/agora) #}
+<div class="v5-agora-cab"><svg class="ico"><use href="#i-aovivo"/></svg> Atualizado às {{ momento }}</div>
+<div class="v5-agora">
+{% for e in estudios %}
+    <article class="v5-estudio{% if e.no_ar %} no-ar{% endif %}">
+        <header><h3>{{ e.estudio }}</h3>{% if e.no_ar %}<span class="v5-ao-vivo">● no ar</span>{% else %}<span class="v5-livre">livre</span>{% endif %}</header>
+        {% if e.no_ar %}{% set a = e.no_ar %}
+        <div class="v5-agora-aula" @click="abrir && abrir('{{ a.id }}')">
+            <div class="v5-agora-hora">{{ a.inicio }}–{{ a.fim }}</div>
+            <div class="v5-agora-turma">{{ a.turma or 'Sem turma' }}</div>
+            <div class="v5-agora-disc">{{ a.disciplina or '—' }}</div>
+            <div class="v5-agora-prof">{{ a.professor or '' }}</div>
+            {% set s = a.status %}{% include "aulas/_status.html" %}
+        </div>
+        {% endif %}
+        <footer>
+            {% if e.proxima %}<span>Próxima: <b>{{ e.proxima.inicio }}</b> {{ e.proxima.turma or '' }} · {{ e.proxima.disciplina or '' }}</span>
+            {% else %}<span>Sem mais aulas hoje</span>{% endif %}
+        </footer>
+    </article>
+{% endfor %}
+</div>

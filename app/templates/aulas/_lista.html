@@ -1,0 +1,62 @@
+{# Fragmento: lista de aulas do período, agrupada por dia (htmx: /parciais/aulas) #}
+{% set ordem = ['sem_relatorio','devolvida','em_relatorio','aguardando_validacao','aguardando_imagem','validada','prevista','cancelada'] %}
+<div class="v5-resumo" role="group" aria-label="Filtrar por situação">
+    <button type="button" class="v5-filtro-st" :class="{ ativo: status === '' }" @click="trocarStatus('')">
+        Todas <b>{{ resumo.total }}</b>
+    </button>
+    {% for s in ordem %}{% if resumo.get(s) %}
+    <button type="button" class="v5-filtro-st v5-st-{{ s }}" :class="{ ativo: status === '{{ s }}' }" @click="trocarStatus('{{ s }}')">
+        {{ rotulos[s] }} <b>{{ resumo[s] }}</b>
+    </button>
+    {% endif %}{% endfor %}
+</div>
+
+{% if not dias %}
+<div class="card v5-vazio">
+    <svg class="ico ico-xl"><use href="#i-vazio"/></svg>
+    <h3>Nenhuma aula neste período</h3>
+    <p>Confira os filtros, ou se a grade das turmas está cadastrada em Grade horária.</p>
+</div>
+{% endif %}
+
+{% for dia, itens in dias.items() %}
+<section class="card v5-dia">
+    <header class="v5-dia-cab">
+        <h3>{{ dia | dia_extenso }}{% if dia == hoje %} <span class="v5-hoje">hoje</span>{% endif %}</h3>
+        <span class="v5-dia-total">{{ itens | length }} aula{{ '' if itens|length == 1 else 's' }}</span>
+    </header>
+    <div class="v5-tabela" role="table">
+        {% for a in itens %}
+        <div class="v5-linha{% if a.status == 'cancelada' %} v5-cancelada{% endif %}" role="row" tabindex="0"
+             @click="abrir('{{ a.id }}')" @keydown.enter="abrir('{{ a.id }}')">
+            <span class="v5-hora" role="cell">
+                {% if a.inicio %}<b>{{ a.inicio }}</b><small>{{ a.fim or '' }}</small>{% else %}<b>{{ a.horario or '—' }}</b>{% endif %}
+            </span>
+            <span class="v5-aula" role="cell">
+                <span class="v5-titulo">{{ a.turma or 'Sem turma' }} · {{ a.disciplina or '—' }}</span>
+                <span class="v5-sub">
+                    {{ a.professor or 'Professor não informado' }}
+                    {% if a.estudio %} · {{ a.estudio }}{% endif %}
+                    {% if a.tipo == 'gravacao' %} · <em>gravação</em>{% elif a.tipo == 'aula_extra' %} · <em>aula extra</em>{% endif %}
+                    {% if a.remanejada %} · <em>remanejada</em>{% endif %}
+                    {% if a.origem == 'relatorio' %} · <em>fora da grade</em>{% endif %}
+                </span>
+                {% if a.precisa_correcao and a.observacao_coordenacao %}
+                <span class="v4-nota"><svg class="ico ico-sm"><use href="#i-mensagem"/></svg><span>{{ a.observacao_coordenacao }}</span></span>
+                {% endif %}
+            </span>
+            <span class="v5-sinais" role="cell">
+                {% if a.class_report_id and a.status != 'cancelada' %}
+                <span class="v4-chip {{ 'ok' if a.tem_video else 'falta' }}" title="Vídeo no Drive"><svg class="ico"><use href="#i-{{ 'check' if a.tem_video else 'relogio' }}"/></svg> vídeo</span>
+                <span class="v4-chip {{ 'ok' if a.tem_pdf else 'falta' }}" title="PDF no Drive"><svg class="ico"><use href="#i-{{ 'check' if a.tem_pdf else 'relogio' }}"/></svg> PDF</span>
+                {% endif %}
+                {% if a.image_director_report_id %}
+                <span class="v4-chip {{ 'ok' if a.imagem_status == 'VALIDADO' else '' }}" title="Relatório de imagem"><svg class="ico"><use href="#i-claquete"/></svg> imagem</span>
+                {% endif %}
+            </span>
+            <span role="cell">{% set s = a.status %}{% include "aulas/_status.html" %}</span>
+        </div>
+        {% endfor %}
+    </div>
+</section>
+{% endfor %}

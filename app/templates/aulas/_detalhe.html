@@ -1,0 +1,60 @@
+{# Fragmento: painel de uma aula (htmx: /parciais/aulas/{id}) #}
+{% set faixa = (a.inicio ~ ' às ' ~ a.fim) if a.inicio and a.fim else (a.horario or '') %}
+{% set turno = 'Manhã' if a.inicio and a.inicio < '12:30' else ('Tarde' if a.inicio and a.inicio < '18:00' else ('Noite' if a.inicio else '')) %}
+<div class="v5-painel-cab">
+    <div>
+        <div class="v5-painel-data">{{ a.data | dia_extenso }} · {{ faixa }}</div>
+        <h2>{{ a.turma or 'Sem turma' }}</h2>
+        <div class="v5-painel-sub">{{ a.disciplina or '—' }} · {{ a.professor or 'Professor não informado' }}{% if a.estudio %} · {{ a.estudio }}{% endif %}</div>
+    </div>
+    <button type="button" class="btn btn-secondary btn-sm" @click="fechar()" aria-label="Fechar"><svg class="ico"><use href="#i-fechar"/></svg></button>
+</div>
+
+<div class="v5-painel-status">{% set s = a.status %}{% include "aulas/_status.html" %}
+    {% if a.cobrar %}<span class="v5-cobrar"><svg class="ico ico-sm"><use href="#i-faturamento"/></svg> Cobrar: <b>{{ a.cobrar }}</b></span>{% endif %}
+</div>
+
+{% if a.motivo_cancelamento %}<p class="v5-aviso"><svg class="ico ico-sm"><use href="#i-alerta"/></svg> {{ a.motivo_cancelamento }}</p>{% endif %}
+{% if a.fora_da_grade or a.origem == 'relatorio' %}<p class="v5-aviso"><svg class="ico ico-sm"><use href="#i-alerta"/></svg> Esta aula tem relatório, mas não está na grade vigente desse dia.</p>{% endif %}
+{% if a.remanejada %}<p class="v5-aviso"><svg class="ico ico-sm"><use href="#i-agenda"/></svg> Remanejada na Agenda para {{ a.estudio or 'outro estúdio' }}.</p>{% endif %}
+{% if a.precisa_correcao and a.observacao_coordenacao %}<p class="v4-nota"><svg class="ico ico-sm"><use href="#i-mensagem"/></svg><span>{{ a.observacao_coordenacao }}</span></p>{% endif %}
+
+<ol class="v5-passos">
+    <li class="{{ 'ok' if a.class_report_id and a.status not in ['em_relatorio','devolvida'] else ('atencao' if a.status in ['em_relatorio','devolvida','sem_relatorio'] else '') }}">
+        <b>Relatório do assistente</b>
+        <span>{% if not a.class_report_id %}Ainda não feito{% elif a.status in ['em_relatorio','devolvida'] %}Em rascunho{% else %}Finalizado{% endif %}</span>
+    </li>
+    <li class="{{ 'ok' if a.tem_video and a.tem_pdf else ('atencao' if a.class_report_id else '') }}">
+        <b>Vídeo e PDF no Drive</b>
+        <span>{{ 'Encontrados' if a.tem_video and a.tem_pdf else ('Só o vídeo' if a.tem_video else ('Só o PDF' if a.tem_pdf else 'Ainda não')) }}</span>
+    </li>
+    <li class="{{ 'ok' if a.imagem_status == 'VALIDADO' else ('atencao' if a.image_director_report_id else '') }}">
+        <b>Relatório de imagem do turno</b>
+        <span>{% if not a.image_director_report_id %}Ainda não feito{% else %}{{ {'RASCUNHO':'Rascunho','AGUARDANDO_VALIDACAO':'Aguardando o diretor-chefe','VALIDADO':'Validado','CANCELADO':'Cancelado'}.get(a.imagem_status, a.imagem_status) }}{% endif %}</span>
+    </li>
+    <li class="{{ 'ok' if a.status == 'validada' else '' }}">
+        <b>Validação e faturamento</b>
+        <span>{{ 'Pronta para faturar' if a.status == 'validada' else rotulos.get(a.status, a.status) }}</span>
+    </li>
+</ol>
+
+<div class="v5-acoes">
+    {% if a.class_report_id %}
+        <a class="btn btn-primary" href="/aula?cr={{ a.class_report_id }}"><svg class="ico"><use href="#i-linha-tempo"/></svg> Linha do tempo completa</a>
+        {% if pode_aula %}<a class="btn btn-secondary" href="/report?report_id={{ a.class_report_id }}"><svg class="ico"><use href="#i-documento"/></svg> {{ 'Corrigir relatório' if a.status == 'devolvida' else ('Continuar relatório' if a.status == 'em_relatorio' else 'Abrir relatório') }}</a>{% endif %}
+        {% if papel in ['admin','gestor','coordenador','coordenadora'] and a.status == 'aguardando_validacao' %}
+        <a class="btn btn-secondary" href="/reports-audit"><svg class="ico"><use href="#i-ok"/></svg> Validar</a>
+        {% endif %}
+    {% elif pode_aula and a.status in ['prevista','sem_relatorio'] and a.turma_id %}
+        <a class="btn btn-primary" href="/report?data={{ a.data }}&turma={{ a.turma_id }}&horario={{ faixa | urlencode }}{% if a.modalidade %}&modalidade={{ a.modalidade | urlencode }}{% endif %}{% if a.disciplina_id %}&disciplina={{ a.disciplina_id }}{% endif %}{% if a.professor_id %}&professor={{ a.professor_id }}{% endif %}{% if a.estudio %}&estudio={{ a.estudio | urlencode }}{% endif %}">
+            <svg class="ico"><use href="#i-lapis"/></svg> Fazer o relatório desta aula</a>
+    {% endif %}
+
+    {% if a.image_director_report_id %}
+        {% if pode_imagem %}<a class="btn btn-secondary" href="/diretor-imagem?id={{ a.image_director_report_id }}"><svg class="ico"><use href="#i-claquete"/></svg> Relatório de imagem</a>{% endif %}
+        {% if not a.class_report_id %}<a class="btn btn-secondary" href="/aula?idr={{ a.image_director_report_id }}"><svg class="ico"><use href="#i-linha-tempo"/></svg> Linha do tempo</a>{% endif %}
+    {% elif pode_imagem and a.status != 'cancelada' %}
+        <a class="btn btn-secondary" href="/diretor-imagem?locked=1&data={{ a.data }}&turno={{ turno | urlencode }}&horario={{ faixa | urlencode }}{% if a.turma_id %}&turma={{ a.turma_id }}{% endif %}{% if a.estudio %}&estudio={{ a.estudio | urlencode }}{% endif %}{% if a.class_report_id %}&class_report_id={{ a.class_report_id }}{% endif %}{% if a.disciplina_id %}&disciplina_id={{ a.disciplina_id }}{% endif %}{% if a.professor_id %}&professor_id={{ a.professor_id }}{% endif %}">
+            <svg class="ico"><use href="#i-claquete"/></svg> Fazer o relatório de imagem do turno</a>
+    {% endif %}
+</div>

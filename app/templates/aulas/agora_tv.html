@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ao vivo — Canal Educação</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=5.0">
+</head>
+<body class="v5-tv">
+    {% include "_icones.html" %}
+    <header class="v5-tv-cab">
+        <div class="v5-tv-marca"><svg class="ico"><use href="#i-tv"/></svg> Canal Educação · Ao vivo</div>
+        <div class="v5-tv-relogio" id="relogio">--:--</div>
+    </header>
+    <main id="estudios" hx-get="/parciais/aulas/agora" hx-trigger="load, every 30s">
+        <div class="v5-vazio">Carregando…</div>
+    </main>
+    <script src="/static/js/app.js?v=5.0"></script>
+    <script>
+        if (!getToken()) { location.href = '/?volta=' + encodeURIComponent(location.pathname); }
+        document.body.addEventListener('htmx:configRequest', (e) => { e.detail.headers['Authorization'] = `Bearer ${getToken()}`; });
+        document.body.addEventListener('htmx:responseError', (e) => { if (e.detail.xhr.status === 401) logout(); });
+        const relogio = () => { document.getElementById('relogio').textContent = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }); };
+        relogio(); setInterval(relogio, 10000);
+        // o "abrir" dos cartões só existe na tela Aulas; aqui é só exibição
+        window.abrir = null;
+    </script>
+    <script src="/static/vendor/htmx.min.js"></script>
+</body>
+</html>

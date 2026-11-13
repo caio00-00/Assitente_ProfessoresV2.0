@@ -28,6 +28,7 @@ from app.models.image_director_report import (
     ImageDirectorCustomQuestion,
     ImageDirectorCustomAnswer,
 )
+from app.models.aula import Aula, AulaSincronizacao  # noqa: F401  v5: a aula no centro
 
 __all__ = [
     "AuditLog",
@@ -56,4 +57,6 @@ __all__ = [
     "ImageDirectorChecklistResponse",
     "ImageDirectorCustomQuestion",
     "ImageDirectorCustomAnswer",
+    "Aula",
+    "AulaSincronizacao",
 ]

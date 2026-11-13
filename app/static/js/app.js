@@ -23,7 +23,8 @@ function nomeDoPapel(papel) {
     return NOMES_PAPEIS[papel.toLowerCase()] || (papel.charAt(0).toUpperCase() + papel.slice(1));
 }
 function iniciais(nome) {
-    const partes = String(nome || '').trim().split(/\s+/).filter(Boolean);
+    // só palavras com letra: 'Carla Coordenação (teste)' → CC
+    const partes = String(nome || '').trim().split(/\s+/).filter(p => /^[A-Za-zÀ-ÿ]/.test(p));
     if (!partes.length) return '?';
     return ((partes[0][0] || '') + (partes.length > 1 ? partes[partes.length - 1][0] : '')).toUpperCase();
 }

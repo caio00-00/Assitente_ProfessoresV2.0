@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Canal Educação - Sistema de Gestão de Relatórios de Aula">
     <title>{% block title %}Canal Educação{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=4.1">
+    <link rel="stylesheet" href="/static/css/style.css?v=5.0">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     {% block head %}{% endblock %}
 </head>
@@ -35,6 +35,10 @@
                     <span class="nav-texto">Início</span>
                 </a>
                 <div class="nav-secao">Aulas</div>
+                <a href="/aulas" class="nav-link" data-page="aulas" id="nav-aulas" title="Todas as aulas, com os relatórios, o Drive e a validação">
+                    <span class="icon"><svg class="ico"><use href="#i-calendario"/></svg></span>
+                    <span class="nav-texto">Aulas</span>
+                </a>
                 <a href="/dashboard" class="nav-link" data-page="dashboard" id="nav-dashboard" title="Números das aulas e dos relatórios">
                     <span class="icon"><svg class="ico"><use href="#i-painel"/></svg></span>
                     <span class="nav-texto">Visão geral</span>
@@ -109,7 +113,7 @@
     <div id="toast-container"></div>
 
     <script>window.CANAL_TEMPO_REAL = {{ 'true' if tempo_real else 'false' }};</script>
-    <script src="/static/js/app.js?v=4.1"></script>
+    <script src="/static/js/app.js?v=5.0"></script>
     <script>
         // Highlight active nav link based on current path
         document.addEventListener('DOMContentLoaded', () => {

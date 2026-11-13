@@ -64,6 +64,7 @@ from app.api.rotas_diretor_imagem import router as diretor_imagem_router  # v3.2
 from app.api.rotas_agenda_estudios import router as agenda_estudios_router
 from app.api.rotas_v4 import router as v4_router  # v4: Início, linha do tempo, histórico
 from app.api.rotas_sistema import router as sistema_router  # v4.1: saúde, varredura do Drive, migração
+from app.modulos.aulas import rotas as aulas_v5  # v5: a Aula no centro
 from app.domain.enums.enums import TipoAulaEnum
 
 settings = get_settings()
@@ -222,6 +223,10 @@ app.include_router(diretor_imagem_router)  # Relatório do Diretor de Imagem —
 app.include_router(agenda_estudios_router)  # Agenda de Estúdios (Admin / Diretor-Chefe)
 app.include_router(sistema_router)  # v4.1: /api/v1/sistema/*
 app.include_router(v4_router)  # v4: painel Início, linha do tempo da aula, histórico de versões
+# v5 — depois do v4: /api/v1/aulas/linha-do-tempo (v4) tem de vir antes de /api/v1/aulas/{id}
+app.include_router(aulas_v5.api)
+app.include_router(aulas_v5.parciais)
+app.include_router(aulas_v5.paginas)
 
 
 # ─── Health Check ─────────────────────────────────────────────────────

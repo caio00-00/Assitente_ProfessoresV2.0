@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}Aulas — Canal Educação{% endblock %}
+
+{% block content %}
+<div x-data="telaAulas()" x-init="iniciar()" @keydown.escape.window="fechar()">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><svg class="ico ico-titulo"><use href="#i-calendario"/></svg> Aulas</h1>
+            <p class="page-subtitle">Cada aula prevista, com o relatório do assistente, o de imagem, o Drive e a validação.</p>
+        </div>
+        <div class="v4-toolbar">
+            <div class="v5-alternar" role="tablist">
+                <button type="button" role="tab" :class="{ ativo: modo === 'lista' }" @click="modo = 'lista'"><svg class="ico"><use href="#i-checklist"/></svg> Lista</button>
+                <button type="button" role="tab" :class="{ ativo: modo === 'agora' }" @click="modo = 'agora'"><svg class="ico"><use href="#i-aovivo"/></svg> Agora</button>
+            </div>
+            <a class="btn btn-secondary btn-sm" href="/aulas/agora" target="_blank" title="Abre o modo Agora em tela cheia, para a TV"><svg class="ico"><use href="#i-tv"/></svg> Tela cheia</a>
+        </div>
+    </div>
+
+    <!-- Filtros (o htmx manda estes campos junto com cada busca) -->
+    <form id="filtros" class="card v5-filtros" x-show="modo === 'lista'" @submit.prevent="buscar()" @change="buscar()">
+        <div class="v5-periodo">
+            <button type="button" class="btn btn-secondary btn-sm" @click="andar(-1)" aria-label="Período anterior"><svg class="ico"><use href="#i-voltar"/></svg></button>
+            <button type="button" class="btn btn-sm" :class="periodo === 'dia' ? 'btn-primary' : 'btn-secondary'" @click="definir('dia')">Hoje</button>
+            <button type="button" class="btn btn-sm" :class="periodo === 'semana' ? 'btn-primary' : 'btn-secondary'" @click="definir('semana')">Semana</button>
+            <button type="button" class="btn btn-sm" :class="periodo === 'mes' ? 'btn-primary' : 'btn-secondary'" @click="definir('mes')">Mês</button>
+            <button type="button" class="btn btn-secondary btn-sm" @click="andar(1)" aria-label="Próximo período"><svg class="ico" style="transform: scaleX(-1)"><use href="#i-voltar"/></svg></button>
+            <input type="date" name="inicio" class="form-input" x-model="inicio" aria-label="De">
+            <span class="v5-ate">até</span>
+            <input type="date" name="fim" class="form-input" x-model="fim" aria-label="Até">
+        </div>
+        <div class="v5-campos">
+            <select name="turma_id" class="form-select" aria-label="Turma">
+                <option value="">Todas as turmas</option>
+                <template x-for="t in turmas" :key="t.id"><option :value="t.id" x-text="t.nome"></option></template>
+            </select>
+            <select name="estudio_id" class="form-select" aria-label="Estúdio">
+                <option value="">Todos os estúdios</option>
+                <template x-for="e in estudios" :key="e.id"><option :value="e.id" x-text="e.nome"></option></template>
+            </select>
+            <input type="search" name="q" class="form-input" placeholder="Buscar turma, disciplina, professor…" @input.debounce.400ms="buscar()">
+            <label class="v5-check" x-show="ehAssistente"><input type="checkbox" name="minhas" value="1"> Só os meus relatórios</label>
+            <input type="hidden" name="status" :value="status">
+        </div>
+    </form>
+
+    <!-- Lista -->
+    <div id="lista-aulas" x-show="modo === 'lista'"
+         hx-get="/parciais/aulas" hx-include="#filtros" hx-trigger="buscar-aulas from:body, every 90s"
+         hx-indicator="#carregando">
+        <div class="card v5-vazio">Carregando…</div>
+    </div>
+    <div id="carregando" class="htmx-indicator v5-carregando">Atualizando…</div>
+
+    <!-- Agora -->
+    <div x-show="modo === 'agora'" x-cloak>
+        <template x-if="modo === 'agora'">
+            <div hx-get="/parciais/aulas/agora" hx-trigger="load, every 30s" x-init="htmx.process($el)">
+                <div class="card v5-vazio">Carregando…</div>
+            </div>
+        </template>
+    </div>
+
+    <!-- Painel lateral de uma aula -->
+    <div class="v5-fundo" x-show="painel" x-cloak @click="fechar()"></div>
+    <aside class="v5-painel" x-show="painel" x-cloak x-transition.opacity aria-live="polite">
+        <div id="painel-conteudo"><div class="v5-vazio">Carregando…</div></div>
+    </aside>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Todo pedido do htmx leva o login (o mesmo token das outras telas)
+    document.body.addEventListener('htmx:configRequest', (e) => {
+        const t = getToken();
+        if (t) e.detail.headers['Authorization'] = `Bearer ${t}`;
+    });
+    document.body.addEventListener('htmx:responseError', (e) => {
+        if (e.detail.xhr.status === 401) { logout(); return; }
+        const alvo = e.detail.target;
+        if (alvo) alvo.innerHTML = `<div class="card v5-vazio">${icone('alerta')} Não foi possível carregar agora (erro ${e.detail.xhr.status}). Tente de novo.</div>`;
+    });
+
+    function iso(d) { return d.toISOString().slice(0, 10); }
+    function segunda(d) { const x = new Date(d); const dia = (x.getDay() + 6) % 7; x.setDate(x.getDate() - dia); return x; }
+
+    function telaAulas() {
+        const params = new URLSearchParams(location.search);
+        return {
+            modo: params.get('modo') === 'agora' ? 'agora' : 'lista',
+            periodo: params.get('periodo') || 'dia',
+            inicio: params.get('inicio') || iso(new Date()),
+            fim: params.get('fim') || iso(new Date()),
+            status: params.get('status') || '',
+            painel: false,
+            turmas: [], estudios: [],
+            ehAssistente: (getUser() || {}).role === 'assistente',
+            async iniciar() {
+                if (!getToken()) { location.href = '/'; return; }
+                loadUserProfile();
+                if (!params.get('inicio')) this.definir(this.periodo, false);
+                this.$watch('modo', (m) => this.lembrar());
+                try {
+                    const [ts, es] = await Promise.all([apiGet('/api/v1/turmas/'), apiGet('/api/v1/configuracoes/estudios')]);
+                    this.turmas = (ts || []).map(t => ({ id: t.id, nome: t.nomenclatura_padrao || t.nome })).sort((a, b) => a.nome.localeCompare(b.nome));
+                    this.estudios = (es || []).map(e => ({ id: e.id, nome: e.nome }));
+                } catch (e) { /* filtros ficam só com "Todos" */ }
+                this.$nextTick(() => this.buscar());
+            },
+            definir(p, buscarAgora = true) {
+                this.periodo = p;
+                const hoje = new Date();
+                if (p === 'dia') { this.inicio = this.fim = iso(hoje); }
+                if (p === 'semana') { const s = segunda(hoje); const f = new Date(s); f.setDate(s.getDate() + 6); this.inicio = iso(s); this.fim = iso(f); }
+                if (p === 'mes') { this.inicio = iso(new Date(hoje.getFullYear(), hoje.getMonth(), 1)); this.fim = iso(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0)); }
+                if (buscarAgora) this.$nextTick(() => this.buscar());
+            },
+            andar(sentido) {
+                const i = new Date(this.inicio + 'T12:00'), f = new Date(this.fim + 'T12:00');
+                if (this.periodo === 'mes') {
+                    const n = new Date(i.getFullYear(), i.getMonth() + sentido, 1);
+                    this.inicio = iso(n); this.fim = iso(new Date(n.getFullYear(), n.getMonth() + 1, 0));
+                } else {
+                    const passo = Math.round((f - i) / 86400000) + 1;
+                    i.setDate(i.getDate() + sentido * passo); f.setDate(f.getDate() + sentido * passo);
+                    this.inicio = iso(i); this.fim = iso(f);
+                }
+                this.$nextTick(() => this.buscar());
+            },
+            trocarStatus(s) { this.status = s; this.$nextTick(() => this.buscar()); },
+            buscar() { this.lembrar(); htmx.trigger(document.body, 'buscar-aulas'); },
+            lembrar() {
+                const p = new URLSearchParams({ modo: this.modo, periodo: this.periodo, inicio: this.inicio, fim: this.fim });
+                if (this.status) p.set('status', this.status);
+                history.replaceState(null, '', `/aulas?${p}`);
+            },
+            abrir(id) {
+                this.painel = true;
+                document.getElementById('painel-conteudo').innerHTML = '<div class="v5-vazio">Carregando…</div>';
+                htmx.ajax('GET', `/parciais/aulas/${id}`, { target: '#painel-conteudo' });
+            },
+            fechar() { this.painel = false; },
+        };
+    }
+</script>
+<script src="/static/vendor/htmx.min.js"></script>
+<script defer src="/static/vendor/alpine.min.js"></script>
+{% endblock %}

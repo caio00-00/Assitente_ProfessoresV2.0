@@ -1522,3 +1522,136 @@ body.sidebar-toggled .main-content {
 .stat-roxo { color: var(--text-accent); background: rgba(79, 70, 229, 0.14); }
 .badge-status .ico { width: 12px; height: 12px; stroke-width: 2.6; margin-right: 1px; }
 .empty-state .icon .ico-xl { width: 44px; height: 44px; color: var(--text-muted); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v5 — Aulas (lista, painel, modo Agora, tela da TV)
+   ═══════════════════════════════════════════════════════════════════ */
+[x-cloak] { display: none !important; }
+.htmx-indicator { opacity: 0; transition: opacity .2s; }
+.htmx-request.htmx-indicator, .htmx-request .htmx-indicator { opacity: 1; }
+.v5-carregando { position: fixed; bottom: 1rem; right: 1rem; background: var(--bg-card); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md); padding: .4rem .8rem; font-size: .78rem; color: var(--text-secondary); pointer-events: none; }
+
+/* Selos de status */
+.v5-status { display: inline-flex; align-items: center; font-size: .72rem; font-weight: 600; padding: .18rem .55rem;
+    border-radius: 999px; white-space: nowrap; border: 1px solid transparent; }
+.v5-st-prevista { color: var(--text-secondary); background: var(--bg-glass); border-color: var(--border-subtle); }
+.v5-st-sem_relatorio { color: #fff; background: var(--status-red); }
+.v5-st-em_relatorio { color: #1f2937; background: var(--status-yellow); }
+.v5-st-devolvida { color: #fff; background: #ea580c; }
+.v5-st-aguardando_validacao { color: #fff; background: var(--status-blue); }
+.v5-st-aguardando_imagem { color: #fff; background: #7c3aed; }
+.v5-st-validada { color: #fff; background: var(--status-green); }
+.v5-st-cancelada { color: var(--text-muted); background: transparent; border-color: var(--border-subtle); text-decoration: line-through; }
+
+/* Alternar Lista / Agora */
+.v5-alternar { display: inline-flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.v5-alternar button { background: transparent; border: 0; color: var(--text-secondary); padding: .45rem .8rem; font-size: .82rem;
+    display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; }
+.v5-alternar button.ativo { background: var(--accent-gradient); color: #fff; }
+
+/* Filtros */
+.v5-filtros { display: flex; flex-direction: column; gap: .6rem; margin-bottom: 1rem; }
+.v5-periodo, .v5-campos { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.v5-periodo input[type=date] { width: auto; }
+.v5-campos select, .v5-campos input[type=search] { width: auto; min-width: 180px; flex: 1 1 180px; }
+.v5-ate { color: var(--text-muted); font-size: .8rem; }
+.v5-check { display: inline-flex; align-items: center; gap: .35rem; font-size: .82rem; color: var(--text-secondary); }
+
+/* Resumo por status (também filtra) */
+.v5-resumo { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1rem; }
+.v5-filtro-st { display: inline-flex; gap: .4rem; align-items: center; font-size: .78rem; padding: .35rem .7rem; border-radius: 999px;
+    border: 1px solid var(--border-subtle); background: var(--bg-card); color: var(--text-secondary); cursor: pointer; }
+.v5-filtro-st b { color: var(--text-primary); }
+.v5-filtro-st[class*="v5-st-"] { background: var(--bg-card); color: var(--text-secondary); text-decoration: none; }
+.v5-filtro-st[class*="v5-st-"]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.v5-filtro-st.v5-st-sem_relatorio::before { background: var(--status-red); }
+.v5-filtro-st.v5-st-em_relatorio::before { background: var(--status-yellow); }
+.v5-filtro-st.v5-st-devolvida::before { background: #ea580c; }
+.v5-filtro-st.v5-st-aguardando_validacao::before { background: var(--status-blue); }
+.v5-filtro-st.v5-st-aguardando_imagem::before { background: #7c3aed; }
+.v5-filtro-st.v5-st-validada::before { background: var(--status-green); }
+.v5-filtro-st.v5-st-prevista::before, .v5-filtro-st.v5-st-cancelada::before { background: var(--text-muted); }
+.v5-filtro-st.ativo { border-color: var(--text-accent); box-shadow: 0 0 0 1px var(--text-accent) inset; }
+
+/* Lista por dia */
+.v5-dia { margin-bottom: 1rem; padding: .9rem 1rem; }
+.v5-dia-cab { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .4rem; }
+.v5-dia-cab h3 { margin: 0; font-size: 1rem; }
+.v5-hoje { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; background: var(--accent-gradient); color: #fff;
+    padding: .1rem .45rem; border-radius: 999px; margin-left: .35rem; vertical-align: middle; }
+.v5-dia-total { font-size: .78rem; color: var(--text-muted); }
+.v5-linha { display: grid; grid-template-columns: 64px 1fr auto auto; gap: .9rem; align-items: center; padding: .6rem .5rem;
+    border-top: 1px solid var(--border-subtle); cursor: pointer; border-radius: var(--radius-sm); }
+.v5-linha:first-child { border-top: 0; }
+.v5-linha:hover, .v5-linha:focus { background: var(--bg-glass); outline: none; }
+.v5-hora { display: flex; flex-direction: column; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.v5-hora small { color: var(--text-muted); font-size: .72rem; }
+.v5-aula { display: flex; flex-direction: column; min-width: 0; }
+.v5-titulo { font-weight: 600; font-size: .88rem; }
+.v5-sub { font-size: .76rem; color: var(--text-muted); }
+.v5-sinais { display: flex; gap: .3rem; flex-wrap: wrap; justify-content: flex-end; }
+.v5-cancelada .v5-titulo { text-decoration: line-through; color: var(--text-muted); }
+.v5-vazio { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); }
+.v5-vazio h3 { margin: .4rem 0 .2rem; color: var(--text-primary); }
+
+/* Painel lateral */
+.v5-fundo { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 900; }
+.v5-painel { position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 100%); background: var(--bg-card);
+    border-left: 1px solid var(--border-subtle); z-index: 901; background: var(--bg-secondary); overflow-y: auto; padding: 1.25rem; box-shadow: -8px 0 30px rgba(0,0,0,.25); }
+.v5-painel-cab { display: flex; justify-content: space-between; gap: 1rem; align-items: flex-start; }
+.v5-painel-cab h2 { margin: .15rem 0; font-size: 1.15rem; }
+.v5-painel-data { font-size: .78rem; color: var(--text-muted); }
+.v5-painel-sub { font-size: .85rem; color: var(--text-secondary); }
+.v5-painel-status { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .9rem 0; }
+.v5-cobrar { font-size: .8rem; color: var(--text-secondary); display: inline-flex; align-items: center; gap: .3rem; }
+.v5-aviso { display: flex; gap: .4rem; align-items: flex-start; font-size: .82rem; color: var(--text-secondary);
+    background: rgba(245,158,11,.08); border-radius: 6px; padding: .45rem .6rem; }
+.v5-aviso .ico { color: var(--status-yellow); margin-top: 2px; }
+.v5-passos { list-style: none; margin: 1rem 0; padding: 0; counter-reset: passo; }
+.v5-passos li { counter-increment: passo; display: grid; grid-template-columns: 28px 1fr; grid-template-rows: auto auto;
+    column-gap: .7rem; padding: .5rem 0; border-top: 1px solid var(--border-subtle); font-size: .85rem; }
+.v5-passos li::before { content: counter(passo); grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; display: flex;
+    align-items: center; justify-content: center; font-size: .78rem; font-weight: 700; background: var(--bg-glass); color: var(--text-muted); }
+.v5-passos li.ok::before { content: "✓"; background: var(--status-green); color: #fff; }
+.v5-passos li.atencao::before { background: var(--status-yellow); color: #1f2937; }
+.v5-passos li span { color: var(--text-muted); font-size: .78rem; }
+.v5-acoes { display: flex; flex-direction: column; gap: .5rem; }
+.v5-acoes .btn { justify-content: center; text-decoration: none; }
+
+/* Modo Agora */
+.v5-agora-cab { font-size: .8rem; color: var(--text-muted); margin-bottom: .6rem; display: flex; align-items: center; gap: .35rem; }
+.v5-agora { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
+.v5-estudio { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1rem;
+    display: flex; flex-direction: column; gap: .6rem; min-height: 180px; }
+.v5-estudio.no-ar { border-color: var(--status-red); box-shadow: 0 0 0 1px var(--status-red) inset; }
+.v5-estudio header { display: flex; justify-content: space-between; align-items: center; }
+.v5-estudio h3 { margin: 0; font-size: 1rem; }
+.v5-ao-vivo { color: var(--status-red); font-weight: 700; font-size: .78rem; animation: v5pisca 1.6s infinite; }
+.v5-livre { color: var(--text-muted); font-size: .78rem; }
+@keyframes v5pisca { 50% { opacity: .35; } }
+.v5-agora-aula { cursor: pointer; display: flex; flex-direction: column; gap: .15rem; }
+.v5-agora-hora { font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.v5-agora-turma { font-weight: 700; font-size: 1.05rem; }
+.v5-agora-disc { font-size: .9rem; }
+.v5-agora-prof { font-size: .8rem; color: var(--text-secondary); margin-bottom: .3rem; }
+.v5-estudio footer { margin-top: auto; font-size: .76rem; color: var(--text-muted); border-top: 1px solid var(--border-subtle); padding-top: .5rem; }
+
+/* Tela da TV (/aulas/agora) */
+body.v5-tv { padding: 1.5rem 2rem; min-height: 100vh; }
+.v5-tv-cab { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+.v5-tv-marca { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+.v5-tv-relogio { font-size: 2.2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+body.v5-tv .v5-agora { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.25rem; }
+body.v5-tv .v5-estudio { min-height: 220px; }
+body.v5-tv .v5-agora-turma { font-size: 1.4rem; }
+body.v5-tv .v5-agora-disc { font-size: 1.1rem; }
+body.v5-tv .v5-estudio h3 { font-size: 1.2rem; }
+
+@media (max-width: 700px) {
+    .v5-linha { grid-template-columns: 54px 1fr; }
+    .v5-sinais, .v5-linha > span:last-child { grid-column: 2; justify-content: flex-start; }
+}
+.v5-filtros .form-input, .v5-filtros .form-select { padding: .45rem .6rem; font-size: .85rem; }
+.v5-campos .form-select, .v5-campos .form-input[type=search] { width: auto; min-width: 180px; flex: 1 1 180px; }
+.v5-periodo .form-input[type=date] { width: auto; }
